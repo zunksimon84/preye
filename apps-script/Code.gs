@@ -1151,26 +1151,28 @@ function onOpen() {
 // delivery works. Run this from the menu (or the Run ▶ button) — it will
 // trigger the OAuth consent screen on first use, which is exactly the grant
 // the Anschuss-Protokoll's PDF mailer needs.
-// Diagnostic — pops up the list of "Send mail as" aliases the script can
-// use. Run from Bereitstellungen-Editor → Run ▶ → menu_listAliases.
+// Diagnostic — logs the list of "Send mail as" aliases the script can use.
+// Run from the editor: Run ▶ → menu_listAliases, then open "Executions"
+// (Ausführungen) in the left sidebar and read the log output.
 function menu_listAliases() {
-  const ui = SpreadsheetApp.getUi();
-  let aliases = [];
-  try { aliases = GmailApp.getAliases(); } catch (err) {
-    ui.alert("Fehler: " + (err && err.message || err));
-    return;
-  }
   const me = Session.getActiveUser().getEmail();
-  const wanted = FROM_EMAIL;
-  const has = aliases.indexOf(wanted) >= 0;
-  ui.alert(
-    "Script-Besitzer: " + me + "\n" +
-    "Gewünschter Absender: " + wanted + "\n" +
-    "Verfügbare Aliasse:\n" + (aliases.length ? aliases.join("\n") : "(keine)") + "\n\n" +
-    (has ? "✓ " + wanted + " ist als Alias verfügbar."
-         : '✗ ' + wanted + ' fehlt — bitte in Gmail unter Einstellungen → ' +
-           'Konten und Import → „Senden als" hinzufügen und verifizieren.')
-  );
+  let aliases = [];
+  let err = "";
+  try { aliases = GmailApp.getAliases(); }
+  catch (e) { err = String(e && e.message || e); }
+
+  console.log("Script-Besitzer: " + me);
+  console.log("Gewünschter Absender (FROM_EMAIL): " + FROM_EMAIL);
+  console.log("getAliases-Fehler: " + (err || "(keiner)"));
+  console.log("Anzahl Aliasse: " + aliases.length);
+  console.log("Aliasse: " + JSON.stringify(aliases));
+  const has = aliases.indexOf(FROM_EMAIL) >= 0;
+  console.log(has
+    ? "RESULT: ✓ " + FROM_EMAIL + " ist als Alias verfügbar."
+    : "RESULT: ✗ " + FROM_EMAIL + " fehlt in der Aliasliste.");
+
+  // Also return so it shows in the editor's debug pane.
+  return { owner: me, wanted: FROM_EMAIL, aliases: aliases, available: has, error: err };
 }
 
 function menu_testEmail() {
