@@ -1280,6 +1280,112 @@ function addNsfRow(name, phone) {
   $("#nsf-rows").appendChild(row);
 }
 
+// ---------- Einladungsentwurf (default invitation template) ----------
+// Global text template that drives every event's invitation. Stored in
+// Script Properties; pulled on open, pushed on save. Both languages.
+let templateEditor = null; // { de: {subject, body}, en: {...}, activeLang }
+
+async function openTemplateEditor() {
+  const btn = $("#edit-template-btn");
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Lade …";
+  try {
+    const [de, en] = await Promise.all([
+      fetchJson("invite-template-get", { language: "de" }),
+      fetchJson("invite-template-get", { language: "en" }),
+    ]);
+    if (de.error) throw new Error(de.error);
+    if (en.error) throw new Error(en.error);
+    templateEditor = {
+      de: { subject: de.subject || "", body: de.body || "" },
+      en: { subject: en.subject || "", body: en.body || "" },
+      activeLang: "de",
+    };
+    // Render the placeholder reference once from the backend's list.
+    const placeholders = (de.placeholders || []);
+    $("#template-placeholder-list").innerHTML = placeholders.map((p) =>
+      `<li><code>${escapeHtml(p.name)}</code> — ${escapeHtml(p.doc)}</li>`
+    ).join("");
+    showTemplateLang("de", true);
+    $("#template-status").textContent =
+      (de.using_default_body && en.using_default_body)
+        ? "Standardentwurf — noch nicht geändert."
+        : "Eigener Entwurf gespeichert.";
+    $("#template-backdrop").hidden = false;
+    $("#template-modal").hidden = false;
+  } catch (err) {
+    showToast(err.message || "Fehler", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+function showTemplateLang(lang, skipSave) {
+  if (!templateEditor) return;
+  if (!skipSave && templateEditor.activeLang) {
+    templateEditor[templateEditor.activeLang].subject = $("#template-subject").value;
+    templateEditor[templateEditor.activeLang].body = $("#template-body").value;
+  }
+  templateEditor.activeLang = lang;
+  $("#template-subject").value = templateEditor[lang].subject || "";
+  $("#template-body").value = templateEditor[lang].body || "";
+  document.querySelectorAll(".tpl-lang-tab").forEach((b) =>
+    b.classList.toggle("active", b.dataset.lang === lang)
+  );
+}
+
+function closeTemplateEditor() {
+  templateEditor = null;
+  $("#template-modal").hidden = true;
+  $("#template-backdrop").hidden = true;
+}
+
+async function saveTemplate() {
+  if (!templateEditor) return;
+  // Capture the currently-edited language.
+  templateEditor[templateEditor.activeLang].subject = $("#template-subject").value;
+  templateEditor[templateEditor.activeLang].body = $("#template-body").value;
+  const btn = $("#template-save");
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Speichere …";
+  try {
+    await postJson({
+      action: "invite-template-save",
+      language: "de",
+      subject: templateEditor.de.subject,
+      body: templateEditor.de.body,
+    });
+    await postJson({
+      action: "invite-template-save",
+      language: "en",
+      subject: templateEditor.en.subject,
+      body: templateEditor.en.body,
+    });
+    showToast("Einladungsentwurf gespeichert ✓");
+    closeTemplateEditor();
+  } catch (err) {
+    showToast(err.message || "Fehler beim Speichern", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+async function resetTemplate() {
+  if (!confirm("Beide Sprachen auf den Standardentwurf zurücksetzen? Eigene Änderungen gehen verloren.")) return;
+  try {
+    await postJson({ action: "invite-template-save", language: "de", subject: "", body: "" });
+    await postJson({ action: "invite-template-save", language: "en", subject: "", body: "" });
+    showToast("Auf Standard zurückgesetzt");
+    closeTemplateEditor();
+  } catch (err) {
+    showToast(err.message || "Fehler", "error");
+  }
+}
+
 function wireUi() {
   $("#new-event-btn").addEventListener("click", () => { location.hash = "#/new"; });
   $("#new-event-form").addEventListener("submit", submitNewEvent);
@@ -1329,6 +1435,17 @@ function wireUi() {
   $("#squad-edit-cancel").addEventListener("click", closeSquadEditor);
   $("#squad-edit-backdrop").addEventListener("click", closeSquadEditor);
   $("#squad-edit-save").addEventListener("click", saveEditingSquad);
+
+  // Einladungsentwurf
+  $("#edit-template-btn").addEventListener("click", openTemplateEditor);
+  $("#template-close").addEventListener("click", closeTemplateEditor);
+  $("#template-cancel").addEventListener("click", closeTemplateEditor);
+  $("#template-backdrop").addEventListener("click", closeTemplateEditor);
+  $("#template-save").addEventListener("click", saveTemplate);
+  $("#template-reset").addEventListener("click", resetTemplate);
+  document.querySelectorAll(".tpl-lang-tab").forEach((b) =>
+    b.addEventListener("click", () => showTemplateLang(b.dataset.lang))
+  );
   window.addEventListener("hashchange", route);
 }
 

@@ -99,6 +99,7 @@ function doGet(e) {
     if (action === "event-detail") return json_(eventDetail_(params));
     if (action === "address-book") return json_(addressBookList_());
     if (action === "invite-preview") return json_(invitePreview_(params));
+    if (action === "invite-template-get") return json_(inviteTemplateGetEndpoint_(params));
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -156,6 +157,10 @@ function doPost(e) {
     }
     if (action === "event-delete") {
       const r = eventDelete_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "invite-template-save") {
+      const r = inviteTemplateSaveEndpoint_(body);
       return json_(r, r.error ? 400 : 200);
     }
     // default — log a harvest
@@ -1767,43 +1772,118 @@ function eventInvitesSend_(body) {
   return { ok: true, sent: sent, skipped: skipped, errors: errors };
 }
 
-// Default invitation text — mirrors the Drückjagd template Jakob keeps.
-// inviteEmailBodyTemplate_ returns a body with the literal token {link} where
-// the magic-link goes. The organizer can preview/edit that template before
-// sending, and on send the per-hunter URL is swapped in for {link}.
-function inviteEmailBodyTemplate_(ev) {
-  const eventDate = formatGermanDate_(ev.date);
-  const twoWeeksBefore = addDays_(ev.date, -14);
-  const rsvpDeadline = formatGermanDate_(ev.rsvp_deadline || twoWeeksBefore);
-  const writtenInvite = formatGermanDate_(twoWeeksBefore);
-  const teilgebiet = String(ev.teilgebiet || "").trim();
-  const organizer = String(ev.organizer || "").trim() || "Jakob";
-
-  const revier = revierFromTeilgebiete_(teilgebiet);
-  const sentence1 = "ich möchte Dich recht herzlich zur nächsten Drückjagd in **" +
-    revier + "** am **" +
-    (eventDate || "[noch offen]") + "** einladen." +
-    (teilgebiet ? " " + teilgebietSentence_(teilgebiet) : "");
-
-  return [
+// Built-in default invitation templates. Saved overrides live in Script
+// Properties ("invite_tpl_de_subject", "invite_tpl_de_body", same for _en);
+// when present they replace the defaults below for every event.
+//
+// Placeholders the template may use:
+//   {forename} {link}                — per recipient, filled at send time
+//   {event_name} {date} {revier}     — event-level, filled when previewing
+//   {teilgebiet} {teilgebiete_satz}    or sending
+//   {rsvp_deadline} {written_invite_date} {organizer}
+const DEFAULT_INVITE_DE = {
+  subject: "Einladung Drückjagd: {event_name}",
+  body: [
     "Hallo **{forename}**,",
     "",
-    sentence1,
+    "ich möchte Dich recht herzlich zur nächsten Drückjagd in **{revier}** am **{date}** einladen.{teilgebiete_satz}",
     "",
-    "Ich bitte Dich, mir bis zum **" + (rsvpDeadline || "[noch offen]") +
-      "** eine verbindliche Zusage zu machen, wenn und in welcher Funktion Du teilnehmen möchtest (Schütze/Treiber/Hundeführer). Nutze dafür bitte ausschließlich diesen Anmeldelink:",
+    "Ich bitte Dich, mir bis zum **{rsvp_deadline}** eine verbindliche Zusage zu machen, wenn und in welcher Funktion Du teilnehmen möchtest (Schütze/Treiber/Hundeführer). Nutze dafür bitte ausschließlich diesen Anmeldelink:",
     "",
     "{link}",
     "",
     "Treiber kannst Du gerne mitbringen, bitte vorher mit Namen anmelden.",
     "",
-    "Im Laufe des **" + (writtenInvite || "[noch offen]") +
-      "** (zwei Wochen vorher) bekommst Du von mir eine schriftliche Einladung, der Du alle Details zur Anreise und zum Ablauf entnehmen kannst.",
+    "Im Laufe des **{written_invite_date}** (zwei Wochen vorher) bekommst Du von mir eine schriftliche Einladung, der Du alle Details zur Anreise und zum Ablauf entnehmen kannst.",
     "",
     "Ich freue mich, wenn Du dabei bist und wir waidgerecht und mit Freude gemeinsam Beute machen. Horrido!",
     "",
-    "Dein **" + organizer + "**",
-  ].join("\n");
+    "Dein **{organizer}**",
+  ].join("\n"),
+};
+
+const DEFAULT_INVITE_EN = {
+  subject: "Invitation — driven hunt: {event_name}",
+  body: [
+    "Hi **{forename}**,",
+    "",
+    "I would like to cordially invite you to the next driven hunt (Drückjagd) in **{revier}** on **{date}**.{teilgebiete_satz}",
+    "",
+    "Please confirm your participation by **{rsvp_deadline}** and let me know in what capacity you would like to take part (Schütze / Treiber / Hundeführer — shooter / beater / dog handler). Please use only this link:",
+    "",
+    "{link}",
+    "",
+    "Beaters may be brought along, please register them by name beforehand.",
+    "",
+    "On or around **{written_invite_date}** (two weeks before) I will send you a written invitation with the details of arrival and schedule.",
+    "",
+    "Looking forward to having you join us — may we hunt fairly and with joy. Horrido!",
+    "",
+    "Yours, **{organizer}**",
+  ].join("\n"),
+};
+
+function inviteTemplatePropKeys_(lang) {
+  const l = (lang === "en") ? "en" : "de";
+  return { subject: "invite_tpl_" + l + "_subject", body: "invite_tpl_" + l + "_body" };
+}
+
+// Returns the raw template (with placeholders intact). Falls back to the
+// built-in default for any field the organizer hasn't customised.
+function getInviteTemplate_(lang) {
+  const fallback = (lang === "en") ? DEFAULT_INVITE_EN : DEFAULT_INVITE_DE;
+  const keys = inviteTemplatePropKeys_(lang);
+  const props = PropertiesService.getScriptProperties();
+  const subject = props.getProperty(keys.subject);
+  const body = props.getProperty(keys.body);
+  return {
+    subject: (subject && subject.trim()) ? subject : fallback.subject,
+    body: (body && body.trim()) ? body : fallback.body,
+    using_default_subject: !subject || !subject.trim(),
+    using_default_body: !body || !body.trim(),
+  };
+}
+
+function setInviteTemplate_(lang, subject, body) {
+  const keys = inviteTemplatePropKeys_(lang);
+  const props = PropertiesService.getScriptProperties();
+  // Empty string → restore the built-in default.
+  if (subject && String(subject).trim()) props.setProperty(keys.subject, String(subject));
+  else props.deleteProperty(keys.subject);
+  if (body && String(body).trim()) props.setProperty(keys.body, String(body));
+  else props.deleteProperty(keys.body);
+}
+
+// Substitute event-level placeholders. {forename} and {link} stay in the
+// output for per-recipient substitution at send time.
+function fillEventPlaceholders_(template, ev, lang) {
+  const isEn = (lang === "en");
+  const eventDate = isEn ? formatLongEnglishDate_(ev.date) : formatGermanDate_(ev.date);
+  const twoWeeksBefore = addDays_(ev.date, -14);
+  const rsvpDeadline = isEn
+    ? formatLongEnglishDate_(ev.rsvp_deadline || twoWeeksBefore)
+    : formatGermanDate_(ev.rsvp_deadline || twoWeeksBefore);
+  const writtenInvite = isEn ? formatLongEnglishDate_(twoWeeksBefore) : formatGermanDate_(twoWeeksBefore);
+  const teilgebiet = String(ev.teilgebiet || "").trim();
+  const revier = revierFromTeilgebiete_(teilgebiet);
+  const teilgebieteSatz = teilgebiet
+    ? " " + (isEn ? teilgebietSentenceEn_(teilgebiet) : teilgebietSentence_(teilgebiet))
+    : "";
+  const organizer = String(ev.organizer || "").trim() || "Jakob";
+  const fallbackOpen = isEn ? "[to be confirmed]" : "[noch offen]";
+  return String(template || "")
+    .split("{event_name}").join(String(ev.name || ""))
+    .split("{date}").join(eventDate || fallbackOpen)
+    .split("{revier}").join(revier || "Peenwerder")
+    .split("{teilgebiet}").join(teilgebiet)
+    .split("{teilgebiete_satz}").join(teilgebieteSatz)
+    .split("{rsvp_deadline}").join(rsvpDeadline || fallbackOpen)
+    .split("{written_invite_date}").join(writtenInvite || fallbackOpen)
+    .split("{organizer}").join(organizer);
+}
+
+function inviteEmailBodyTemplate_(ev) {
+  return fillEventPlaceholders_(getInviteTemplate_("de").body, ev, "de");
 }
 
 // Render the editable plain-text body into HTML for the actual email so the
@@ -1839,50 +1919,15 @@ function inviteBodyToPlain_(text, linkUrl) {
 }
 
 function inviteSubject_(ev) {
-  return "Einladung Drückjagd: " + String(ev.name || "").trim();
+  return fillEventPlaceholders_(getInviteTemplate_("de").subject, ev, "de");
 }
 
-// English variants for guests who picked language = "en". Wording mirrors
-// Jakob's German template; hunting-specific terms (Schütze / Treiber /
-// Hundeführer) are kept in German with the English meaning in parentheses
-// because that's how the rest of the day will run on the ground.
 function inviteEmailBodyTemplateEn_(ev) {
-  const eventDate = formatLongEnglishDate_(ev.date);
-  const twoWeeksBefore = addDays_(ev.date, -14);
-  const rsvpDeadline = formatLongEnglishDate_(ev.rsvp_deadline || twoWeeksBefore);
-  const writtenInvite = formatLongEnglishDate_(twoWeeksBefore);
-  const teilgebiet = String(ev.teilgebiet || "").trim();
-  const organizer = String(ev.organizer || "").trim() || "Jakob";
-
-  const revier = revierFromTeilgebiete_(teilgebiet);
-  const sentence1 = "I would like to cordially invite you to the next driven hunt (Drückjagd) in **" +
-    revier + "** on **" +
-    (eventDate || "[to be confirmed]") + "**." +
-    (teilgebiet ? " " + teilgebietSentenceEn_(teilgebiet) : "");
-
-  return [
-    "Hi **{forename}**,",
-    "",
-    sentence1,
-    "",
-    "Please confirm your participation by **" + (rsvpDeadline || "[to be confirmed]") +
-      "** and let me know in what capacity you would like to take part (Schütze / Treiber / Hundeführer — shooter / beater / dog handler). Please use only this link:",
-    "",
-    "{link}",
-    "",
-    "Beaters may be brought along, please register them by name beforehand.",
-    "",
-    "On or around **" + (writtenInvite || "[to be confirmed]") +
-      "** (two weeks before) I will send you a written invitation with the details of arrival and schedule.",
-    "",
-    "Looking forward to having you join us — may we hunt fairly and with joy. Horrido!",
-    "",
-    "Yours, **" + organizer + "**",
-  ].join("\n");
+  return fillEventPlaceholders_(getInviteTemplate_("en").body, ev, "en");
 }
 
 function inviteSubjectEn_(ev) {
-  return "Invitation — driven hunt: " + String(ev.name || "").trim();
+  return fillEventPlaceholders_(getInviteTemplate_("en").subject, ev, "en");
 }
 
 function teilgebietSentenceEn_(raw) {
@@ -1908,6 +1953,46 @@ function formatLongEnglishDate_(isoDate) {
               : (day % 10 === 2) ? "nd"
               : (day % 10 === 3) ? "rd" : "th";
   return MONTHS[parseInt(m[2], 10) - 1] + " " + day + suffix + ", " + m[1];
+}
+
+// Returns the editable default invitation template (with placeholders
+// intact) for a given language. Frontend uses this for the Einladungsentwurf
+// modal on the events overview.
+function inviteTemplateGetEndpoint_(params) {
+  const lang = String((params && params.language) || "de").toLowerCase();
+  if (lang !== "de" && lang !== "en") return { error: "language must be de or en" };
+  const tpl = getInviteTemplate_(lang);
+  return {
+    language: lang,
+    subject: tpl.subject,
+    body: tpl.body,
+    using_default_subject: tpl.using_default_subject,
+    using_default_body: tpl.using_default_body,
+    // Also expose the placeholder reference so the UI doesn't have to
+    // hard-code it; keeps the help text in one place.
+    placeholders: [
+      { name: "{forename}",            doc: "Vorname des Empfängers (pro Person)" },
+      { name: "{link}",                doc: "persönlicher Anmeldelink (pro Person)" },
+      { name: "{event_name}",          doc: "Name der Jagd" },
+      { name: "{date}",                doc: "Datum der Jagd" },
+      { name: "{revier}",              doc: "Revier (z.B. Peenwerder)" },
+      { name: "{teilgebiet}",          doc: "Liste der Teilgebiete" },
+      { name: "{teilgebiete_satz}",    doc: 'kompletter Satz „Wir bejagen das Teilgebiet …"' },
+      { name: "{rsvp_deadline}",       doc: "Anmeldeschluss" },
+      { name: "{written_invite_date}", doc: "Datum der schriftlichen Einladung (2 Wochen vorher)" },
+      { name: "{organizer}",           doc: "Name des Organisators" },
+    ],
+  };
+}
+
+function inviteTemplateSaveEndpoint_(body) {
+  const lang = String((body && body.language) || "de").toLowerCase();
+  if (lang !== "de" && lang !== "en") return { error: "language must be de or en" };
+  // Empty string explicitly restores the built-in default.
+  const subject = body.subject == null ? "" : String(body.subject);
+  const text = body.body == null ? "" : String(body.body);
+  setInviteTemplate_(lang, subject, text);
+  return { ok: true, language: lang };
 }
 
 // Public preview endpoint — frontend uses this to show the editable email

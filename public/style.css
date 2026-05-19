@@ -2667,6 +2667,85 @@ body.rsvp-page #rsvp-topbar {
   gap: 8px;
 }
 
+/* Einladungsentwurf modal — same shell as invite-modal, separate ID so
+   nothing conflicts when both modals exist in the DOM. */
+#template-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 50;
+}
+#template-modal {
+  position: fixed;
+  z-index: 51;
+  left: 8px;
+  right: 8px;
+  top: calc(8px + var(--safe-top) + var(--vv-top));
+  bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--green-bright);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+#template-modal[hidden] { display: none; }
+#template-modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+#template-modal > header h2 { margin: 0; font-size: 17px; }
+#template-close {
+  background: transparent;
+  border: none;
+  font-size: 26px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.template-placeholders {
+  margin: 4px 0 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0;
+}
+.template-placeholders summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--steel-dark);
+  user-select: none;
+}
+.template-placeholders[open] summary { border-bottom: 1px solid var(--border); }
+.placeholder-list {
+  margin: 0;
+  padding: 8px 14px 10px 28px;
+  list-style: disc;
+}
+.placeholder-list li {
+  font-size: 12.5px;
+  color: var(--steel-dark);
+  margin: 2px 0;
+}
+.placeholder-list code {
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #111;
+}
+
 /* Toast variants used by events page (vanilla toast lives in main app). */
 body.events-page #toast {
   position: fixed;

@@ -37,6 +37,7 @@
       </h1>
       <nav class="filters">
         <a href="index.html" class="filter-btn" id="back-to-map">← Karte</a>
+        <button id="edit-template-btn" class="filter-btn" type="button">Einladungsentwurf</button>
         <button id="new-event-btn" class="filter-btn filter-btn--alert" type="button">+ Neue Jagd</button>
       </nav>
     </header>
@@ -206,6 +207,45 @@
       <div class="invite-actions invite-modal-actions">
         <button id="send-invites-btn" type="button" class="primary-btn">Einladungen versenden</button>
         <button id="invite-cancel" type="button" class="cancel-btn">Abbrechen</button>
+      </div>
+    </section>
+
+    <div id="template-backdrop" hidden></div>
+    <section id="template-modal" hidden aria-modal="true" role="dialog" aria-labelledby="template-title">
+      <header>
+        <h2 id="template-title">Einladungsentwurf</h2>
+        <button id="template-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div class="invite-modal-body">
+        <div class="invite-lang-tabs" role="tablist" aria-label="Sprache">
+          <button type="button" class="invite-lang-tab tpl-lang-tab active" data-lang="de" role="tab">🇩🇪 Deutsch</button>
+          <button type="button" class="invite-lang-tab tpl-lang-tab" data-lang="en" role="tab">🇬🇧 English</button>
+        </div>
+        <p class="invite-hint">
+          Dieser Text wird als Standard für jede Einladung verwendet. Pro Jagd
+          kannst Du ihn weiterhin im Vorschau-Modal anpassen, hier ist die
+          Vorlage. <code>**Text**</code> wird fett, Platzhalter wie
+          <code>{forename}</code>, <code>{date}</code> usw. werden beim
+          Versand mit den jeweiligen Daten ersetzt.
+        </p>
+        <details class="template-placeholders">
+          <summary>Verfügbare Platzhalter</summary>
+          <ul id="template-placeholder-list" class="placeholder-list"></ul>
+        </details>
+        <label class="invite-field">
+          Betreff
+          <input type="text" id="template-subject" />
+        </label>
+        <label class="invite-field">
+          E-Mail-Text
+          <textarea id="template-body" rows="18"></textarea>
+        </label>
+        <p id="template-status" class="muted"></p>
+      </div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="template-save" type="button" class="primary-btn">Speichern</button>
+        <button id="template-reset" type="button" class="ghost-btn">Auf Standard zurücksetzen</button>
+        <button id="template-cancel" type="button" class="cancel-btn">Abbrechen</button>
       </div>
     </section>
 
