@@ -2667,6 +2667,76 @@ body.rsvp-page #rsvp-topbar {
   gap: 8px;
 }
 
+/* Edit-event modal — built dynamically in JS, same shell as the other
+   modals. The warning banner appears at the top if invitations were
+   already sent. */
+.detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.detail-toolbar .ghost-btn { padding: 6px 12px; }
+
+.warning-banner {
+  background: #fff5d6;
+  border: 1px solid #e0c068;
+  border-left: 4px solid #c69400;
+  border-radius: 7px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  color: #5b4b00;
+  line-height: 1.45;
+}
+
+#event-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 50;
+}
+#event-edit-modal {
+  position: fixed;
+  z-index: 51;
+  left: 8px;
+  right: 8px;
+  top: calc(8px + var(--safe-top) + var(--vv-top));
+  bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--green-bright);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+#event-edit-modal[hidden] { display: none; }
+#event-edit-modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+#event-edit-modal > header h2 { margin: 0; font-size: 17px; }
+#event-edit-close {
+  background: transparent;
+  border: none;
+  font-size: 26px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.event-edit-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
 /* Einladungsentwurf modal — same shell as invite-modal, separate ID so
    nothing conflicts when both modals exist in the DOM. */
 #template-backdrop {

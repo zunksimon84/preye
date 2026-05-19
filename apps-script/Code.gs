@@ -131,6 +131,10 @@ function doPost(e) {
       const r = eventCreate_(body);
       return json_(r, r.error ? 400 : 200);
     }
+    if (action === "event-update") {
+      const r = eventUpdate_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
     if (action === "event-hunter-add") {
       const r = eventHunterAdd_(body);
       return json_(r, r.error ? 400 : 200);
@@ -1593,6 +1597,65 @@ function eventCreate_(body) {
     coordinator_name: String(body.coordinator_name || "").trim(),
     coordinator_phone: String(body.coordinator_phone || "").trim(),
     nachsuchenfuehrer: JSON.stringify(nsfList),
+  });
+  return { ok: true, id: id };
+}
+
+// Update an existing event in place. Writes only the columns we care
+// about so unrelated fields (created_at, status, id) stay untouched.
+function eventUpdate_(body) {
+  const id = String(body.id || "").trim();
+  if (!id) return { error: "id required" };
+  const name = String(body.name || "").trim();
+  if (!name) return { error: "name required" };
+  const date = String(body.date || "").trim();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "valid date (YYYY-MM-DD) required" };
+
+  let nsfList = [];
+  if (Array.isArray(body.nachsuchenfuehrer)) {
+    nsfList = body.nachsuchenfuehrer
+      .map(function (p) {
+        return { name: String(p && p.name || "").trim(), phone: String(p && p.phone || "").trim() };
+      })
+      .filter(function (p) { return p.name || p.phone; })
+      .slice(0, 20);
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { error: "not found" };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const idCol = headers.indexOf("id");
+  if (idCol < 0) return { error: "schema: id column missing" };
+  const ids = sheet.getRange(2, idCol + 1, lastRow - 1, 1).getValues();
+  let rowIdx = -1;
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === id) { rowIdx = i + 2; break; }
+  }
+  if (rowIdx < 0) return { error: "not found" };
+
+  const update = {
+    name: name,
+    date: date,
+    teilgebiet: String(body.teilgebiet || "").trim(),
+    rsvp_deadline: String(body.rsvp_deadline || "").trim(),
+    treffpunkt: String(body.treffpunkt || "").trim(),
+    treff_time: String(body.treff_time || "").trim(),
+    start_time: String(body.start_time || "").trim(),
+    end_time: String(body.end_time || "").trim(),
+    briefing: String(body.briefing || "").trim(),
+    organizer: String(body.organizer || "").trim(),
+    vet_name: String(body.vet_name || "").trim(),
+    vet_phone: String(body.vet_phone || "").trim(),
+    coordinator_name: String(body.coordinator_name || "").trim(),
+    coordinator_phone: String(body.coordinator_phone || "").trim(),
+    nachsuchenfuehrer: JSON.stringify(nsfList),
+  };
+  Object.keys(update).forEach(function (k) {
+    const c = headers.indexOf(k);
+    if (c >= 0) sheet.getRange(rowIdx, c + 1).setValue(update[k]);
   });
   return { ok: true, id: id };
 }

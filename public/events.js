@@ -1270,6 +1270,10 @@ async function addSquad() {
 // ---------- Wiring ----------
 
 function addNsfRow(name, phone) {
+  addNsfRowTo($("#nsf-rows"), name, phone);
+}
+
+function addNsfRowTo(target, name, phone) {
   const row = document.createElement("div");
   row.className = "nsf-row";
   row.innerHTML =
@@ -1277,7 +1281,152 @@ function addNsfRow(name, phone) {
     `<input type="tel"  class="nsf-phone" placeholder="Mobil" inputmode="tel" value="${escapeHtml(phone || "")}" autocomplete="off" />` +
     `<button type="button" class="nsf-remove" aria-label="Entfernen">×</button>`;
   row.querySelector(".nsf-remove").addEventListener("click", () => row.remove());
-  $("#nsf-rows").appendChild(row);
+  target.appendChild(row);
+}
+
+// ---------- Edit existing event ----------
+// Opens a modal pre-filled with the current event's data. If any
+// invitation has already been sent (hunter.invited_at set), a warning
+// banner appears AND a confirm dialog runs before saving.
+
+function openEventEditor() {
+  if (!state.currentEvent) return;
+  const event = state.currentEvent.event;
+  const hunters = state.currentEvent.hunters || [];
+  const hasInvited = hunters.some((h) => h && h.invited_at);
+
+  const tgSet = new Set((event.teilgebiet || "").split(/\s*,\s*/).filter(Boolean));
+  const tgCheck = (v) => tgSet.has(v) ? " checked" : "";
+
+  $("#event-edit-body").innerHTML = `
+    ${hasInvited ? `
+      <div class="warning-banner">
+        ⚠ <strong>Einladungen wurden bereits versendet.</strong>
+        Änderungen am Datum, Treffpunkt oder Teilgebiet solltest Du den
+        eingeladenen Jägern per Update-E-Mail mitteilen.
+      </div>
+    ` : ""}
+    <form id="event-edit-form" class="ev-form" onsubmit="return false;">
+      <label>Name<input type="text" id="edit-ev-name" required value="${escapeHtml(event.name)}" /></label>
+      <label>Datum<input type="date" id="edit-ev-date" required value="${escapeHtml(event.date)}" /></label>
+      <fieldset class="ev-fieldset">
+        <legend>Teilgebiet(e) <span class="muted">(mehrfach wählbar, auch revierübergreifend)</span></legend>
+        <div class="ev-revier-grid">
+          <div class="ev-revier-col">
+            <p class="ev-revier-title">Peenwerder</p>
+            <div class="ev-checkbox-grid ev-checkbox-grid--single">
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Hauptrevier"${tgCheck("Hauptrevier")} /> Hauptrevier</label>
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Ost"${tgCheck("Ost")} /> Ost</label>
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Nord"${tgCheck("Nord")} /> Nord</label>
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Nordrand"${tgCheck("Nordrand")} /> Nordrand</label>
+            </div>
+          </div>
+          <div class="ev-revier-col">
+            <p class="ev-revier-title">NPA-Müritz</p>
+            <div class="ev-checkbox-grid ev-checkbox-grid--single">
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Babke"${tgCheck("Babke")} /> Babke</label>
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Langenhagen"${tgCheck("Langenhagen")} /> Langenhagen</label>
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Schwarzenhof"${tgCheck("Schwarzenhof")} /> Schwarzenhof</label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      <label>Anmeldeschluss <span class="muted">(leer = 2 Wochen vor dem Termin)</span><input type="date" id="edit-ev-rsvp-deadline" value="${escapeHtml(event.rsvp_deadline || "")}" /></label>
+      <label>Treffpunkt<input type="text" id="edit-ev-treffpunkt" value="${escapeHtml(event.treffpunkt || "")}" /></label>
+      <div class="ev-form-row">
+        <label>Treffzeit<input type="time" id="edit-ev-treff-time" value="${escapeHtml(event.treff_time || "")}" /></label>
+        <label>Beginn<input type="time" id="edit-ev-start-time" value="${escapeHtml(event.start_time || "")}" /></label>
+        <label>Ende<input type="time" id="edit-ev-end-time" value="${escapeHtml(event.end_time || "")}" /></label>
+      </div>
+      <label>Weitere Hinweise <span class="muted">(optional, intern)</span><textarea id="edit-ev-briefing" rows="3">${escapeHtml(event.briefing || "")}</textarea></label>
+      <label>Organisator<input type="text" id="edit-ev-organizer" value="${escapeHtml(event.organizer || "")}" /></label>
+      <fieldset class="ev-fieldset ev-fieldset-contacts">
+        <legend>Kontakte <span class="muted">(für die schriftliche Einladung)</span></legend>
+        <div class="contact-row">
+          <label>Tierarzt — Name<input type="text" id="edit-ev-vet-name" autocomplete="off" value="${escapeHtml(event.vet_name || "")}" /></label>
+          <label>Tierarzt — Mobil<input type="tel" id="edit-ev-vet-phone" inputmode="tel" autocomplete="off" value="${escapeHtml(event.vet_phone || "")}" /></label>
+        </div>
+        <div class="contact-row">
+          <label>Nachsuchen-Koordinator — Name<input type="text" id="edit-ev-coordinator-name" autocomplete="off" value="${escapeHtml(event.coordinator_name || "")}" /></label>
+          <label>Nachsuchen-Koordinator — Mobil<input type="tel" id="edit-ev-coordinator-phone" inputmode="tel" autocomplete="off" value="${escapeHtml(event.coordinator_phone || "")}" /></label>
+        </div>
+        <div class="nsf-block">
+          <p class="nsf-label">Nachsuchenführer <span class="muted">(beliebig viele)</span></p>
+          <div id="edit-nsf-rows" class="nsf-rows"></div>
+          <button type="button" class="dog-add-btn nsf-add" id="edit-ev-nsf-add">+ Nachsuchenführer hinzufügen</button>
+        </div>
+      </fieldset>
+    </form>
+  `;
+  // Pre-populate Nachsuchenführer rows.
+  const nsfTarget = $("#edit-nsf-rows");
+  (event.nachsuchenfuehrer || []).forEach((p) => addNsfRowTo(nsfTarget, p.name, p.phone));
+  $("#edit-ev-nsf-add").addEventListener("click", () => addNsfRowTo(nsfTarget));
+
+  $("#event-edit-backdrop").hidden = false;
+  $("#event-edit-modal").hidden = false;
+}
+
+function closeEventEditor() {
+  $("#event-edit-modal").hidden = true;
+  $("#event-edit-backdrop").hidden = true;
+}
+
+async function saveEventEdit() {
+  if (!state.currentEvent) return;
+  const hunters = state.currentEvent.hunters || [];
+  const hasInvited = hunters.some((h) => h && h.invited_at);
+  if (hasInvited) {
+    const ok = confirm(
+      "Einladungen wurden bereits versendet.\n\n" +
+      "Sollen die Änderungen trotzdem gespeichert werden? Die eingeladenen " +
+      "Jäger sollten per Update-E-Mail informiert werden — am einfachsten, " +
+      'indem Du danach erneut „Einladung erstellen" öffnest und eine kurze ' +
+      "Notiz vor dem Versenden einfügst."
+    );
+    if (!ok) return;
+  }
+  const teilgebiet = $$("input[name=edit-teilgebiet]:checked").map((c) => c.value).join(", ");
+  const nachsuchenfuehrer = $$("#edit-nsf-rows .nsf-row").map((row) => ({
+    name: row.querySelector(".nsf-name").value.trim(),
+    phone: row.querySelector(".nsf-phone").value.trim(),
+  })).filter((p) => p.name || p.phone);
+
+  const btn = $("#event-edit-save");
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Speichere …";
+  try {
+    await postJson({
+      action: "event-update",
+      id: state.currentEvent.event.id,
+      name: $("#edit-ev-name").value.trim(),
+      date: $("#edit-ev-date").value,
+      teilgebiet,
+      rsvp_deadline: $("#edit-ev-rsvp-deadline").value,
+      treffpunkt: $("#edit-ev-treffpunkt").value.trim(),
+      treff_time: $("#edit-ev-treff-time").value,
+      start_time: $("#edit-ev-start-time").value,
+      end_time: $("#edit-ev-end-time").value,
+      briefing: $("#edit-ev-briefing").value.trim(),
+      organizer: $("#edit-ev-organizer").value.trim(),
+      vet_name: $("#edit-ev-vet-name").value.trim(),
+      vet_phone: $("#edit-ev-vet-phone").value.trim(),
+      coordinator_name: $("#edit-ev-coordinator-name").value.trim(),
+      coordinator_phone: $("#edit-ev-coordinator-phone").value.trim(),
+      nachsuchenfuehrer,
+    });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("events-list");
+    showToast("Jagd aktualisiert ✓");
+    closeEventEditor();
+    await loadEventDetail(state.currentEvent.event.id);
+  } catch (err) {
+    showToast(err.message || "Fehler beim Speichern", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
 }
 
 // ---------- Einladungsentwurf (default invitation template) ----------
@@ -1435,6 +1584,13 @@ function wireUi() {
   $("#squad-edit-cancel").addEventListener("click", closeSquadEditor);
   $("#squad-edit-backdrop").addEventListener("click", closeSquadEditor);
   $("#squad-edit-save").addEventListener("click", saveEditingSquad);
+
+  // Edit existing event
+  $("#edit-event-btn").addEventListener("click", openEventEditor);
+  $("#event-edit-close").addEventListener("click", closeEventEditor);
+  $("#event-edit-cancel").addEventListener("click", closeEventEditor);
+  $("#event-edit-backdrop").addEventListener("click", closeEventEditor);
+  $("#event-edit-save").addEventListener("click", saveEventEdit);
 
   // Einladungsentwurf
   $("#edit-template-btn").addEventListener("click", openTemplateEditor);

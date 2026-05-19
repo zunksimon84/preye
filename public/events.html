@@ -113,7 +113,10 @@
 
       <!-- Detail view -->
       <section id="view-detail" class="ev-view" hidden>
-        <button class="back-btn" id="back-to-list">← Übersicht</button>
+        <div class="detail-toolbar">
+          <button class="back-btn" id="back-to-list">← Übersicht</button>
+          <button id="edit-event-btn" class="ghost-btn" type="button">Bearbeiten</button>
+        </div>
         <div id="event-header"></div>
         <div id="event-contacts" class="ev-contacts" hidden></div>
         <section class="ev-section">
@@ -207,6 +210,19 @@
       <div class="invite-actions invite-modal-actions">
         <button id="send-invites-btn" type="button" class="primary-btn">Einladungen versenden</button>
         <button id="invite-cancel" type="button" class="cancel-btn">Abbrechen</button>
+      </div>
+    </section>
+
+    <div id="event-edit-backdrop" hidden></div>
+    <section id="event-edit-modal" hidden aria-modal="true" role="dialog" aria-labelledby="event-edit-title">
+      <header>
+        <h2 id="event-edit-title">Jagd bearbeiten</h2>
+        <button id="event-edit-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div class="event-edit-body" id="event-edit-body"></div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="event-edit-save" type="button" class="primary-btn">Speichern</button>
+        <button id="event-edit-cancel" type="button" class="cancel-btn">Abbrechen</button>
       </div>
     </section>
 
