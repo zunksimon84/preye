@@ -69,6 +69,11 @@ const DOG_BREEDS = [
 const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions"];
 const ADDRESS_BOOK_HEADER = ["name", "email", "language"];
 
+// Outgoing "From" address for all MailApp.sendEmail calls. Must be a
+// verified "Send mail as" alias on the script-owner Gmail account
+// (Gmail → Settings → Accounts → Send mail as → Add another email address).
+const FROM_EMAIL = "zunk.forstberatung@gmail.com";
+
 // ---------- HTTP entrypoints ----------
 
 function doGet(e) {
@@ -1077,6 +1082,7 @@ function nachsucheCreate_(body) {
       const blob = Utilities.newBlob(bytes, "application/pdf", "anschuss-protokoll.pdf");
       MailApp.sendEmail({
         to: recipient,
+        from: FROM_EMAIL,
         subject: "Anschuss-Protokoll — Nachsuche" + (standNr ? " (Stand " + standNr + ")" : ""),
         body: "Hallo,\n\nanbei das Anschuss-Protokoll von " + hunter + "." +
           (summary ? "\n\n" + summary : "") +
@@ -1149,9 +1155,15 @@ function menu_testEmail() {
   const ui = SpreadsheetApp.getUi();
   const me = Session.getActiveUser().getEmail();
   try {
-    MailApp.sendEmail(me, "PREYE — Test", "E-Mail-Versand funktioniert. " +
-      "Verbleibendes Tageskontingent: " + MailApp.getRemainingDailyQuota());
-    ui.alert("Gesendet an " + me + ".\nVerbleibendes Kontingent heute: " + MailApp.getRemainingDailyQuota());
+    MailApp.sendEmail({
+      to: me,
+      from: FROM_EMAIL,
+      subject: "PREYE — Test",
+      body: "E-Mail-Versand funktioniert. Absender: " + FROM_EMAIL +
+        "\nVerbleibendes Tageskontingent: " + MailApp.getRemainingDailyQuota(),
+    });
+    ui.alert("Gesendet von " + FROM_EMAIL + " an " + me +
+      ".\nVerbleibendes Kontingent heute: " + MailApp.getRemainingDailyQuota());
   } catch (err) {
     ui.alert("Fehlgeschlagen: " + (err && err.message || err));
   }
@@ -1700,7 +1712,7 @@ function eventInvitesSend_(body) {
     const plainBody = inviteBodyToPlain_(personalized, link);
     const htmlBody = inviteBodyToHtml_(personalized, link);
     try {
-      MailApp.sendEmail({ to: email, subject: subject, body: plainBody, htmlBody: htmlBody });
+      MailApp.sendEmail({ to: email, from: FROM_EMAIL, subject: subject, body: plainBody, htmlBody: htmlBody });
       huntersSheet.getRange(i + 2, colInvitedAt + 1).setValue(new Date().toISOString());
       if (String(rows[i][colStatus] || "").toLowerCase() !== "accepted" &&
           String(rows[i][colStatus] || "").toLowerCase() !== "declined") {
