@@ -1151,6 +1151,28 @@ function onOpen() {
 // delivery works. Run this from the menu (or the Run ▶ button) — it will
 // trigger the OAuth consent screen on first use, which is exactly the grant
 // the Anschuss-Protokoll's PDF mailer needs.
+// Diagnostic — pops up the list of "Send mail as" aliases the script can
+// use. Run from Bereitstellungen-Editor → Run ▶ → menu_listAliases.
+function menu_listAliases() {
+  const ui = SpreadsheetApp.getUi();
+  let aliases = [];
+  try { aliases = GmailApp.getAliases(); } catch (err) {
+    ui.alert("Fehler: " + (err && err.message || err));
+    return;
+  }
+  const me = Session.getActiveUser().getEmail();
+  const wanted = FROM_EMAIL;
+  const has = aliases.indexOf(wanted) >= 0;
+  ui.alert(
+    "Script-Besitzer: " + me + "\n" +
+    "Gewünschter Absender: " + wanted + "\n" +
+    "Verfügbare Aliasse:\n" + (aliases.length ? aliases.join("\n") : "(keine)") + "\n\n" +
+    (has ? "✓ " + wanted + " ist als Alias verfügbar."
+         : '✗ ' + wanted + ' fehlt — bitte in Gmail unter Einstellungen → ' +
+           'Konten und Import → „Senden als" hinzufügen und verifizieren.')
+  );
+}
+
 function menu_testEmail() {
   const ui = SpreadsheetApp.getUi();
   const me = Session.getActiveUser().getEmail();
