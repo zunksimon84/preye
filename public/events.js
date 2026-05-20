@@ -921,14 +921,20 @@ function getAcceptedHunters() {
   return (state.currentEvent?.hunters || []).filter((h) => h.status === "accepted");
 }
 
-// Hunters who accepted as Hundeführer — leader of a Treibergruppe.
+// Hunters who accepted as Hundeführer.
 function getHundefuehrer() {
   return getAcceptedHunters().filter((h) => h.role === "Hundeführer");
 }
 
-// Hunters who accepted as Treiber — members of a Treibergruppe.
+// Hunters who accepted as Treiber.
 function getTreiber() {
   return getAcceptedHunters().filter((h) => h.role === "Treiber");
+}
+
+// Eligible members of a Treibergruppe: either Treiber or Hundeführer.
+// Used for both the Treiberführer (row 1) and the regular members.
+function getTreibergruppeCandidates() {
+  return getAcceptedHunters().filter((h) => h.role === "Treiber" || h.role === "Hundeführer");
 }
 
 // Squads (ansteller + treiber) are stored in one sheet with a `type`
@@ -1042,14 +1048,9 @@ function renderTreibergruppen() {
       tile.addEventListener("click", () => openSquadEditor(tile.dataset.sid));
     });
   }
-  const hf = getHundefuehrer();
-  const tr = getTreiber();
-  if (!hf.length && !tr.length) {
-    hint.textContent = "Noch keine Zusagen als Hundeführer oder Treiber.";
-  } else if (!hf.length) {
-    hint.textContent = "Noch kein Hundeführer eingetragen — Treibergruppen brauchen einen Hundeführer.";
-  } else if (!tr.length) {
-    hint.textContent = "Noch keine Treiber eingetragen — Treibergruppen brauchen mindestens einen Treiber.";
+  const candidates = getTreibergruppeCandidates();
+  if (!candidates.length) {
+    hint.textContent = "Noch keine Zusagen als Treiber oder Hundeführer — eine Treibergruppe braucht mindestens einen.";
   } else {
     hint.textContent = "";
   }
@@ -1066,11 +1067,10 @@ function renderTreiberTile(squad) {
   const leader = (squad.positions && squad.positions[0] && squad.positions[0].hunter)
     || squad.ansteller || "";
   const totalCount = (squad.positions || []).filter((p) => p && p.hunter).length;
-  const treiberCount = Math.max(totalCount - 1, 0);
+  const memberCount = Math.max(totalCount - 1, 0);
   const summary = leader
-    ? `Hundeführer: ${escapeHtml(leader)}`
-    : '<span class="muted">Hundeführer noch offen</span>';
-  // Compact starting-position line: prefer label, else coords, else nothing.
+    ? `Treiberführer: ${escapeHtml(leader)}`
+    : '<span class="muted">Treiberführer noch offen</span>';
   const sp = squad.start_pos;
   let startLine = "";
   if (sp) {
@@ -1085,7 +1085,7 @@ function renderTreiberTile(squad) {
       <span class="squad-tile-name">${escapeHtml(displayTreiberName(squad.name))}</span>
       <span class="squad-tile-ansteller">${summary}</span>
       ${startLine}
-      <span class="squad-tile-count">${treiberCount} Treiber</span>
+      <span class="squad-tile-count">${memberCount} Mitglied${memberCount === 1 ? "" : "er"}</span>
     </button>
   `;
 }
@@ -1159,15 +1159,16 @@ function openAnstellerEditor(squad) {
 function openTreiberEditor(squad) {
   $("#squad-edit-title").textContent = displayTreiberName(squad.name);
   const body = $("#squad-edit-body");
-  const hundefuehrer = getHundefuehrer();
-  const treiber = getTreiber();
+  const candidates = getTreibergruppeCandidates();
   const positions = (squad.positions && squad.positions.length) ? squad.positions : [{ hunter: "" }];
   const sp = squad.start_pos || {};
   const lat = sp.lat !== undefined && sp.lat !== "" ? Number(sp.lat).toFixed(6) : "";
   const lng = sp.lng !== undefined && sp.lng !== "" ? Number(sp.lng).toFixed(6) : "";
   body.innerHTML = `
     <p class="squad-modal-hint">
-      Reihe 1 ist <strong>der Hundeführer</strong>, alle weiteren sind Treiber.
+      Reihe 1 ist <strong>der Treiberführer</strong> (Gruppenleiter). Mitglieder
+      darunter können <strong>Treiber oder Hundeführer</strong> sein — der
+      Treiberführer selbst muss kein Hundeführer sein.
     </p>
 
     <fieldset class="ev-fieldset start-pos-fieldset">
@@ -1183,9 +1184,9 @@ function openTreiberEditor(squad) {
     </fieldset>
 
     <div class="schuetzen-list" id="modal-treiber-list">
-      ${positions.map((p, i) => renderTreiberRow(p, i, hundefuehrer, treiber)).join("")}
+      ${positions.map((p, i) => renderTreiberRow(p, i, candidates)).join("")}
     </div>
-    <button class="ghost-btn" type="button" id="modal-add-treiber">+ Treiber hinzufügen</button>
+    <button class="ghost-btn" type="button" id="modal-add-treiber">+ Mitglied hinzufügen</button>
     <label class="squad-field">
       <span class="squad-field-label">Bemerkung <span class="muted">(optional)</span></span>
       <textarea id="modal-squad-briefing" rows="2">${escapeHtml(squad.briefing || "")}</textarea>
@@ -1198,7 +1199,7 @@ function openTreiberEditor(squad) {
   $("#modal-add-treiber").addEventListener("click", () => {
     const list = $("#modal-treiber-list");
     const idx = list.querySelectorAll(".treiber-row").length;
-    list.insertAdjacentHTML("beforeend", renderTreiberRow(null, idx, hundefuehrer, treiber));
+    list.insertAdjacentHTML("beforeend", renderTreiberRow(null, idx, candidates));
     wireTreiberRow(list.lastElementChild);
   });
   $("#start-pos-here").addEventListener("click", () => {
@@ -1230,32 +1231,33 @@ function collectTreiberStartPos() {
   };
 }
 
-// Treibergruppe row — just a hunter dropdown. Row 0 picks from
-// Hundeführer-acceptances; rows 1+ pick from Treiber-acceptances.
-function renderTreiberRow(pos, idx, hundefuehrer, treiber) {
+// Treibergruppe row — hunter dropdown drawn from the unified Treiber /
+// Hundeführer acceptance pool. Row 0 = Treiberführer (group leader),
+// rows 1+ = members. Each option shows the hunter's role in parentheses
+// so the organizer can see at a glance who brings dogs.
+function renderTreiberRow(pos, idx, candidates) {
   const isLeader = idx === 0;
-  const numLabel = isLeader ? "Hundeführer" : (idx + 1) + ".";
+  const numLabel = isLeader ? "Treiberführer" : (idx + 1) + ".";
   const removeBtn = isLeader
     ? '<span class="sr-remove sr-remove-placeholder" aria-hidden="true"></span>'
-    : '<button class="link-btn sr-remove" type="button" aria-label="Treiber entfernen">×</button>';
-  const options = isLeader ? hundefuehrer : treiber;
+    : '<button class="link-btn sr-remove" type="button" aria-label="Mitglied entfernen">×</button>';
   const emptyHint = isLeader
-    ? '— Hundeführer wählen —'
-    : '— Treiber wählen —';
+    ? '— Treiberführer wählen —'
+    : '— Treiber oder Hundeführer wählen —';
   return `
     <div class="treiber-row schuetze-row${isLeader ? " schuetze-row--ansteller" : ""}" data-idx="${idx}">
       <div class="sr-line sr-hunter-line">
         <span class="sr-num">${escapeHtml(numLabel)}</span>
         <select class="tr-hunter sr-hunter">
           <option value="">${escapeHtml(emptyHint)}</option>
-          ${options.map((h) => {
+          ${candidates.map((h) => {
             const sel = (h.hunter === (pos && pos.hunter)) ? " selected" : "";
-            return `<option value="${escapeHtml(h.hunter)}"${sel}>${escapeHtml(h.hunter)}</option>`;
+            return `<option value="${escapeHtml(h.hunter)}"${sel}>${escapeHtml(h.hunter)} (${escapeHtml(h.role)})</option>`;
           }).join("")}
         </select>
         ${removeBtn}
       </div>
-      ${options.length === 0 ? `<p class="sr-empty muted">${isLeader ? "Noch keine Zusage als Hundeführer." : "Noch keine Zusage als Treiber."}</p>` : ""}
+      ${candidates.length === 0 ? '<p class="sr-empty muted">Noch keine Zusage als Treiber oder Hundeführer.</p>' : ""}
     </div>
   `;
 }
@@ -1496,10 +1498,8 @@ async function addTreibergruppe() {
   const oldText = btn.textContent;
   btn.textContent = "Lege an …";
   try {
-    const hf = getHundefuehrer();
-    const tr = getTreiber();
-    if (!hf.length && !tr.length) {
-      showToast("Erst Zusagen als Hundeführer oder Treiber einsammeln.", "error", 5000);
+    if (!getTreibergruppeCandidates().length) {
+      showToast("Erst Zusagen als Treiber oder Hundeführer einsammeln.", "error", 5000);
       return;
     }
     const r = await postJson({
