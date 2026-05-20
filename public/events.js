@@ -675,16 +675,19 @@ async function sendInvites() {
     });
     invalidateCache("event-detail", { id: state.currentEvent.event.id });
     invalidateCache("events-list");
+    closeInvitePreview();
+    // Reload first so the cumulative count reflects the rows just written.
+    await loadEventDetail(state.currentEvent.event.id);
+    const totalInvited = (state.currentEvent?.hunters || []).filter((h) => h.invited_at).length;
     if (data.errors && data.errors.length) {
       const failed = data.errors.map((e) => e.hunter).join(", ");
-      showToast(`Versendet: ${data.sent}, Fehler bei: ${failed}`, "error", 6000);
+      showToast(`Versendet: ${data.sent} · insgesamt eingeladen: ${totalInvited}. Fehler bei: ${failed}`, "error", 7000);
     } else if (data.sent === 0) {
-      showToast("Keine ausstehenden Einladungen.");
+      showToast(`Keine ausstehenden Einladungen — insgesamt eingeladen: ${totalInvited}.`);
     } else {
-      showToast(`${data.sent} Einladung${data.sent === 1 ? "" : "en"} versendet ✓`);
+      const newWord = data.sent === 1 ? "neue Einladung" : "neue Einladungen";
+      showToast(`${data.sent} ${newWord} versendet ✓ · insgesamt eingeladen: ${totalInvited}`);
     }
-    closeInvitePreview();
-    await loadEventDetail(state.currentEvent.event.id);
   } catch (err) {
     showToast(err.message, "error");
   } finally {
