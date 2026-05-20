@@ -27,7 +27,11 @@ const SHEETS = {
   address_book: "address_book",
 };
 
-const POST_HEADER = ["id", "name", "area", "lat", "lng"];
+const POST_HEADER = ["id", "name", "area", "lat", "lng", "type"];
+
+// The three stand types used in Drückjagden. Stored as full words;
+// the UI maps Drückjagdbock → "DJB" for compact display.
+const POST_TYPES = ["Kanzel", "Drückjagdbock", "Leiter"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
@@ -125,6 +129,14 @@ function doPost(e) {
     }
     if (action === "nachsuche-close") {
       const r = nachsucheClose_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "post-add") {
+      const r = postAdd_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "posts-batch-add") {
+      const r = postsBatchAdd_(body);
       return json_(r, r.error ? 400 : 200);
     }
     if (action === "event-create") {
@@ -429,14 +441,62 @@ function logHarvest_(body) {
 function readPosts_() {
   const rows = readSheet_(SHEETS.posts, POST_HEADER);
   return rows.map(function (r) {
+    let type = String(r.type || "").trim();
+    if (POST_TYPES.indexOf(type) === -1) type = "Kanzel"; // legacy rows
     return {
       id: String(r.id),
       name: String(r.name),
       area: String(r.area),
       lat: Number(r.lat),
       lng: Number(r.lng),
+      type: type,
     };
   });
+}
+
+// Manual or CSV import of a single hunting post (Kanzel / Drückjagdbock /
+// Leiter). Backend authority on type + area validation so the sheet doesn't
+// fill with free-form junk.
+const POST_AREAS = ["Hauptrevier", "Ost", "Nord", "Nordrand", "Babke", "Langenhagen", "Schwarzenhof"];
+
+function postAdd_(body) {
+  const name = String(body.name || "").trim();
+  if (!name) return { error: "name required" };
+  if (name.length > 60) return { error: "name too long" };
+  const area = String(body.area || "").trim();
+  if (POST_AREAS.indexOf(area) === -1) return { error: "invalid area" };
+  let type = String(body.type || "").trim();
+  if (POST_TYPES.indexOf(type) === -1) type = "Kanzel";
+  const lat = Number(body.lat);
+  const lng = Number(body.lng);
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) return { error: "lat out of range" };
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) return { error: "lng out of range" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+  // Generate an id with a short area-based prefix so existing conventions
+  // (HR-01, O-02, …) extend cleanly to the new areas.
+  const prefix = {
+    "Hauptrevier": "HR", "Ost": "O", "Nord": "N", "Nordrand": "NR",
+    "Babke": "BA", "Langenhagen": "LH", "Schwarzenhof": "SH",
+  }[area] || "P";
+  const id = prefix + "-" + Date.now().toString(36).toUpperCase();
+  appendByName_(sheet, {
+    id: id, name: name, area: area, lat: lat, lng: lng, type: type,
+  });
+  return { ok: true, id: id };
+}
+
+function postsBatchAdd_(body) {
+  const rows = Array.isArray(body.posts) ? body.posts : [];
+  let added = 0;
+  const errors = [];
+  for (let i = 0; i < rows.length && i < 500; i++) {
+    const r = postAdd_(rows[i] || {});
+    if (r.error) errors.push({ row: i + 1, error: r.error, name: rows[i] && rows[i].name || "" });
+    else added++;
+  }
+  return { ok: true, added: added, errors: errors };
 }
 
 function readHunters_() {

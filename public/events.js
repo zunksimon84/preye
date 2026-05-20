@@ -1355,15 +1355,23 @@ function positionSelectHtml(currentPosition) {
     ? "kanzel:" + (currentPosition.post_id || "")
     : currentPosition && currentPosition.type === "klettersitz"
       ? "klettersitz" : "";
+  // Append the type abbreviation when not a plain Kanzel, so the
+  // organizer sees at a glance whether a stand is a Drückjagdbock or
+  // a Leiter.
+  const typeBadge = (postType) => {
+    if (postType === "Drückjagdbock") return " · DJB";
+    if (postType === "Leiter") return " · Leiter";
+    return "";
+  };
   const groupOptions = kanzeln.map((p) => {
     const v = "kanzel:" + p.id;
     const sel = (v === currentValue) ? " selected" : "";
-    return `<option value="${escapeHtml(v)}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.area)})</option>`;
+    return `<option value="${escapeHtml(v)}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.area)})${escapeHtml(typeBadge(p.type))}</option>`;
   }).join("");
   const selKlettersitz = (currentValue === "klettersitz") ? " selected" : "";
   return `
     <option value="">— Position wählen —</option>
-    ${kanzeln.length ? `<optgroup label="Kanzel">${groupOptions}</optgroup>` : ""}
+    ${kanzeln.length ? `<optgroup label="Stand">${groupOptions}</optgroup>` : ""}
     <option value="klettersitz"${selKlettersitz}>Klettersitz (Koordinaten)</option>
   `;
 }
@@ -1544,6 +1552,114 @@ function addNsfRowTo(target, name, phone) {
     `<button type="button" class="nsf-remove" aria-label="Entfernen">×</button>`;
   row.querySelector(".nsf-remove").addEventListener("click", () => row.remove());
   target.appendChild(row);
+}
+
+// ---------- Posts (Stände) manager ----------
+// Lets the organizer add Kanzel / Drückjagdbock / Leiter posts to the
+// system so they show up in the Ansteller-Runden Kanzel picker. Single
+// add via form, or batch via CSV.
+
+async function openPostsModal() {
+  await loadPostsIfNeeded();
+  refreshPostsStats();
+  $("#posts-backdrop").hidden = false;
+  $("#posts-modal").hidden = false;
+}
+
+function closePostsModal() {
+  $("#posts-modal").hidden = true;
+  $("#posts-backdrop").hidden = true;
+}
+
+function refreshPostsStats() {
+  const total = (state.posts || []).length;
+  const byArea = {};
+  for (const p of state.posts || []) {
+    byArea[p.area] = (byArea[p.area] || 0) + 1;
+  }
+  const parts = Object.keys(byArea).sort().map((a) => `${a}: ${byArea[a]}`);
+  $("#posts-stats").textContent = `${total} Stände gespeichert${parts.length ? " — " + parts.join(", ") : ""}.`;
+}
+
+async function submitNewPost(e) {
+  e.preventDefault();
+  const status = $("#post-add-status");
+  status.textContent = "";
+  const body = {
+    action: "post-add",
+    type: $("#post-type").value,
+    name: $("#post-name").value.trim(),
+    area: $("#post-area").value,
+    lat: Number($("#post-lat").value),
+    lng: Number($("#post-lng").value),
+  };
+  if (!body.name) { status.textContent = "Bezeichnung fehlt."; return; }
+  if (!body.area) { status.textContent = "Teilgebiet wählen."; return; }
+  if (!Number.isFinite(body.lat) || !Number.isFinite(body.lng)) {
+    status.textContent = "Koordinaten ungültig."; return;
+  }
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  try {
+    await postJson(body);
+    // Bootstrap (which carries posts) is cached — invalidate so the next
+    // load picks up the new stand for everyone.
+    invalidateCache("bootstrap");
+    state.postsLoaded = false;
+    await loadPostsIfNeeded();
+    refreshPostsStats();
+    e.target.reset();
+    $("#post-type").value = "Kanzel";
+    showToast("Stand angelegt ✓");
+  } catch (err) {
+    status.textContent = err.message || "Fehler beim Speichern";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function handlePostCsv(file) {
+  if (!file) return;
+  const text = await file.text();
+  const rows = parseCsv(text);
+  if (!rows.length) { showToast("CSV ist leer.", "error"); return; }
+  const first = rows[0].map((c) => c.toLowerCase().trim());
+  const hasHeader = first.some((c) => c === "type" || c === "name" || c === "area" || c === "lat" || c === "lng");
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  // Column mapping: default to positional [type, name, area, lat, lng].
+  let typeIdx = 0, nameIdx = 1, areaIdx = 2, latIdx = 3, lngIdx = 4;
+  if (hasHeader) {
+    first.forEach((h, i) => {
+      if (h === "type" || h.startsWith("typ")) typeIdx = i;
+      else if (h === "name" || h.includes("name") || h.includes("bezeichnung")) nameIdx = i;
+      else if (h === "area" || h.includes("teilgebiet") || h.includes("revier")) areaIdx = i;
+      else if (h === "lat" || h.includes("breit")) latIdx = i;
+      else if (h === "lng" || h === "long" || h.includes("läng")) lngIdx = i;
+    });
+  }
+  const posts = dataRows.map((row) => ({
+    type: (row[typeIdx] || "Kanzel").trim(),
+    name: (row[nameIdx] || "").trim(),
+    area: (row[areaIdx] || "").trim(),
+    lat: Number((row[latIdx] || "").trim()),
+    lng: Number((row[lngIdx] || "").trim()),
+  })).filter((p) => p.name && p.area);
+  if (!posts.length) {
+    showToast("Keine gültigen Zeilen gefunden — erwartet: type, name, area, lat, lng.", "error", 5000);
+    return;
+  }
+  try {
+    const r = await postJson({ action: "posts-batch-add", posts });
+    invalidateCache("bootstrap");
+    state.postsLoaded = false;
+    await loadPostsIfNeeded();
+    refreshPostsStats();
+    const parts = [`${r.added} angelegt`];
+    if (r.errors && r.errors.length) parts.push(`${r.errors.length} Fehler`);
+    showToast(parts.join(" · "), r.errors && r.errors.length ? "error" : null, 5000);
+  } catch (err) {
+    showToast(err.message || "CSV-Import fehlgeschlagen", "error");
+  }
 }
 
 // ---------- Edit existing event ----------
@@ -1854,6 +1970,28 @@ function wireUi() {
   $("#event-edit-cancel").addEventListener("click", closeEventEditor);
   $("#event-edit-backdrop").addEventListener("click", closeEventEditor);
   $("#event-edit-save").addEventListener("click", saveEventEdit);
+
+  // Stände verwalten
+  $("#manage-posts-btn").addEventListener("click", openPostsModal);
+  $("#posts-close").addEventListener("click", closePostsModal);
+  $("#posts-cancel").addEventListener("click", closePostsModal);
+  $("#posts-backdrop").addEventListener("click", closePostsModal);
+  $("#add-post-form").addEventListener("submit", submitNewPost);
+  $("#post-here-btn").addEventListener("click", () => {
+    if (!navigator.geolocation) { showToast("Standort nicht verfügbar", "error"); return; }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      $("#post-lat").value = pos.coords.latitude.toFixed(6);
+      $("#post-lng").value = pos.coords.longitude.toFixed(6);
+      showToast("Position übernommen");
+    }, (err) => showToast("Standort: " + err.message, "error", 4000),
+    { enableHighAccuracy: true, timeout: 8000 });
+  });
+  $("#post-csv-btn").addEventListener("click", () => $("#post-csv-input").click());
+  $("#post-csv-input").addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (file) await handlePostCsv(file);
+  });
 
   // Einladungsentwurf
   $("#edit-template-btn").addEventListener("click", openTemplateEditor);

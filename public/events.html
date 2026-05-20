@@ -37,6 +37,7 @@
       </h1>
       <nav class="filters">
         <a href="index.html" class="filter-btn" id="back-to-map">← Karte</a>
+        <button id="manage-posts-btn" class="filter-btn" type="button">Stände</button>
         <button id="edit-template-btn" class="filter-btn" type="button">Einladungsentwurf</button>
         <button id="new-event-btn" class="filter-btn filter-btn--alert" type="button">+ Neue Jagd</button>
       </nav>
@@ -223,6 +224,79 @@
       <div class="invite-actions invite-modal-actions">
         <button id="send-invites-btn" type="button" class="primary-btn">Einladungen versenden</button>
         <button id="invite-cancel" type="button" class="cancel-btn">Abbrechen</button>
+      </div>
+    </section>
+
+    <div id="posts-backdrop" hidden></div>
+    <section id="posts-modal" hidden aria-modal="true" role="dialog" aria-labelledby="posts-title">
+      <header>
+        <h2 id="posts-title">Stände verwalten</h2>
+        <button id="posts-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div class="invite-modal-body">
+        <p class="invite-hint">
+          Lege Kanzeln, Drückjagdböcke (DJB) und Leitern an, damit sie im
+          Kanzel-Auswahlmenü der Ansteller Runden erscheinen. Einzeln über das
+          Formular unten oder als Batch via CSV-Import.
+        </p>
+
+        <form id="add-post-form" class="ev-form">
+          <div class="ev-form-row">
+            <label>Typ
+              <select id="post-type">
+                <option value="Kanzel">Kanzel</option>
+                <option value="Drückjagdbock">Drückjagdbock (DJB)</option>
+                <option value="Leiter">Leiter</option>
+              </select>
+            </label>
+            <label>Teilgebiet
+              <select id="post-area" required>
+                <option value="">— wählen —</option>
+                <optgroup label="Peenwerder">
+                  <option>Hauptrevier</option>
+                  <option>Ost</option>
+                  <option>Nord</option>
+                  <option>Nordrand</option>
+                </optgroup>
+                <optgroup label="NPA-Müritz">
+                  <option>Babke</option>
+                  <option>Langenhagen</option>
+                  <option>Schwarzenhof</option>
+                </optgroup>
+              </select>
+            </label>
+          </div>
+          <label>Bezeichnung <span class="muted">(z.B. „Nr. 5 Ackerkante" oder „DJB 7")</span>
+            <input id="post-name" type="text" required maxlength="60" />
+          </label>
+          <div class="sr-coords-grid">
+            <input type="number" id="post-lat" step="0.000001" inputmode="decimal" placeholder="Breitengrad" required />
+            <input type="number" id="post-lng" step="0.000001" inputmode="decimal" placeholder="Längengrad" required />
+          </div>
+          <div class="post-form-actions">
+            <button type="submit" class="primary-btn small">+ Stand anlegen</button>
+            <button type="button" id="post-here-btn" class="ghost-btn">📍 Aktuelle Position</button>
+            <span id="post-add-status" class="muted"></span>
+          </div>
+        </form>
+
+        <div class="post-csv-row">
+          <button type="button" id="post-csv-btn" class="ghost-btn">CSV importieren</button>
+          <input type="file" id="post-csv-input" accept=".csv,text/csv,text/plain" hidden />
+          <details class="post-csv-help">
+            <summary>CSV-Format</summary>
+            <p>Spalten in dieser Reihenfolge: <code>type,name,area,lat,lng</code></p>
+            <p><strong>type</strong>: Kanzel · Drückjagdbock · Leiter</p>
+            <p><strong>area</strong>: Hauptrevier · Ost · Nord · Nordrand · Babke · Langenhagen · Schwarzenhof</p>
+            <p>Beispiel: <code>Drückjagdbock,DJB 7,Babke,53.6234,12.8423</code></p>
+            <p class="muted">Komma, Semikolon und Tab werden automatisch erkannt. Optionale Kopfzeile wird ignoriert.</p>
+          </details>
+        </div>
+
+        <p id="posts-stats" class="muted post-stats"></p>
+      </div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="posts-cancel" type="button" class="cancel-btn">Schließen</button>
       </div>
     </section>
 
