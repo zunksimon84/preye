@@ -2690,9 +2690,12 @@ function fetchSquadMap_(baseMarkerSpecs, recipientCoord) {
   const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
   if (!apiKey) return { blob: null, error: "Kein MAPS_API_KEY in den Script-Properties hinterlegt (menu_setMapsApiKey ausführen)." };
   if (!baseMarkerSpecs.length && !recipientCoord) return { blob: null, error: "Keine Koordinaten für die Karte (Stände ohne lat/lng?)." };
+  // EEA accounts can't request satellite/hybrid tiles via the Static Maps
+  // API (Google restriction since 2024). Terrain still works and gives us
+  // forest shading + roads, which is what hunters need to orient.
   const params = [
     "size=640x480",
-    "maptype=hybrid",
+    "maptype=terrain",
     "scale=2",
   ];
   for (const m of baseMarkerSpecs) {
