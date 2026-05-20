@@ -2834,12 +2834,14 @@ function fetchMapTilerMap_(positions, postsById) {
   }
   if (!coords.length) return { blob: null, error: "Keine Koordinaten für die Karte." };
 
-  // hybrid = satellite imagery + road/area labels — closest match to
-  // the German "Hybrid" Google Maps layer we had before the EEA ban.
+  // outdoor-v2 is on MapTiler's free tier and made for outdoor/hiking
+  // use: forest patches in green, dirt paths, water features, contour
+  // lines. Satellite/hybrid styles require their Premium plan (HTTP
+  // 403 on free keys), so this is the sensible default for hunters.
   // Auto-fits to the markers for multi-position runs; falls back to
   // an explicit centre+zoom for single-position runs where auto-fit
   // would yield a degenerate bounding box.
-  const style = "hybrid";
+  const style = "outdoor-v2";
   const size = "640x640@2x";
   let url;
   if (coords.length === 1) {
