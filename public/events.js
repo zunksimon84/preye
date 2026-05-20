@@ -1171,7 +1171,7 @@ function openTreiberEditor(squad) {
     </p>
 
     <fieldset class="ev-fieldset start-pos-fieldset">
-      <legend>Startposition <span class="muted">(wo sich die Gruppe trifft)</span></legend>
+      <legend>Startposition <span class="muted">(von wo die Gruppe startet)</span></legend>
       <div class="sr-coords-grid">
         <input type="number" id="start-pos-lat" step="0.000001" inputmode="decimal" value="${lat}" placeholder="Breitengrad" />
         <input type="number" id="start-pos-lng" step="0.000001" inputmode="decimal" value="${lng}" placeholder="Längengrad" />
