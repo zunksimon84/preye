@@ -108,8 +108,18 @@ async function postJson(body) {
 
 // ---------- Privacy gate (mirrors app.js) ----------
 
+// Short-circuit the privacy gate when we've already verified within the
+// last 15 minutes — otherwise every page load (events overview, event
+// detail, etc.) eats two Apps Script cold-start round-trips (~2–4 s)
+// before anything renders. Mutations still go through the live token,
+// so a revoked token only stays valid for the rest of the TTL window.
+const GATE_OK_KEY = "preye.gate.verified_at";
+const GATE_OK_TTL_MS = 15 * 60 * 1000;
+
 async function passGate() {
   if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) return true;
+  const verifiedAt = parseInt(localStorage.getItem(GATE_OK_KEY) || "0", 10);
+  if (verifiedAt && Date.now() - verifiedAt < GATE_OK_TTL_MS) return true;
   let isPublic = true;
   try {
     const res = await fetch(cfg.APPS_SCRIPT_URL + "?action=site-status");
@@ -118,17 +128,26 @@ async function passGate() {
   } catch (err) {
     return true;
   }
-  if (isPublic) return true;
+  if (isPublic) {
+    localStorage.setItem(GATE_OK_KEY, String(Date.now()));
+    return true;
+  }
   const cached = localStorage.getItem("preye.token");
   if (cached) {
     try {
       const v = await fetch(cfg.APPS_SCRIPT_URL + "?action=verify-access&token=" + encodeURIComponent(cached));
       const vr = await v.json();
-      if (vr.ok) return true;
+      if (vr.ok) {
+        localStorage.setItem(GATE_OK_KEY, String(Date.now()));
+        return true;
+      }
     } catch (err) {}
     localStorage.removeItem("preye.token");
+    localStorage.removeItem(GATE_OK_KEY);
   }
-  return showGate();
+  const ok = await showGate();
+  if (ok) localStorage.setItem(GATE_OK_KEY, String(Date.now()));
+  return ok;
 }
 
 function showGate() {
@@ -1326,18 +1345,27 @@ async function saveEditingSquad() {
   const squad = state.currentEvent.squads.find((s) => s.id === editingSquadId);
   if (!squad) return;
   const isTreiber = squad.type === "treiber";
-  const btn = $("#squad-edit-save");
-  btn.disabled = true;
-  const oldText = btn.textContent;
-  btn.textContent = "Speichere …";
+  const positions = isTreiber
+    ? collectTreiberPositions($("#squad-edit-body"))
+    : collectPositions($("#squad-edit-body"));
+  const ansteller = positions[0]?.hunter || "";
+  const briefing = $("#modal-squad-briefing").value.trim();
+  const start_pos = isTreiber ? collectTreiberStartPos() : null;
+
+  // Optimistic UI: snapshot the old state, apply the new one locally,
+  // close the modal immediately so the user isn't waiting on the
+  // Apps Script round-trip. Roll back on failure.
+  const prev = {
+    ansteller: squad.ansteller,
+    positions: squad.positions,
+    briefing: squad.briefing,
+    start_pos: squad.start_pos,
+  };
+  Object.assign(squad, { ansteller, positions, briefing, start_pos });
+  renderSquads();
+  closeSquadEditor();
+  showToast("Speichere …");
   try {
-    const positions = isTreiber
-      ? collectTreiberPositions($("#squad-edit-body"))
-      : collectPositions($("#squad-edit-body"));
-    // The leader (Ansteller / Hundeführer) is whoever sits at the top.
-    const ansteller = positions[0]?.hunter || "";
-    const briefing = $("#modal-squad-briefing").value.trim();
-    const start_pos = isTreiber ? collectTreiberStartPos() : null;
     await postJson({
       action: "event-squad-save",
       id: squad.id,
@@ -1350,15 +1378,11 @@ async function saveEditingSquad() {
       start_pos,
     });
     invalidateCache("event-detail", { id: state.currentEvent.event.id });
-    Object.assign(squad, { ansteller, positions, briefing, start_pos });
-    renderSquads(); // renders both ansteller and treiber lists
-    closeSquadEditor();
     showToast("Gespeichert ✓");
   } catch (err) {
-    showToast(err.message || "Fehler beim Speichern", "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = oldText;
+    Object.assign(squad, prev);
+    renderSquads();
+    showToast(err.message || "Fehler beim Speichern", "error", 6000);
   }
 }
 

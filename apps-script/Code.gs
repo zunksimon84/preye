@@ -2603,7 +2603,10 @@ function eventInfomailsPreview_(body) {
     sampleSubject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(sample.squad.name);
     if (hasMapsKey) {
       try {
-        const pdfBlob = buildInfoMailPdf_(ev, sample.squad, sample.positions, sample.pos, postsById);
+        // Match the send path: one PDF per Runde, no recipient-specific
+        // red marker. The recipient's stand is identified via the
+        // email body + the table row in the PDF.
+        const pdfBlob = buildInfoMailPdf_(ev, sample.squad, sample.positions, null, postsById);
         if (pdfBlob) {
           samplePdfBase64 = Utilities.base64Encode(pdfBlob.getBytes());
           samplePdfName = pdfBlob.getName();
@@ -2651,6 +2654,19 @@ function eventInfomailsSend_(body) {
     const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
     if (!positions.length) continue;
 
+    // Build the PDF ONCE per Runde and reuse it for every recipient in
+    // that Runde. Drops the dominant DocumentApp cost from O(recipients)
+    // to O(runden) — a 20-recipient hunt with 4 Runden now does 4 PDF
+    // builds instead of 20.
+    let pdfBlob = null;
+    let pdfError = "";
+    try {
+      pdfBlob = buildInfoMailPdf_(ev, squad, positions, null, postsById);
+    } catch (err) {
+      pdfError = String(err && err.message || err);
+    }
+    const subject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(squad.name);
+
     for (let i = 0; i < positions.length; i++) {
       const pos = positions[i];
       const h = huntersByName[pos.hunter.toLowerCase()];
@@ -2658,15 +2674,16 @@ function eventInfomailsSend_(body) {
 
       try {
         const html = buildInfoMailBodyHtml_(ev, squad, pos);
-        const subject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(squad.name);
         const opts = { from: FROM_EMAIL, htmlBody: html };
-        const pdfBlob = buildInfoMailPdf_(ev, squad, positions, pos, postsById);
         if (pdfBlob) opts.attachments = [pdfBlob];
         GmailApp.sendEmail(h.email, subject, htmlToPlain_(html), opts);
         sent++;
       } catch (err) {
         errors.push({ hunter: pos.hunter, error: String(err && err.message || err) });
       }
+    }
+    if (pdfError) {
+      errors.push({ hunter: displayRundeNameServer_(squad.name), error: "PDF build: " + pdfError });
     }
   }
   return { ok: true, sent: sent, errors: errors };
@@ -2810,15 +2827,22 @@ function htmlToPlain_(html) {
     .trim();
 }
 
-// Build the per-Schütze PDF: title + event meta + the embedded
-// satellite map + a roster table (recipient bolded) + Kontakte. Returns a
-// Blob ready to attach. Uses DocumentApp + Drive's HTML→PDF conversion;
-// the temp Google-Doc is trashed right after we have the PDF bytes.
+// Build the per-Runde PDF: title + event meta + the embedded
+// satellite map + a roster table + Kontakte. Returns a Blob ready to
+// attach. Uses DocumentApp + Drive's HTML→PDF conversion; the temp
+// Google-Doc is trashed right after we have the PDF bytes.
+//
+// recipientPos is optional. When provided, the recipient's stand is
+// highlighted red on the map and the matching roster row is bolded —
+// used for per-Schütze personalisation. When null, the same PDF is
+// shared by everyone in the Runde (huge speedup, since one DocumentApp
+// round-trip serves N recipients instead of one per Schütze).
 function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
   const rundeLabel = displayRundeNameServer_(squad.name);
   const cleanName = function (s) { return String(s || "").replace(/[\\\/?%*:|"<>]/g, " "); };
-  const filename = "Infomail " + cleanName(ev.name) + " — " + cleanName(rundeLabel) + " — " +
-    cleanName(recipientPos.hunter || "");
+  const filename = recipientPos
+    ? "Infomail " + cleanName(ev.name) + " — " + cleanName(rundeLabel) + " — " + cleanName(recipientPos.hunter || "")
+    : "Infomail " + cleanName(ev.name) + " — " + cleanName(rundeLabel);
   const doc = DocumentApp.create(filename);
   const docId = doc.getId();
   try {
@@ -2828,7 +2852,8 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     // Title block.
     const title = body.appendParagraph(ev.name);
     title.editAsText().setFontFamily("Arial").setFontSize(20).setBold(true);
-    const sub = body.appendParagraph(rundeLabel + " — " + (recipientPos.hunter || ""));
+    const subText = recipientPos ? rundeLabel + " — " + (recipientPos.hunter || "") : rundeLabel;
+    const sub = body.appendParagraph(subText);
     sub.editAsText().setFontFamily("Arial").setFontSize(13).setBold(false).setForegroundColor("#1a5f1a");
 
     // Event meta block.
@@ -2842,8 +2867,9 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     if (timeBits.length) metaLines.push(timeBits.join("  ·  "));
     const ansteller = (positions[0] && positions[0].hunter) || squad.ansteller || "";
     metaLines.push("Ansteller: " + ansteller);
-    const myStand = positionLabel_(recipientPos, postsById);
-    metaLines.push("Dein Stand: " + myStand);
+    if (recipientPos) {
+      metaLines.push("Dein Stand: " + positionLabel_(recipientPos, postsById));
+    }
     metaLines.forEach(function (line) {
       const p = body.appendParagraph(line);
       p.editAsText().setFontFamily("Arial").setFontSize(11);
@@ -2851,9 +2877,9 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     body.appendParagraph(" ");
 
     // Map (centered, full-width). Marker letters here match the row letters in
-    // the table below, so the recipient can identify each position.
+    // the table below, so a Schütze can identify each position by name.
     const baseMarkers = squadBaseMarkers_(positions, postsById);
-    const recipientCoord = positionCoords_(recipientPos, postsById);
+    const recipientCoord = recipientPos ? positionCoords_(recipientPos, postsById) : null;
     const mapResult = fetchSquadMap_(baseMarkers, recipientCoord);
     if (mapResult.blob) {
       const img = body.appendImage(mapResult.blob);
@@ -2862,7 +2888,10 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       img.setWidth(targetWidth);
       img.setHeight(targetWidth * ratio);
       img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-      const cap = body.appendParagraph("Dein Stand ist rot, die Stände Deiner Runde gelb (A, B, C …).");
+      const capText = recipientPos
+        ? "Dein Stand ist rot, die Stände Deiner Runde gelb (A, B, C …)."
+        : "Die Stände der Runde sind gelb markiert (A, B, C …) und entsprechen der Tabelle unten.";
+      const cap = body.appendParagraph(capText);
       cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
       cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
     } else {
@@ -2886,7 +2915,7 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     });
     for (let i = 0; i < positions.length; i++) {
       const p = positions[i];
-      const isMe = p.hunter === recipientPos.hunter;
+      const isMe = recipientPos && p.hunter === recipientPos.hunter;
       const row = table.appendTableRow();
       const letterCell = row.appendTableCell(String.fromCharCode(65 + i));
       letterCell.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#7a5a00");
