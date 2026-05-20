@@ -35,7 +35,7 @@ const POST_TYPES = ["Kanzel", "Drückjagdbock", "Leiter"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
-const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer"];
+const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer"];
 const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "language", "token", "status", "role", "dogs", "invited_at", "responded_at"];
 
 // JGHV-anerkannte Jagdhundrassen — single source of truth, baked here so
@@ -1540,6 +1540,8 @@ function eventsList_() {
       teilgebiet: String(ev.teilgebiet || ""),
       rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
+      treffpunkt_lat: numOrEmpty_(ev.treffpunkt_lat),
+      treffpunkt_lng: numOrEmpty_(ev.treffpunkt_lng),
       treff_time: toTimeString_(ev.treff_time),
       start_time: toTimeString_(ev.start_time),
       end_time: toTimeString_(ev.end_time),
@@ -1548,6 +1550,12 @@ function eventsList_() {
       stats: stats,
     };
   }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+}
+
+function numOrEmpty_(v) {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? n : "";
 }
 
 function eventDetail_(params) {
@@ -1610,6 +1618,8 @@ function eventDetail_(params) {
       teilgebiet: String(ev.teilgebiet || ""),
       rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
+      treffpunkt_lat: numOrEmpty_(ev.treffpunkt_lat),
+      treffpunkt_lng: numOrEmpty_(ev.treffpunkt_lng),
       treff_time: toTimeString_(ev.treff_time),
       start_time: toTimeString_(ev.start_time),
       end_time: toTimeString_(ev.end_time),
@@ -1654,6 +1664,8 @@ function eventCreate_(body) {
     teilgebiet: String(body.teilgebiet || "").trim(),
     rsvp_deadline: String(body.rsvp_deadline || "").trim(),
     treffpunkt: String(body.treffpunkt || "").trim(),
+    treffpunkt_lat: numOrEmpty_(body.treffpunkt_lat),
+    treffpunkt_lng: numOrEmpty_(body.treffpunkt_lng),
     treff_time: String(body.treff_time || "").trim(),
     start_time: String(body.start_time || "").trim(),
     end_time: String(body.end_time || "").trim(),
@@ -1710,6 +1722,8 @@ function eventUpdate_(body) {
     teilgebiet: String(body.teilgebiet || "").trim(),
     rsvp_deadline: String(body.rsvp_deadline || "").trim(),
     treffpunkt: String(body.treffpunkt || "").trim(),
+    treffpunkt_lat: numOrEmpty_(body.treffpunkt_lat),
+    treffpunkt_lng: numOrEmpty_(body.treffpunkt_lng),
     treff_time: String(body.treff_time || "").trim(),
     start_time: String(body.start_time || "").trim(),
     end_time: String(body.end_time || "").trim(),
@@ -2002,12 +2016,20 @@ function fillEventPlaceholders_(template, ev, lang) {
     : "";
   const organizer = String(ev.organizer || "").trim() || "Jakob";
   const fallbackOpen = isEn ? "[to be confirmed]" : "[noch offen]";
+  const treffpunkt = String(ev.treffpunkt || "").trim();
+  const tpLat = numOrEmpty_(ev.treffpunkt_lat);
+  const tpLng = numOrEmpty_(ev.treffpunkt_lng);
+  const treffpunktMap = (tpLat !== "" && tpLng !== "")
+    ? "https://www.google.com/maps?q=" + tpLat + "," + tpLng
+    : "";
   return String(template || "")
     .split("{event_name}").join(String(ev.name || ""))
     .split("{date}").join(eventDate || fallbackOpen)
     .split("{revier}").join(revier || "Peenwerder")
     .split("{teilgebiet}").join(teilgebiet)
     .split("{teilgebiete_satz}").join(teilgebieteSatz)
+    .split("{treffpunkt}").join(treffpunkt)
+    .split("{treffpunkt_map}").join(treffpunktMap)
     .split("{rsvp_deadline}").join(rsvpDeadline || fallbackOpen)
     .split("{written_invite_date}").join(writtenInvite || fallbackOpen)
     .split("{organizer}").join(organizer);
@@ -2109,6 +2131,8 @@ function inviteTemplateGetEndpoint_(params) {
       { name: "{revier}",              doc: "Revier (z.B. Peenwerder)" },
       { name: "{teilgebiet}",          doc: "Liste der Teilgebiete" },
       { name: "{teilgebiete_satz}",    doc: 'kompletter Satz „Wir bejagen das Teilgebiet …"' },
+      { name: "{treffpunkt}",          doc: "Name des Treffpunkts (z.B. Forsthalle Rützenfelde)" },
+      { name: "{treffpunkt_map}",      doc: "Google-Maps-Link zum Treffpunkt (leer wenn keine Koordinaten gesetzt)" },
       { name: "{rsvp_deadline}",       doc: "Anmeldeschluss" },
       { name: "{written_invite_date}", doc: "Datum der schriftlichen Einladung (2 Wochen vorher)" },
       { name: "{organizer}",           doc: "Name des Organisators" },
@@ -2156,6 +2180,8 @@ function normalizeEventDates_(ev) {
     teilgebiet: ev.teilgebiet,
     rsvp_deadline: toDateString_(ev.rsvp_deadline),
     treffpunkt: ev.treffpunkt,
+    treffpunkt_lat: numOrEmpty_(ev.treffpunkt_lat),
+    treffpunkt_lng: numOrEmpty_(ev.treffpunkt_lng),
     treff_time: toTimeString_(ev.treff_time),
     start_time: toTimeString_(ev.start_time),
     end_time: toTimeString_(ev.end_time),

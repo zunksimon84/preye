@@ -80,6 +80,11 @@
           </fieldset>
           <label>Anmeldeschluss <span class="muted">(leer = automatisch 2 Wochen vor dem Termin)</span><input type="date" id="ev-rsvp-deadline" /></label>
           <label>Treffpunkt<input type="text" id="ev-treffpunkt" value="Forsthalle Rützenfelde" /></label>
+          <div class="ev-form-row treffpunkt-coords-row">
+            <label>Treffpunkt — Breitengrad <span class="muted">(optional)</span><input type="number" id="ev-treffpunkt-lat" step="0.000001" inputmode="decimal" placeholder="z.B. 53.6234" /></label>
+            <label>Treffpunkt — Längengrad <span class="muted">(optional)</span><input type="number" id="ev-treffpunkt-lng" step="0.000001" inputmode="decimal" placeholder="z.B. 12.8423" /></label>
+            <button type="button" id="ev-treffpunkt-here" class="ghost-btn treffpunkt-here-btn">📍 Aktuelle Position</button>
+          </div>
           <div class="ev-form-row">
             <label>Treffzeit<input type="time" id="ev-treff-time" /></label>
             <label>Beginn<input type="time" id="ev-start-time" /></label>

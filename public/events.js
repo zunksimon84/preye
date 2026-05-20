@@ -307,6 +307,8 @@ async function submitNewEvent(e) {
       name: row.querySelector(".nsf-name").value.trim(),
       phone: row.querySelector(".nsf-phone").value.trim(),
     })).filter((p) => p.name || p.phone);
+    const tpLatStr = $("#ev-treffpunkt-lat").value.trim();
+    const tpLngStr = $("#ev-treffpunkt-lng").value.trim();
     const body = {
       action: "event-create",
       name: $("#ev-name").value.trim(),
@@ -314,6 +316,8 @@ async function submitNewEvent(e) {
       teilgebiet,
       rsvp_deadline: $("#ev-rsvp-deadline").value,
       treffpunkt: $("#ev-treffpunkt").value.trim(),
+      treffpunkt_lat: tpLatStr ? Number(tpLatStr) : "",
+      treffpunkt_lng: tpLngStr ? Number(tpLngStr) : "",
       treff_time: $("#ev-treff-time").value,
       start_time: $("#ev-start-time").value,
       end_time: $("#ev-end-time").value,
@@ -371,7 +375,19 @@ function renderEventDetail() {
   const teilgebietLabel = teilgebietParts.length > 1 ? "Teilgebiete" : "Teilgebiet";
   const teilgebietValue = teilgebietParts.join(", ");
   const infoRows = [];
-  if (event.treffpunkt) infoRows.push({ label: "Treffpunkt", value: event.treffpunkt });
+  if (event.treffpunkt || (event.treffpunkt_lat !== "" && event.treffpunkt_lng !== "")) {
+    const lat = event.treffpunkt_lat;
+    const lng = event.treffpunkt_lng;
+    const hasCoords = (lat !== "" && lng !== "" && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)));
+    let html = escapeHtml(event.treffpunkt || "");
+    if (hasCoords) {
+      const url = `https://www.google.com/maps?q=${lat},${lng}`;
+      const coordStr = `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
+      html += (event.treffpunkt ? " " : "") +
+        `<a class="ev-map-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="In Google Maps öffnen">📍 ${escapeHtml(coordStr)}</a>`;
+    }
+    infoRows.push({ label: "Treffpunkt", html: html });
+  }
   if (teilgebietValue) infoRows.push({ label: teilgebietLabel, value: teilgebietValue });
   if (event.rsvp_deadline) infoRows.push({ label: "Anmeldeschluss", value: formatLongDate(event.rsvp_deadline) });
   const times = [
@@ -389,7 +405,7 @@ function renderEventDetail() {
         ${infoRows.map((r) => `
           <div class="ev-info-row">
             <span class="ev-info-label">${escapeHtml(r.label)}</span>
-            <span class="ev-info-value">${escapeHtml(r.value)}</span>
+            <span class="ev-info-value">${r.html != null ? r.html : escapeHtml(r.value)}</span>
           </div>
         `).join("")}
       </div>
@@ -1543,6 +1559,17 @@ function addNsfRow(name, phone) {
   addNsfRowTo($("#nsf-rows"), name, phone);
 }
 
+// Reusable geolocation helper for any pair of lat/lng inputs.
+function fillTreffpunktCoords(latSelector, lngSelector) {
+  if (!navigator.geolocation) { showToast("Standort nicht verfügbar", "error"); return; }
+  navigator.geolocation.getCurrentPosition((pos) => {
+    $(latSelector).value = pos.coords.latitude.toFixed(6);
+    $(lngSelector).value = pos.coords.longitude.toFixed(6);
+    showToast("Position übernommen");
+  }, (err) => showToast("Standort: " + err.message, "error", 4000),
+  { enableHighAccuracy: true, timeout: 8000 });
+}
+
 function addNsfRowTo(target, name, phone) {
   const row = document.createElement("div");
   row.className = "nsf-row";
@@ -1711,6 +1738,11 @@ function openEventEditor() {
       </fieldset>
       <label>Anmeldeschluss <span class="muted">(leer = 2 Wochen vor dem Termin)</span><input type="date" id="edit-ev-rsvp-deadline" value="${escapeHtml(event.rsvp_deadline || "")}" /></label>
       <label>Treffpunkt<input type="text" id="edit-ev-treffpunkt" value="${escapeHtml(event.treffpunkt || "")}" /></label>
+      <div class="ev-form-row treffpunkt-coords-row">
+        <label>Breitengrad <span class="muted">(optional)</span><input type="number" id="edit-ev-treffpunkt-lat" step="0.000001" inputmode="decimal" value="${escapeHtml(event.treffpunkt_lat ?? "")}" /></label>
+        <label>Längengrad <span class="muted">(optional)</span><input type="number" id="edit-ev-treffpunkt-lng" step="0.000001" inputmode="decimal" value="${escapeHtml(event.treffpunkt_lng ?? "")}" /></label>
+        <button type="button" id="edit-ev-treffpunkt-here" class="ghost-btn treffpunkt-here-btn">📍 Aktuelle Position</button>
+      </div>
       <div class="ev-form-row">
         <label>Treffzeit<input type="time" id="edit-ev-treff-time" value="${escapeHtml(event.treff_time || "")}" /></label>
         <label>Beginn<input type="time" id="edit-ev-start-time" value="${escapeHtml(event.start_time || "")}" /></label>
@@ -1740,6 +1772,8 @@ function openEventEditor() {
   const nsfTarget = $("#edit-nsf-rows");
   (event.nachsuchenfuehrer || []).forEach((p) => addNsfRowTo(nsfTarget, p.name, p.phone));
   $("#edit-ev-nsf-add").addEventListener("click", () => addNsfRowTo(nsfTarget));
+  $("#edit-ev-treffpunkt-here").addEventListener("click", () =>
+    fillTreffpunktCoords("#edit-ev-treffpunkt-lat", "#edit-ev-treffpunkt-lng"));
 
   $("#event-edit-backdrop").hidden = false;
   $("#event-edit-modal").hidden = false;
@@ -1775,6 +1809,8 @@ async function saveEventEdit() {
   const oldText = btn.textContent;
   btn.textContent = "Speichere …";
   try {
+    const tpLatStr = $("#edit-ev-treffpunkt-lat").value.trim();
+    const tpLngStr = $("#edit-ev-treffpunkt-lng").value.trim();
     await postJson({
       action: "event-update",
       id: state.currentEvent.event.id,
@@ -1783,6 +1819,8 @@ async function saveEventEdit() {
       teilgebiet,
       rsvp_deadline: $("#edit-ev-rsvp-deadline").value,
       treffpunkt: $("#edit-ev-treffpunkt").value.trim(),
+      treffpunkt_lat: tpLatStr ? Number(tpLatStr) : "",
+      treffpunkt_lng: tpLngStr ? Number(tpLngStr) : "",
       treff_time: $("#edit-ev-treff-time").value,
       start_time: $("#edit-ev-start-time").value,
       end_time: $("#edit-ev-end-time").value,
@@ -1916,6 +1954,7 @@ async function resetTemplate() {
 function wireUi() {
   $("#new-event-btn").addEventListener("click", () => { location.hash = "#/new"; });
   $("#new-event-form").addEventListener("submit", submitNewEvent);
+  $("#ev-treffpunkt-here").addEventListener("click", () => fillTreffpunktCoords("#ev-treffpunkt-lat", "#ev-treffpunkt-lng"));
   $("#new-event-cancel").addEventListener("click", () => { location.hash = "#/"; });
   $("#back-to-list").addEventListener("click", () => { location.hash = "#/"; });
   $("#add-hunter-form").addEventListener("submit", addHunter);

@@ -2008,6 +2008,24 @@ body.rsvp-page #rsvp-topbar {
   color: var(--muted);
 }
 .ev-info-row .ev-info-value { color: #111; font-weight: 500; }
+.ev-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--steel-dark);
+  font-size: 12px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.ev-map-link:hover { background: var(--card); border-color: var(--green-bright-edge); color: #111; }
+
+.treffpunkt-coords-row { gap: 8px; }
+.treffpunkt-here-btn { align-self: end; padding: 7px 10px; flex: 0 0 auto; }
 
 /* Stats strip for Treff / Beginn / Ende. */
 .ev-times-strip {
