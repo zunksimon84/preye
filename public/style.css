@@ -2146,6 +2146,24 @@ body.rsvp-page #rsvp-topbar {
 .squad-tile-count { font-size: 12px; color: #2d3a05; opacity: 0.8; margin-top: auto; }
 .squad-tile-ansteller .muted { color: #4a4d52; }
 
+/* Treibergruppe tiles — soft slate-blue so they read as a separate kind
+   of group from the lime Ansteller Runden. */
+.treiber-tile {
+  background: linear-gradient(135deg, #c7d4e0 0%, #b3c4d4 100%);
+  border-color: #93a7b9;
+  color: #1e2a36;
+}
+.treiber-tile:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16); }
+.treiber-tile .squad-tile-count { color: #1e2a36; }
+
+.ev-section--treiber .ev-section-title { border-bottom-color: #93a7b9; }
+
+/* Hint shown inside a Treibergruppe row when no acceptances yet. */
+.sr-empty {
+  margin: 4px 0 0 32px;
+  font-size: 12.5px;
+}
+
 /* Squad edit modal --------------------------------------------------------- */
 
 #squad-edit-backdrop {

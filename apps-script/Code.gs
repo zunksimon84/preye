@@ -62,11 +62,11 @@ const DOG_BREEDS = [
   "Irish Red and White Setter", "Welsh Springer Spaniel",
   "Sonstige",
 ];
-// "Squad" is the legacy label — in German hunting we call this an
-// "Ansteller Runde" (a group led by one Ansteller). Old columns
-// (post_id/post_name/members) are kept so existing rows aren't broken;
-// new rows only use ansteller + positions (JSON of Schützen).
-const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions"];
+// "Squad" is the legacy label — in German hunting we call these
+// "Ansteller Runden" (Schützen led by an Ansteller) and "Treibergruppen"
+// (Treiber led by a Hundeführer). Both share the same row schema; the
+// "type" column distinguishes them ("ansteller" / "treiber"; empty = ansteller).
+const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions", "type"];
 const ADDRESS_BOOK_HEADER = ["name", "email", "language"];
 
 // Outgoing "From" address for all GmailApp.sendEmail calls. Must be a
@@ -1524,9 +1524,11 @@ function eventDetail_(params) {
     .map(function (s) {
       let positions = [];
       try { positions = JSON.parse(String(s.positions || "[]")); } catch (e) {}
+      const groupType = String(s.type || "").trim().toLowerCase() || "ansteller";
       return {
         id: String(s.id),
         name: String(s.name || ""),
+        type: (groupType === "treiber") ? "treiber" : "ansteller",
         ansteller: String(s.ansteller || ""),
         positions: Array.isArray(positions) ? positions : [],
         briefing: String(s.briefing || ""),
@@ -2293,10 +2295,16 @@ function eventSquadSave_(body) {
   const name = String(body.name || "").trim();
   const ansteller = String(body.ansteller || "").trim();
   const briefing = String(body.briefing || "").trim();
+  const groupType = (body.type === "treiber") ? "treiber" : "ansteller";
+  // Ansteller-Runden positions carry Kanzel/Klettersitz; Treibergruppen
+  // positions are just hunter names. We normalise both shapes here.
   const positions = Array.isArray(body.positions)
     ? body.positions
         .filter(function (p) { return p && String(p.hunter || "").trim(); })
         .map(function (p) {
+          if (groupType === "treiber") {
+            return { hunter: String(p.hunter || "").trim() };
+          }
           const lat = Number(p.lat);
           const lng = Number(p.lng);
           return {
@@ -2312,7 +2320,7 @@ function eventSquadSave_(body) {
     : [];
   const positionsJson = JSON.stringify(positions);
 
-  function writeAnstellerRow(rowIdx /* 1-based sheet row */) {
+  function writeRow(rowIdx /* 1-based sheet row */) {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
       .map(function (s) { return String(s).trim(); });
     const update = {
@@ -2321,6 +2329,7 @@ function eventSquadSave_(body) {
       ansteller: ansteller,
       positions: positionsJson,
       briefing: briefing,
+      type: groupType,
     };
     Object.keys(update).forEach(function (k) {
       const c = headers.indexOf(k);
@@ -2335,7 +2344,7 @@ function eventSquadSave_(body) {
     const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       if (String(ids[i][0]).trim() === id) {
-        writeAnstellerRow(i + 2);
+        writeRow(i + 2);
         return { ok: true, id: id };
       }
     }
@@ -2349,6 +2358,7 @@ function eventSquadSave_(body) {
     ansteller: ansteller,
     positions: positionsJson,
     briefing: briefing,
+    type: groupType,
   });
   return { ok: true, id: newId };
 }
