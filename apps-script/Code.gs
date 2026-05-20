@@ -2714,14 +2714,45 @@ function positionLabel_(pos, postsById) {
   return "(Position offen)";
 }
 
+// Extracts the post's numeric ID from its name (e.g., "Nr. 13" → "13",
+// "DJB 5" → "5", "Klettersitz Süd" → ""). Used to label markers and
+// roster rows with the actual post number rather than sequential letters.
+function postNumberString_(pos, postsById) {
+  let nm = "";
+  if (pos.type === "kanzel" && pos.post_id && postsById[pos.post_id]) {
+    nm = String(postsById[pos.post_id].name || "");
+  } else if (pos.type === "klettersitz" && pos.label) {
+    nm = String(pos.label);
+  }
+  const m = /(\d+)/.exec(nm);
+  return m ? m[1] : "";
+}
+
+// Single-char map marker label: prefers the post's last digit so the
+// marker matches the number shown in the PDF roster table (e.g., a
+// "3" pin on the map points to "Nr. 13" in the table). Falls back to
+// A/B/C/... if the post has no recognisable number.
+function squadMarkerLabel_(pos, postsById, fallbackIndex) {
+  const num = postNumberString_(pos, postsById);
+  if (num) return num[num.length - 1];
+  return String.fromCharCode(65 + fallbackIndex);
+}
+
+// The label shown in the PDF roster table's "#" column — the full
+// post number when we have one, else the same A/B/C fallback as the
+// map marker, so the two columns always stay consistent.
+function squadRosterLabel_(pos, postsById, fallbackIndex) {
+  const num = postNumberString_(pos, postsById);
+  if (num) return num;
+  return String.fromCharCode(65 + fallbackIndex);
+}
+
 function squadBaseMarkers_(positions, postsById) {
   const out = [];
   for (let i = 0; i < positions.length; i++) {
     const c = positionCoords_(positions[i], postsById);
     if (!c) continue;
-    // Sequential A,B,C labels so the marker matches the order shown in the
-    // email's roster (Static Maps only supports single-char labels).
-    const label = String.fromCharCode(65 + i);
+    const label = squadMarkerLabel_(positions[i], postsById, i);
     out.push("color:yellow|label:" + label + "|" + c.lat + "," + c.lng);
   }
   return out;
@@ -2889,8 +2920,8 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       img.setHeight(targetWidth * ratio);
       img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
       const capText = recipientPos
-        ? "Dein Stand ist rot, die Stände Deiner Runde gelb (A, B, C …)."
-        : "Die Stände der Runde sind gelb markiert (A, B, C …) und entsprechen der Tabelle unten.";
+        ? "Dein Stand ist rot, die Stände Deiner Runde gelb — die Zahl auf dem Pin entspricht der letzten Ziffer der Standnummer."
+        : "Die Stände der Runde sind gelb markiert — die Zahl auf dem Pin entspricht der letzten Ziffer der Standnummer.";
       const cap = body.appendParagraph(capText);
       cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
       cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
@@ -2907,7 +2938,7 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     const table = body.appendTable();
     table.setBorderColor("#cccccc").setBorderWidth(0.5);
     const header = table.appendTableRow();
-    const headerCells = ["#", "Schütze", "Stand"];
+    const headerCells = ["Nr.", "Schütze", "Stand"];
     headerCells.forEach(function (cell) {
       const c = header.appendTableCell(cell);
       c.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#1a5f1a");
@@ -2917,8 +2948,11 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       const p = positions[i];
       const isMe = recipientPos && p.hunter === recipientPos.hunter;
       const row = table.appendTableRow();
-      const letterCell = row.appendTableCell(String.fromCharCode(65 + i));
-      letterCell.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#7a5a00");
+      // "#" column shows the post's full number (e.g., "13"); the map
+      // marker shows the last digit of that number, so the user can
+      // cross-reference the two visually.
+      const numCell = row.appendTableCell(squadRosterLabel_(p, postsById, i));
+      numCell.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#7a5a00");
       const hunterCell = row.appendTableCell(p.hunter + (i === 0 ? "  (Ansteller)" : ""));
       const ht = hunterCell.editAsText().setFontFamily("Arial").setFontSize(10);
       if (isMe) { ht.setBold(true); hunterCell.setBackgroundColor("#fff2c0"); }
