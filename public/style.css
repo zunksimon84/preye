@@ -1636,6 +1636,35 @@ body.rsvp-page #rsvp-topbar {
 
 .event-card-wrap { position: relative; }
 
+/* Year header that separates Drückjagden into calendar-year groups. */
+.year-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0 4px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--steel-dark);
+  text-transform: none;
+}
+.year-divider::before,
+.year-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.year-divider span {
+  background: var(--green-bright);
+  color: #111;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  letter-spacing: 0.6px;
+}
+.year-divider:first-child { margin-top: 4px; }
+
 .event-card {
   display: flex;
   align-items: center;

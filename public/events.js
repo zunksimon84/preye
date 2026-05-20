@@ -244,32 +244,46 @@ function renderEventsList() {
   const list = $("#events-list");
   $("#events-empty").hidden = state.events.length > 0;
   if (!state.events.length) { list.innerHTML = ""; return; }
-  list.innerHTML = state.events.map((ev) => {
-    const dateStr = formatDate(ev.date);
-    const s = ev.stats || { invited: 0, accepted: 0, declined: 0, pending: 0 };
-    const animal = pickEventAnimal(ev.id);
-    return `
-      <div class="event-card-wrap">
-        <a class="event-card" href="#/event/${encodeURIComponent(ev.id)}">
-          <img class="event-card-icon" src="event-icons/${animal}.png" alt="" loading="lazy" />
-          <div class="event-card-content">
-            <div class="event-card-head">
-              <h3>${escapeHtml(ev.name)}</h3>
-              <span class="event-date">${escapeHtml(dateStr)}</span>
-            </div>
-            ${ev.treffpunkt ? `<p class="event-meta">${escapeHtml(ev.treffpunkt)}${ev.treff_time ? " · " + escapeHtml(ev.treff_time) : ""}</p>` : ""}
-            <div class="event-stats">
-              <span class="stat stat-invited">${s.invited} eingeladen</span>
-              <span class="stat stat-accepted">${s.accepted} ✓</span>
-              <span class="stat stat-declined">${s.declined} ✗</span>
-              <span class="stat stat-pending">${s.pending} offen</span>
-            </div>
+  // Backend sorts ascending by date; we insert a year-divider whenever the
+  // year changes so it's visually obvious where a calendar year ends.
+  let lastYear = null;
+  const parts = [];
+  for (const ev of state.events) {
+    const year = (ev.date || "").slice(0, 4);
+    if (year && year !== lastYear) {
+      parts.push(`<div class="year-divider"><span>${escapeHtml(year)}</span></div>`);
+      lastYear = year;
+    }
+    parts.push(renderEventCard(ev));
+  }
+  list.innerHTML = parts.join("");
+}
+
+function renderEventCard(ev) {
+  const dateStr = formatDate(ev.date);
+  const s = ev.stats || { invited: 0, accepted: 0, declined: 0, pending: 0 };
+  const animal = pickEventAnimal(ev.id);
+  return `
+    <div class="event-card-wrap">
+      <a class="event-card" href="#/event/${encodeURIComponent(ev.id)}">
+        <img class="event-card-icon" src="event-icons/${animal}.png" alt="" loading="lazy" />
+        <div class="event-card-content">
+          <div class="event-card-head">
+            <h3>${escapeHtml(ev.name)}</h3>
+            <span class="event-date">${escapeHtml(dateStr)}</span>
           </div>
-        </a>
-        <button class="event-delete-btn" data-eid="${escapeHtml(ev.id)}" type="button" aria-label="Veranstaltung löschen" title="Veranstaltung löschen">×</button>
-      </div>
-    `;
-  }).join("");
+          ${ev.treffpunkt ? `<p class="event-meta">${escapeHtml(ev.treffpunkt)}${ev.treff_time ? " · " + escapeHtml(ev.treff_time) : ""}</p>` : ""}
+          <div class="event-stats">
+            <span class="stat stat-invited">${s.invited} eingeladen</span>
+            <span class="stat stat-accepted">${s.accepted} ✓</span>
+            <span class="stat stat-declined">${s.declined} ✗</span>
+            <span class="stat stat-pending">${s.pending} offen</span>
+          </div>
+        </div>
+      </a>
+      <button class="event-delete-btn" data-eid="${escapeHtml(ev.id)}" type="button" aria-label="Veranstaltung löschen" title="Veranstaltung löschen">×</button>
+    </div>
+  `;
 }
 
 async function deleteEvent(id) {

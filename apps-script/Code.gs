@@ -1549,7 +1549,7 @@ function eventsList_() {
       status: String(ev.status || ""),
       stats: stats,
     };
-  }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+  }).sort(function (a, b) { return (a.date || "").localeCompare(b.date || ""); });
 }
 
 function numOrEmpty_(v) {
