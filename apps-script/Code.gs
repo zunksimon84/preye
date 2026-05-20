@@ -2838,10 +2838,13 @@ function fetchMapboxMap_(positions, postsById) {
   }
   if (!coords.length) return { blob: null, error: "Keine Koordinaten für die Karte." };
 
-  // outdoors-v12 is great for forest orientation: green forest patches,
-  // dirt paths, water features, elevation contours. All Mapbox styles
-  // are available on the free tier.
-  const style = "outdoors-v12";
+  // satellite-streets-v12 is Mapbox's "hybrid" — real aerial imagery
+  // (forests, fields, dirt tracks visible) overlaid with road/water/
+  // place labels. Best detail for hunting orientation. Overridable via
+  // the MAPBOX_STYLE script property: try "outdoors-v12" for a
+  // hiking-style topo, "satellite-v9" for satellite without labels,
+  // or "streets-v12" for the plain street view.
+  const style = (props.getProperty("MAPBOX_STYLE") || "").trim() || "satellite-streets-v12";
   const size = "640x640@2x";
   const overlay = overlays.join(",");
   let url;
