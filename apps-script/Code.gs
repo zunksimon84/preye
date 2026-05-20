@@ -91,8 +91,6 @@ const FREIGABEN_MATRIX = [
       { id: "ak0", label: "AK 0" },
       { id: "ak1", label: "AK 1" },
       { id: "ak2", label: "AK 2" },
-      { id: "ak3", label: "AK 3" },
-      { id: "ak4", label: "AK 4" },
     ]},
     { id: "ricken",   label: "Ricken",      aks: [
       { id: "ak0", label: "AK 0" },
