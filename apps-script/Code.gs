@@ -2804,17 +2804,35 @@ function fetchSquadMap_(baseMarkerSpecs, recipientCoord) {
   }
 }
 
-// Run this from the Apps Script editor to diagnose why the PDF has no
-// map. Logs the result so you see it in the editor's execution log
-// without depending on a UI alert (which would block invisibly when
-// run from the editor — the alert lives in the spreadsheet tab).
+// Run this from the Apps Script editor to diagnose the map rendering.
+// Logs the API-key status, builds a sample Static Maps URL using the
+// CURRENT icon URLs (so we can verify the deployed code is using the
+// new preye.org/markers/* pins), and reports whether the fetch itself
+// returned a valid image. Logs go to the editor's execution log; we
+// avoid ui.alert because it would block invisibly when invoked from
+// the editor.
 function menu_testInfomailMap() {
   const props = PropertiesService.getScriptProperties();
   const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
   console.log("MAPS_API_KEY gesetzt? " + (apiKey ? "ja (" + apiKey.length + " Zeichen)" : "NEIN"));
+
+  // Build a sample marker spec the way the live code does so we can
+  // see exactly what icon URL is being passed to Static Maps.
+  const samplePos = { type: "kanzel", post_id: "demo" };
+  const samplePostsById = { demo: { name: "Nr. 13", area: "Hauptrevier", type: "Kanzel" } };
+  const sampleLabel = squadRosterLabel_(samplePos, samplePostsById, 0);
+  const sampleIcon = markerIconUrl_(sampleLabel);
+  console.log("Sample marker label: " + sampleLabel);
+  console.log("Sample icon URL: " + sampleIcon);
+
+  const markerSpec = "icon:" + sampleIcon + "|53.63065,12.83461";
+  const staticUrl = "https://maps.googleapis.com/maps/api/staticmap?size=640x480&maptype=terrain&scale=2&markers=" +
+    encodeURIComponent(markerSpec) + "&key=" + encodeURIComponent(apiKey);
+  console.log("Static Maps URL (paste in browser to verify visually):\n" + staticUrl);
+
   const result = fetchSquadMap_(
-    ["color:yellow|label:A|53.63065,12.83461"],
-    { lat: 53.63100, lng: 12.83500 }
+    [markerSpec],
+    null
   );
   if (result.blob) {
     const out = {
