@@ -1806,13 +1806,24 @@ function openInfomailPreviewModal(preview) {
   const anstellerOnlyCount = preview.ansteller_recipients || 0;
 
   const summary = `
-    <label class="infomail-opt">
-      <input type="checkbox" id="infomail-include-schuetzen" ${infomailIncludeSchuetzen ? "checked" : ""}>
-      <span><strong>Schützen einbeziehen</strong></span>
-      <span class="muted small">(sonst geht die Mail nur an die Ansteller)</span>
-    </label>
-    <p class="invite-hint" id="infomail-recipients-line"></p>
-    <p class="muted infomail-subject"><strong>Betreff:</strong> ${escapeHtml(preview.sample_subject || "")}</p>
+    <div class="infomail-section infomail-options-section">
+      <div class="infomail-section-heading">⚙️ Versand-Optionen</div>
+      <label class="infomail-opt" for="infomail-include-schuetzen">
+        <input type="checkbox" id="infomail-include-schuetzen" ${infomailIncludeSchuetzen ? "checked" : ""}>
+        <span class="infomail-opt-text">
+          <span class="infomail-opt-title">Schützen einbeziehen</span>
+          <span class="infomail-opt-sub">Ohne Haken geht die Infomail nur an die jeweiligen Ansteller — die übrigen Schützen werden übersprungen.</span>
+        </span>
+      </label>
+    </div>
+
+    <div class="infomail-section infomail-meta-section">
+      <div class="infomail-meta-row" id="infomail-recipients-line"></div>
+      <div class="infomail-meta-row">
+        <span class="infomail-meta-label">Betreff</span>
+        <span class="infomail-meta-value">${escapeHtml(preview.sample_subject || "")}</span>
+      </div>
+    </div>
   `;
 
   const updateRecipientLine = () => {
@@ -1820,10 +1831,14 @@ function openInfomailPreviewModal(preview) {
     infomailIncludeSchuetzen = inclSchuetzen;
     const n = inclSchuetzen ? fullCount : anstellerOnlyCount;
     const runden = preview.runden || 0;
-    const line = inclSchuetzen
-      ? `Empfänger: <strong>${n}</strong> Schütze${n === 1 ? "" : "n"} in <strong>${runden}</strong> Ansteller-Runde${runden === 1 ? "" : "n"}.`
-      : `Empfänger: <strong>${n}</strong> Ansteller (Schützen werden nicht angeschrieben).`;
-    $("#infomail-recipients-line").innerHTML = line;
+    const value = inclSchuetzen
+      ? `${n} Schütze${n === 1 ? "" : "n"} in ${runden} Ansteller-Runde${runden === 1 ? "" : "n"}`
+      : `${n} Ansteller (Schützen werden nicht angeschrieben)`;
+    $("#infomail-recipients-line").innerHTML =
+      '<span class="infomail-meta-label">Empfänger</span>' +
+      '<span class="infomail-meta-value"><strong>' + n + '</strong> ' + escapeHtml(value.replace(/^\d+\s/, "")) + '</span>';
+    const opt = $("#infomail-include-schuetzen").closest(".infomail-opt");
+    if (opt) opt.classList.toggle("infomail-opt--off", !inclSchuetzen);
     const sendBtn = $("#infomail-send");
     sendBtn.textContent = inclSchuetzen ? "An alle Schützen versenden" : "Nur an Ansteller versenden";
     sendBtn.disabled = !n;
@@ -1841,28 +1856,40 @@ function openInfomailPreviewModal(preview) {
     const pdfName = escapeHtml(preview.sample_pdf_name || "infomail-vorschau.pdf");
     const pdfBlock = infomailPdfBlobUrl
       ? `
-        <h4 class="infomail-section-title">PDF-Anhang (Karte + Standbesetzung)</h4>
-        <p class="muted infomail-pdf-note" style="margin-top:0;">
-          <a href="${infomailPdfBlobUrl}" target="_blank" rel="noopener">In neuem Tab öffnen ↗</a>
-          &nbsp;·&nbsp;
-          <a href="${infomailPdfBlobUrl}" download="${pdfName}">PDF herunterladen</a>
-        </p>
-        <object id="infomail-pdf-embed" class="infomail-preview-pdf"
-                data="${infomailPdfBlobUrl}#zoom=page-width" type="application/pdf">
-          <p class="muted">
-            Dein Browser zeigt die PDF-Vorschau hier nicht direkt an —
-            nutze "In neuem Tab öffnen" oder "PDF herunterladen" oben.
-          </p>
-        </object>
+        <div class="infomail-section">
+          <div class="infomail-section-heading">
+            📎 PDF-Anhang
+            <span class="infomail-section-actions">
+              <a class="infomail-link-btn" href="${infomailPdfBlobUrl}" target="_blank" rel="noopener">In neuem Tab ↗</a>
+              <a class="infomail-link-btn" href="${infomailPdfBlobUrl}" download="${pdfName}">Download</a>
+            </span>
+          </div>
+          <object id="infomail-pdf-embed" class="infomail-preview-pdf"
+                  data="${infomailPdfBlobUrl}#zoom=page-width" type="application/pdf">
+            <p class="muted infomail-pdf-fallback">
+              Dein Browser zeigt die PDF-Vorschau hier nicht direkt an —
+              nutze die Links oben rechts.
+            </p>
+          </object>
+        </div>
       `
-      : '<p class="muted infomail-pdf-note">⚠ PDF konnte nicht erzeugt werden (kein Karten-Key?). Die Mail würde ohne Anhang verschickt.</p>';
+      : `
+        <div class="infomail-section">
+          <div class="infomail-section-heading">📎 PDF-Anhang</div>
+          <p class="muted infomail-pdf-fallback">
+            ⚠ PDF konnte nicht erzeugt werden (kein Karten-Key?). Die Mail würde ohne Anhang verschickt.
+          </p>
+        </div>
+      `;
 
     // Sandbox the mail body so its inline styles can't bleed into the rest
     // of the page; PDF iframe is unsandboxed because Chromium needs the
     // default permissions to render the embedded viewer.
     body.innerHTML = warnsHtml + summary +
-      '<h4 class="infomail-section-title">E-Mail-Text</h4>' +
-      '<iframe id="infomail-preview-iframe" class="infomail-preview-iframe" sandbox="allow-same-origin"></iframe>' +
+      '<div class="infomail-section">' +
+        '<div class="infomail-section-heading">📨 E-Mail-Text</div>' +
+        '<iframe id="infomail-preview-iframe" class="infomail-preview-iframe" sandbox="allow-same-origin"></iframe>' +
+      '</div>' +
       pdfBlock;
     const iframe = $("#infomail-preview-iframe");
     iframe.srcdoc = preview.sample_html;
