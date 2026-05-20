@@ -1768,7 +1768,7 @@ function openInfomailPreviewModal(preview) {
   const body = $("#infomail-body");
   const warns = [];
   if (!preview.has_maps_key) {
-    warns.push('⚠ Kein Maps-API-Key gesetzt — die Mails gehen ohne Karte raus.');
+    warns.push('⚠ Kein Karten-Key gesetzt (Geoapify oder Google) — die Mails gehen ohne Karte raus.');
   }
   if (preview.no_email && preview.no_email.length) {
     warns.push("Wird übersprungen (keine E-Mail / nicht im Roster): " + preview.no_email.join(", "));

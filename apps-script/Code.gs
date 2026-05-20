@@ -2609,7 +2609,11 @@ function eventInfomailsPreview_(body) {
     }
   }
   const props = PropertiesService.getScriptProperties();
-  const hasMapsKey = !!(props.getProperty("MAPS_API_KEY") || "").trim();
+  const hasGoogleKey = !!(props.getProperty("MAPS_API_KEY") || "").trim();
+  const hasGeoapifyKey = !!(props.getProperty("GEOAPIFY_KEY") || "").trim();
+  // We can render a map if EITHER provider is configured — the PDF
+  // builder prefers Geoapify and falls back to the Google composite.
+  const hasMapKey = hasGoogleKey || hasGeoapifyKey;
 
   // Render the first eligible recipient's actual email body + the PDF that
   // would be attached. The PDF is shipped to the client as base64 so it can
@@ -2623,7 +2627,7 @@ function eventInfomailsPreview_(body) {
     sampleHtml = buildInfoMailBodyHtml_(ev, sample.squad, sample.pos);
     sampleRecipient = sample.hunter.hunter + " <" + sample.hunter.email + ">";
     sampleSubject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(sample.squad.name);
-    if (hasMapsKey) {
+    if (hasMapKey) {
       try {
         // Match the send path: one PDF per Runde, no recipient-specific
         // red marker. The recipient's stand is identified via the
@@ -2646,7 +2650,8 @@ function eventInfomailsPreview_(body) {
     recipients: recipients,
     no_email: noEmail,
     not_accepted: notAccepted,
-    has_maps_key: hasMapsKey,
+    has_maps_key: hasMapKey,
+    map_provider: hasGeoapifyKey ? "geoapify" : (hasGoogleKey ? "google" : "none"),
     sample_recipient: sampleRecipient,
     sample_subject: sampleSubject,
     sample_html: sampleHtml,
