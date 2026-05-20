@@ -100,18 +100,19 @@ const FREIGABEN_MATRIX = [
 ];
 
 // Compact "AK 0–3" / "AK 0, 2" label for the PDF Freigaben section.
-// AK-numbered groups (id matches /^ak\d+$/) get the range syntax;
-// non-numbered groups (Schwarzwild's Frischling/Überläufer/Bache,…)
-// fall back to a dot-separated list of full labels.
+// Uses each AK's position in its group as its number — works for both
+// number-coded ids (ak0, ak1, …) and stage-named ones (Frischling /
+// Überläufer / Keiler), so Schwarzwild gets the same compact "AK 0–2"
+// rendering as the cervids.
 function formatAkSelection_(group, checkedAks) {
   if (!checkedAks.length) return "";
-  const allNumbered = group.aks.every(function (ak) { return /^ak\d+$/.test(ak.id); });
-  if (!allNumbered) {
-    return checkedAks.map(function (ak) { return ak.label; }).join(" · ");
-  }
+  const idToIdx = {};
+  group.aks.forEach(function (ak, i) { idToIdx[ak.id] = i; });
   const nums = checkedAks
-    .map(function (ak) { return parseInt(ak.id.slice(2), 10); })
+    .map(function (ak) { return idToIdx[ak.id]; })
+    .filter(function (n) { return typeof n === "number"; })
     .sort(function (a, b) { return a - b; });
+  if (!nums.length) return "";
   const ranges = [];
   let start = nums[0];
   let prev = nums[0];
