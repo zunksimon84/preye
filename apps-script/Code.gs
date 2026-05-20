@@ -3148,8 +3148,35 @@ function menu_testInfomailMap() {
   const fakePositions = [{ type: "kanzel", post_id: "demo" }];
   const fakePostsById = { demo: { name: "Nr. 13", area: "Hauptrevier", type: "Kanzel", lat: 53.63065, lng: 12.83461 } };
   if (tilerKey) {
+    // Stage 1: bare minimum — known-free style, no markers, fixed centre.
+    // This tells us if the key works at all.
+    const u1 = "https://api.maptiler.com/maps/streets-v2/static/12.83,53.63,12/300x300.png?key=" +
+      encodeURIComponent(tilerKey);
+    try {
+      const r1 = UrlFetchApp.fetch(u1, { muteHttpExceptions: true });
+      console.log("MapTiler stage1 (streets-v2, no markers): HTTP " + r1.getResponseCode());
+    } catch (e) { console.log("MapTiler stage1 throw: " + (e && e.message || e)); }
+
+    // Stage 2: outdoor-v2, fixed centre+zoom, no markers.
+    const u2 = "https://api.maptiler.com/maps/outdoor-v2/static/12.83,53.63,12/300x300.png?key=" +
+      encodeURIComponent(tilerKey);
+    try {
+      const r2 = UrlFetchApp.fetch(u2, { muteHttpExceptions: true });
+      console.log("MapTiler stage2 (outdoor-v2, no markers): HTTP " + r2.getResponseCode());
+    } catch (e) { console.log("MapTiler stage2 throw: " + (e && e.message || e)); }
+
+    // Stage 3: outdoor-v2 with a built-in MapTiler marker (no custom URL).
+    const u3 = "https://api.maptiler.com/maps/outdoor-v2/static/12.83,53.63,12/300x300.png?key=" +
+      encodeURIComponent(tilerKey) +
+      "&markers=12.83,53.63";
+    try {
+      const r3 = UrlFetchApp.fetch(u3, { muteHttpExceptions: true });
+      console.log("MapTiler stage3 (built-in marker): HTTP " + r3.getResponseCode());
+    } catch (e) { console.log("MapTiler stage3 throw: " + (e && e.message || e)); }
+
+    // Stage 4: the real flow.
     const r = fetchMapTilerMap_(fakePositions, fakePostsById);
-    console.log("MapTiler " + (r.blob ? "OK: " + r.blob.getBytes().length + " bytes" : "FEHLER: " + r.error));
+    console.log("MapTiler stage4 (real call) " + (r.blob ? "OK: " + r.blob.getBytes().length + " bytes" : "FEHLER: " + r.error));
   }
   if (geoKey) {
     const r = fetchGeoapifyMap_(fakePositions, fakePostsById);
