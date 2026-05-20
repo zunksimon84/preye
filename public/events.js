@@ -1838,17 +1838,22 @@ function openInfomailPreviewModal(preview) {
   }
 
   if (preview.sample_html) {
+    const pdfName = escapeHtml(preview.sample_pdf_name || "infomail-vorschau.pdf");
     const pdfBlock = infomailPdfBlobUrl
       ? `
         <h4 class="infomail-section-title">PDF-Anhang (Karte + Standbesetzung)</h4>
-        <iframe id="infomail-pdf-iframe" class="infomail-preview-iframe infomail-preview-pdf"
-                src="${infomailPdfBlobUrl}#zoom=page-width"
-                title="Infomail-PDF"></iframe>
-        <p class="muted infomail-pdf-note">
-          Falls die PDF-Vorschau nicht angezeigt wird:
-          <a href="${infomailPdfBlobUrl}" target="_blank" rel="noopener"
-             download="${escapeHtml(preview.sample_pdf_name || "infomail-vorschau.pdf")}">PDF herunterladen</a>.
+        <p class="muted infomail-pdf-note" style="margin-top:0;">
+          <a href="${infomailPdfBlobUrl}" target="_blank" rel="noopener">In neuem Tab öffnen ↗</a>
+          &nbsp;·&nbsp;
+          <a href="${infomailPdfBlobUrl}" download="${pdfName}">PDF herunterladen</a>
         </p>
+        <object id="infomail-pdf-embed" class="infomail-preview-pdf"
+                data="${infomailPdfBlobUrl}#zoom=page-width" type="application/pdf">
+          <p class="muted">
+            Dein Browser zeigt die PDF-Vorschau hier nicht direkt an —
+            nutze "In neuem Tab öffnen" oder "PDF herunterladen" oben.
+          </p>
+        </object>
       `
       : '<p class="muted infomail-pdf-note">⚠ PDF konnte nicht erzeugt werden (kein Karten-Key?). Die Mail würde ohne Anhang verschickt.</p>';
 

@@ -2350,9 +2350,13 @@ body.rsvp-page #rsvp-topbar {
   background: #fff;
 }
 .infomail-preview-pdf {
+  width: 100%;
   min-height: 640px;
   height: 70vh;
   background: #f2f3f5;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: block;
 }
 .infomail-pdf-note {
   margin: 6px 0 0;
