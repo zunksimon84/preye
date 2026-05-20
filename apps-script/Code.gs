@@ -2417,6 +2417,7 @@ function normalizeEventDates_(ev) {
     coordinator_name: ev.coordinator_name,
     coordinator_phone: ev.coordinator_phone,
     nachsuchenfuehrer: ev.nachsuchenfuehrer,
+    freigaben: ev.freigaben,
   };
 }
 
