@@ -1222,8 +1222,9 @@ function onOpen() {
     .addToUi();
   ui.createMenu("📧 E-Mail")
     .addItem("Test-E-Mail an mich senden", "menu_testEmail")
-    .addItem("Maps API Key setzen (Google Static Maps)", "menu_setMapsApiKey")
-    .addItem("Geoapify-Key setzen (Karten + Pins)", "menu_setGeoapifyKey")
+    .addItem("MapTiler-Key setzen (Satellit + Pins) ⭐", "menu_setMapTilerKey")
+    .addItem("Geoapify-Key setzen (OSM + Pins)", "menu_setGeoapifyKey")
+    .addItem("Maps API Key setzen (Google Fallback)", "menu_setMapsApiKey")
     .addToUi();
 }
 
@@ -1274,11 +1275,31 @@ function menu_setMapsApiKey() {
   ui.alert("Gespeichert. Info-Mails können jetzt eine Karte einbetten.");
 }
 
+// Stores the MapTiler API key. Once set, the Infomail PDF builder
+// uses MapTiler's Static Maps API (satellite/hybrid base + our own
+// preye.org/markers/ pin PNGs rendered natively on the map) as the
+// primary provider. Free tier: 100 000 requests/month. Sign up at
+// https://www.maptiler.com/ (no card required).
+function menu_setMapTilerKey() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt(
+    "MapTiler Key",
+    "API-Key von maptiler.com (Free-Tier 100 k/Monat).\n\n" +
+    "Damit werden die Infomail-Karten mit Satellitenbild + Beschriftung " +
+    "gerendert und die Stand-Pins zeigen die volle Nummer (inkl. a/b-Suffix).",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const k = (r.getResponseText() || "").trim();
+  if (!k) { ui.alert("Kein Key eingegeben."); return; }
+  PropertiesService.getScriptProperties().setProperty("MAPTILER_KEY", k);
+  ui.alert("MapTiler-Key gespeichert. Beim nächsten Infomail-Versand wird die Satellitenkarte verwendet.");
+}
+
 // Stores the Geoapify API key. Once set, the Infomail PDF builder
-// switches from the Google-composite path to a single Geoapify Static
-// Maps call — OSM-bright base map + native teardrop pins with the
-// post number rendered on each. Free tier: 3 000 requests/day. Sign
-// up at https://www.geoapify.com/ (no card required).
+// uses Geoapify's Static Maps API (OSM base + native teardrop pins
+// with up to 2-char text labels). Free tier: 3 000 requests/day.
+// Sign up at https://www.geoapify.com/ (no card required).
 function menu_setGeoapifyKey() {
   const ui = SpreadsheetApp.getUi();
   const r = ui.prompt(
@@ -2611,9 +2632,10 @@ function eventInfomailsPreview_(body) {
   const props = PropertiesService.getScriptProperties();
   const hasGoogleKey = !!(props.getProperty("MAPS_API_KEY") || "").trim();
   const hasGeoapifyKey = !!(props.getProperty("GEOAPIFY_KEY") || "").trim();
-  // We can render a map if EITHER provider is configured — the PDF
-  // builder prefers Geoapify and falls back to the Google composite.
-  const hasMapKey = hasGoogleKey || hasGeoapifyKey;
+  const hasMapTilerKey = !!(props.getProperty("MAPTILER_KEY") || "").trim();
+  // We can render a map if ANY provider is configured. Priority order:
+  // MapTiler (best detail + full pin labels) → Geoapify → Google composite.
+  const hasMapKey = hasMapTilerKey || hasGeoapifyKey || hasGoogleKey;
 
   // Render the first eligible recipient's actual email body + the PDF that
   // would be attached. The PDF is shipped to the client as base64 so it can
@@ -2651,7 +2673,9 @@ function eventInfomailsPreview_(body) {
     no_email: noEmail,
     not_accepted: notAccepted,
     has_maps_key: hasMapKey,
-    map_provider: hasGeoapifyKey ? "geoapify" : (hasGoogleKey ? "google" : "none"),
+    map_provider: hasMapTilerKey ? "maptiler" :
+                   hasGeoapifyKey ? "geoapify" :
+                   hasGoogleKey ? "google" : "none",
     sample_recipient: sampleRecipient,
     sample_subject: sampleSubject,
     sample_html: sampleHtml,
@@ -2784,6 +2808,67 @@ const PIN_HEIGHT_PT = 36;     // height: 88/64 aspect rounded to fit
 
 function markerIconUrl_(text) {
   return MARKER_BASE_URL + encodeURIComponent(String(text)) + ".png";
+}
+
+// Fetches a single PNG of the squad's stands rendered on a MapTiler
+// satellite/hybrid map with our pre-rendered pin PNGs as native markers.
+// MapTiler's Static Images API accepts arbitrary HTTPS icon URLs (unlike
+// Google Static Maps and Geoapify), so the full post number — suffix
+// included — renders directly on the pin head. Free tier: 100k req/mo.
+function fetchMapTilerMap_(positions, postsById) {
+  const props = PropertiesService.getScriptProperties();
+  const key = (props.getProperty("MAPTILER_KEY") || "").trim();
+  if (!key) return { blob: null, error: "Kein MAPTILER_KEY hinterlegt." };
+
+  const coords = [];
+  const markers = [];
+  for (let i = 0; i < positions.length; i++) {
+    const c = positionCoords_(positions[i], postsById);
+    if (!c) continue;
+    coords.push(c);
+    const label = squadRosterLabel_(positions[i], postsById, i);
+    // MapTiler marker syntax: ICON_URL(LON,LAT). The URL must be
+    // URL-encoded; the (lon,lat) part stays literal.
+    const iconUrl = "https://preye.org/markers/" + encodeURIComponent(label) + ".png";
+    markers.push(encodeURIComponent(iconUrl) + "(" + c.lng + "," + c.lat + ")");
+  }
+  if (!coords.length) return { blob: null, error: "Keine Koordinaten für die Karte." };
+
+  // hybrid = satellite imagery + road/area labels — closest match to
+  // the German "Hybrid" Google Maps layer we had before the EEA ban.
+  // Auto-fits to the markers for multi-position runs; falls back to
+  // an explicit centre+zoom for single-position runs where auto-fit
+  // would yield a degenerate bounding box.
+  const style = "hybrid";
+  const size = "640x640@2x";
+  let url;
+  if (coords.length === 1) {
+    url = "https://api.maptiler.com/maps/" + style + "/static/" +
+      coords[0].lng + "," + coords[0].lat + ",15/" + size + ".png" +
+      "?key=" + encodeURIComponent(key) +
+      "&markers=" + markers[0];
+  } else {
+    url = "https://api.maptiler.com/maps/" + style + "/static/auto/" + size + ".png" +
+      "?key=" + encodeURIComponent(key) +
+      "&markers=" + markers.join("|") +
+      "&padding=80";
+  }
+  try {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const code = res.getResponseCode();
+    if (code !== 200) {
+      return { blob: null, error: "MapTiler HTTP " + code + ": " +
+        String(res.getContentText() || "").slice(0, 200) };
+    }
+    const blob = res.getBlob();
+    const ct = blob.getContentType() || "";
+    if (ct.indexOf("image/") !== 0) {
+      return { blob: null, error: "MapTiler lieferte " + ct + " statt eines Bildes." };
+    }
+    return { blob: blob.setName("squadmap.png"), error: "" };
+  } catch (err) {
+    return { blob: null, error: "MapTiler UrlFetchApp: " + (err && err.message || err) };
+  }
 }
 
 // Fetches a single PNG of the squad's stands rendered on an OSM-based
@@ -3051,21 +3136,22 @@ function menu_testInfomailMap() {
   const props = PropertiesService.getScriptProperties();
   const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
   const geoKey = (props.getProperty("GEOAPIFY_KEY") || "").trim();
-  console.log("MAPS_API_KEY gesetzt? " + (apiKey ? "ja (" + apiKey.length + " Zeichen)" : "NEIN"));
-  console.log("GEOAPIFY_KEY gesetzt? " + (geoKey ? "ja (" + geoKey.length + " Zeichen)" : "NEIN"));
+  const tilerKey = (props.getProperty("MAPTILER_KEY") || "").trim();
+  console.log("MAPTILER_KEY gesetzt? " + (tilerKey ? "ja (" + tilerKey.length + " Zeichen)" : "NEIN"));
+  console.log("GEOAPIFY_KEY  gesetzt? " + (geoKey ? "ja (" + geoKey.length + " Zeichen)" : "NEIN"));
+  console.log("MAPS_API_KEY  gesetzt? " + (apiKey ? "ja (" + apiKey.length + " Zeichen)" : "NEIN"));
 
-  // Probe the real Geoapify path with a sample marker so we can see
-  // what URL goes out and what comes back. Posts a fake position so it
-  // works even if no real Runde exists yet.
+  // Probe each configured provider end-to-end with a sample marker so
+  // the editor log shows exactly which one(s) work and what fails.
+  const fakePositions = [{ type: "kanzel", post_id: "demo" }];
+  const fakePostsById = { demo: { name: "Nr. 13", area: "Hauptrevier", type: "Kanzel", lat: 53.63065, lng: 12.83461 } };
+  if (tilerKey) {
+    const r = fetchMapTilerMap_(fakePositions, fakePostsById);
+    console.log("MapTiler " + (r.blob ? "OK: " + r.blob.getBytes().length + " bytes" : "FEHLER: " + r.error));
+  }
   if (geoKey) {
-    const fakePositions = [{ type: "kanzel", post_id: "demo" }];
-    const fakePostsById = { demo: { name: "Nr. 13", area: "Hauptrevier", type: "Kanzel", lat: 53.63065, lng: 12.83461 } };
     const r = fetchGeoapifyMap_(fakePositions, fakePostsById);
-    if (r.blob) {
-      console.log("Geoapify OK: " + r.blob.getBytes().length + " bytes, " + r.blob.getContentType());
-    } else {
-      console.log("Geoapify FEHLER: " + r.error);
-    }
+    console.log("Geoapify " + (r.blob ? "OK: " + r.blob.getBytes().length + " bytes" : "FEHLER: " + r.error));
   }
 
 
@@ -3182,50 +3268,60 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     });
     body.appendParagraph(" ");
 
-    // Map rendering. Prefer Geoapify (OSM base + native teardrop pins
-    // with the post number on each) since it returns one composed PNG
-    // and the detail level fits forest orientation. Falls back to the
-    // Google Static Maps + DocumentApp positioned-image composite when
-    // no Geoapify key is set yet.
+    // Map rendering, in priority order:
+    //   1. MapTiler hybrid (satellite + labels) with our preye.org pin PNGs
+    //      rendered natively on the map — best detail, full labels.
+    //   2. Geoapify OSM with built-in pins (2-char label cap, no satellite).
+    //   3. Google Static Maps base + DocumentApp positioned-image composite.
+    // Fallback only fires when a provider's key is missing — an active
+    // rejection (bad key, quota, etc.) surfaces in the PDF so we can fix it.
     let mapPlaced = false;
     let mapError = "";
-    const geo = fetchGeoapifyMap_(positions, postsById);
-    if (geo.blob) {
-      const img = body.appendImage(geo.blob);
+    const placeImage = function (blob) {
+      const img = body.appendImage(blob);
       const ratio = img.getHeight() / img.getWidth();
       img.setWidth(MAP_TARGET_WIDTH_PT);
       img.setHeight(MAP_TARGET_WIDTH_PT * ratio);
       img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
       mapPlaced = true;
-    } else if (/Kein GEOAPIFY_KEY/.test(geo.error)) {
-      // No Geoapify key yet — fall back to the Google composite.
-      const composite = fetchBaseMapAndPositions_(positions, postsById);
-      if (composite.blob) {
-        const inlineImg = body.appendImage(composite.blob);
-        inlineImg.setWidth(MAP_TARGET_WIDTH_PT);
-        inlineImg.setHeight(MAP_TARGET_WIDTH_PT);
-        const mapPara = inlineImg.getParent().asParagraph();
-        mapPara.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
-        const ptPerPx = MAP_TARGET_WIDTH_PT / composite.renderedSize;
-        for (let pi = 0; pi < composite.pins.length; pi++) {
-          const pin = composite.pins[pi];
-          const pinBlob = fetchMarkerBlob_(pin.label);
-          if (!pinBlob) continue;
-          const posImg = mapPara.addPositionedImage(pinBlob);
-          posImg.setWidth(PIN_WIDTH_PT);
-          posImg.setHeight(PIN_HEIGHT_PT);
-          posImg.setLayout(DocumentApp.PositionedLayout.ABOVE_TEXT);
-          posImg.setLeftOffset(pin.pxX * ptPerPx - PIN_WIDTH_PT / 2);
-          posImg.setTopOffset(pin.pxY * ptPerPx - PIN_HEIGHT_PT);
+    };
+
+    const tiler = fetchMapTilerMap_(positions, postsById);
+    if (tiler.blob) {
+      placeImage(tiler.blob);
+    } else if (/Kein MAPTILER_KEY/.test(tiler.error)) {
+      const geo = fetchGeoapifyMap_(positions, postsById);
+      if (geo.blob) {
+        placeImage(geo.blob);
+      } else if (/Kein GEOAPIFY_KEY/.test(geo.error)) {
+        const composite = fetchBaseMapAndPositions_(positions, postsById);
+        if (composite.blob) {
+          const inlineImg = body.appendImage(composite.blob);
+          inlineImg.setWidth(MAP_TARGET_WIDTH_PT);
+          inlineImg.setHeight(MAP_TARGET_WIDTH_PT);
+          const mapPara = inlineImg.getParent().asParagraph();
+          mapPara.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
+          const ptPerPx = MAP_TARGET_WIDTH_PT / composite.renderedSize;
+          for (let pi = 0; pi < composite.pins.length; pi++) {
+            const pin = composite.pins[pi];
+            const pinBlob = fetchMarkerBlob_(pin.label);
+            if (!pinBlob) continue;
+            const posImg = mapPara.addPositionedImage(pinBlob);
+            posImg.setWidth(PIN_WIDTH_PT);
+            posImg.setHeight(PIN_HEIGHT_PT);
+            posImg.setLayout(DocumentApp.PositionedLayout.ABOVE_TEXT);
+            posImg.setLeftOffset(pin.pxX * ptPerPx - PIN_WIDTH_PT / 2);
+            posImg.setTopOffset(pin.pxY * ptPerPx - PIN_HEIGHT_PT);
+          }
+          mapPlaced = true;
+        } else {
+          mapError = composite.error || geo.error || tiler.error;
         }
-        mapPlaced = true;
       } else {
-        mapError = composite.error || geo.error;
+        mapError = geo.error;
       }
     } else {
-      // Geoapify actively rejected (bad key, billing, etc.) — surface
-      // the reason rather than silently falling back.
-      mapError = geo.error;
+      mapError = tiler.error;
     }
 
     if (mapPlaced) {
