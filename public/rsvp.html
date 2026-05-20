@@ -45,10 +45,26 @@
 
         <div class="rsvp-role-choice" id="rsvp-role-choice" hidden>
           <p class="rsvp-role-prompt">In welcher Funktion möchtest Du teilnehmen?</p>
+
+          <fieldset class="rsvp-confirms" id="rsvp-confirms">
+            <legend>Vor der Zusage bitte bestätigen:</legend>
+            <label class="rsvp-confirm">
+              <input type="checkbox" id="rsvp-confirm-jagdschein" />
+              <span>Ich bin im Besitz eines gültigen Jagdscheins.</span>
+            </label>
+            <label class="rsvp-confirm">
+              <input type="checkbox" id="rsvp-confirm-vsg" />
+              <span>Die Vorschriften der
+                <a href="https://cdn.svlfg.de/fiona8-blobs/public/svlfgonpremiseproduction/4602f00372a5a47d/3ae5d95e332a/vsg4_4-jagd.pdf"
+                   target="_blank" rel="noopener noreferrer">VSG 4.4</a>
+                habe ich zur Kenntnis genommen.</span>
+            </label>
+          </fieldset>
+
           <div class="rsvp-role-buttons">
-            <button class="role-btn" data-role="Schütze/Standschnaller" type="button">Schütze / Standschnaller</button>
-            <button class="role-btn" data-role="Treiber" type="button">Treiber</button>
-            <button class="role-btn" data-role="Hundeführer" type="button">Hundeführer</button>
+            <button class="role-btn" data-role="Schütze/Standschnaller" type="button" disabled>Schütze / Standschnaller</button>
+            <button class="role-btn" data-role="Treiber" type="button" disabled>Treiber</button>
+            <button class="role-btn" data-role="Hundeführer" type="button" disabled>Hundeführer</button>
           </div>
           <button class="rsvp-role-back" id="rsvp-role-back" type="button">← zurück</button>
         </div>

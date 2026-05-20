@@ -200,14 +200,34 @@ async function respond(choice, role, dogs) {
   }
 }
 
-$("#rsvp-accept").addEventListener("click", () => showSection("roles"));
+// Role buttons stay disabled until both confirmation checkboxes are ticked
+// (gültiger Jagdschein + VSG-4.4-Kenntnisnahme). This is a UX gate — there
+// is no server-side enforcement; the trust model is the magic-link.
+function updateRoleButtonsEnabled() {
+  const ok = $("#rsvp-confirm-jagdschein").checked && $("#rsvp-confirm-vsg").checked;
+  $$(".role-btn").forEach((btn) => { btn.disabled = !ok; });
+}
+
+$("#rsvp-accept").addEventListener("click", () => {
+  // Reset the confirmation state every time we (re-)enter the role screen
+  // so a previously-cached state doesn't trick the user.
+  $("#rsvp-confirm-jagdschein").checked = false;
+  $("#rsvp-confirm-vsg").checked = false;
+  updateRoleButtonsEnabled();
+  showSection("roles");
+});
 $("#rsvp-decline").addEventListener("click", () => respond("decline"));
 $("#rsvp-role-back").addEventListener("click", () => showSection("actions"));
 $("#dog-back").addEventListener("click", () => showSection("roles"));
 $("#dog-add").addEventListener("click", () => addDogRow());
 $("#dog-submit").addEventListener("click", () => respond("accept", selectedRole, collectDogs()));
 $$(".role-btn").forEach((btn) => {
-  btn.addEventListener("click", () => pickRole(btn.dataset.role));
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    pickRole(btn.dataset.role);
+  });
 });
+$("#rsvp-confirm-jagdschein").addEventListener("change", updateRoleButtonsEnabled);
+$("#rsvp-confirm-vsg").addEventListener("change", updateRoleButtonsEnabled);
 
 loadInvite();
