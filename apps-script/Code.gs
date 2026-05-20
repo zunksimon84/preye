@@ -1222,8 +1222,8 @@ function onOpen() {
     .addToUi();
   ui.createMenu("📧 E-Mail")
     .addItem("Test-E-Mail an mich senden", "menu_testEmail")
-    .addItem("MapTiler-Key setzen (Satellit + Pins) ⭐", "menu_setMapTilerKey")
-    .addItem("Geoapify-Key setzen (OSM + Pins)", "menu_setGeoapifyKey")
+    .addItem("Mapbox-Token setzen (Karten + volle Pin-Beschriftung) ⭐", "menu_setMapboxToken")
+    .addItem("Geoapify-Key setzen (Karten + Pins, 2-Zeichen-Limit)", "menu_setGeoapifyKey")
     .addItem("Maps API Key setzen (Google Fallback)", "menu_setMapsApiKey")
     .addToUi();
 }
@@ -1275,25 +1275,28 @@ function menu_setMapsApiKey() {
   ui.alert("Gespeichert. Info-Mails können jetzt eine Karte einbetten.");
 }
 
-// Stores the MapTiler API key. Once set, the Infomail PDF builder
-// uses MapTiler's Static Maps API (satellite/hybrid base + our own
+// Stores the Mapbox access token. Once set, the Infomail PDF builder
+// uses Mapbox's Static Images API (outdoors style with our own
 // preye.org/markers/ pin PNGs rendered natively on the map) as the
-// primary provider. Free tier: 100 000 requests/month. Sign up at
-// https://www.maptiler.com/ (no card required).
-function menu_setMapTilerKey() {
+// primary provider. The full post number — suffix and all — fits on
+// every pin head because Mapbox accepts arbitrary HTTPS icon URLs.
+// Free tier: 50 000 requests/month. Sign up at https://account.mapbox.com/
+// (no card required). The "Default public token" on the account page
+// (starts with `pk.`) is what to paste here.
+function menu_setMapboxToken() {
   const ui = SpreadsheetApp.getUi();
   const r = ui.prompt(
-    "MapTiler Key",
-    "API-Key von maptiler.com (Free-Tier 100 k/Monat).\n\n" +
-    "Damit werden die Infomail-Karten mit Satellitenbild + Beschriftung " +
-    "gerendert und die Stand-Pins zeigen die volle Nummer (inkl. a/b-Suffix).",
+    "Mapbox Access Token",
+    "Default public token von account.mapbox.com (beginnt mit pk.).\n\n" +
+    "Damit werden die Infomail-Karten gerendert und die Stand-Pins zeigen " +
+    "die volle Nummer inkl. a/b-Suffix.",
     ui.ButtonSet.OK_CANCEL
   );
   if (r.getSelectedButton() !== ui.Button.OK) return;
   const k = (r.getResponseText() || "").trim();
-  if (!k) { ui.alert("Kein Key eingegeben."); return; }
-  PropertiesService.getScriptProperties().setProperty("MAPTILER_KEY", k);
-  ui.alert("MapTiler-Key gespeichert. Beim nächsten Infomail-Versand wird die Satellitenkarte verwendet.");
+  if (!k) { ui.alert("Kein Token eingegeben."); return; }
+  PropertiesService.getScriptProperties().setProperty("MAPBOX_TOKEN", k);
+  ui.alert("Mapbox-Token gespeichert. Beim nächsten Infomail-Versand wird Mapbox verwendet.");
 }
 
 // Stores the Geoapify API key. Once set, the Infomail PDF builder
@@ -2632,10 +2635,10 @@ function eventInfomailsPreview_(body) {
   const props = PropertiesService.getScriptProperties();
   const hasGoogleKey = !!(props.getProperty("MAPS_API_KEY") || "").trim();
   const hasGeoapifyKey = !!(props.getProperty("GEOAPIFY_KEY") || "").trim();
-  const hasMapTilerKey = !!(props.getProperty("MAPTILER_KEY") || "").trim();
+  const hasMapboxToken = !!(props.getProperty("MAPBOX_TOKEN") || "").trim();
   // We can render a map if ANY provider is configured. Priority order:
-  // MapTiler (best detail + full pin labels) → Geoapify → Google composite.
-  const hasMapKey = hasMapTilerKey || hasGeoapifyKey || hasGoogleKey;
+  // Mapbox (full pin labels) → Geoapify (2-char pin labels) → Google composite.
+  const hasMapKey = hasMapboxToken || hasGeoapifyKey || hasGoogleKey;
 
   // Render the first eligible recipient's actual email body + the PDF that
   // would be attached. The PDF is shipped to the client as base64 so it can
@@ -2673,7 +2676,7 @@ function eventInfomailsPreview_(body) {
     no_email: noEmail,
     not_accepted: notAccepted,
     has_maps_key: hasMapKey,
-    map_provider: hasMapTilerKey ? "maptiler" :
+    map_provider: hasMapboxToken ? "mapbox" :
                    hasGeoapifyKey ? "geoapify" :
                    hasGoogleKey ? "google" : "none",
     sample_recipient: sampleRecipient,
@@ -2810,66 +2813,65 @@ function markerIconUrl_(text) {
   return MARKER_BASE_URL + encodeURIComponent(String(text)) + ".png";
 }
 
-// Fetches a single PNG of the squad's stands rendered on a MapTiler
-// satellite/hybrid map with our pre-rendered pin PNGs as native markers.
-// MapTiler's Static Images API accepts arbitrary HTTPS icon URLs (unlike
-// Google Static Maps and Geoapify), so the full post number — suffix
-// included — renders directly on the pin head. Free tier: 100k req/mo.
-function fetchMapTilerMap_(positions, postsById) {
+// Fetches a single PNG of the squad's stands rendered on a Mapbox
+// outdoors map with our pre-rendered pin PNGs as native markers.
+// Mapbox's Static Images API accepts arbitrary HTTPS icon URLs (unlike
+// Google Static Maps and Geoapify), so the full post number — including
+// 3+ char labels like "100" or "23a" — renders directly on the pin head.
+// Free tier: 50k req/mo.
+function fetchMapboxMap_(positions, postsById) {
   const props = PropertiesService.getScriptProperties();
-  const key = (props.getProperty("MAPTILER_KEY") || "").trim();
-  if (!key) return { blob: null, error: "Kein MAPTILER_KEY hinterlegt." };
+  const token = (props.getProperty("MAPBOX_TOKEN") || "").trim();
+  if (!token) return { blob: null, error: "Kein MAPBOX_TOKEN hinterlegt." };
 
   const coords = [];
-  const markers = [];
+  const overlays = [];
   for (let i = 0; i < positions.length; i++) {
     const c = positionCoords_(positions[i], postsById);
     if (!c) continue;
     coords.push(c);
     const label = squadRosterLabel_(positions[i], postsById, i);
-    // MapTiler marker syntax: ICON_URL(LON,LAT). The URL must be
-    // URL-encoded; the (lon,lat) part stays literal.
+    // Mapbox overlay syntax: url-{encoded_url}({lon},{lat}). The URL
+    // must be URL-encoded; the (lon,lat) stays literal.
     const iconUrl = "https://preye.org/markers/" + encodeURIComponent(label) + ".png";
-    markers.push(encodeURIComponent(iconUrl) + "(" + c.lng + "," + c.lat + ")");
+    overlays.push("url-" + encodeURIComponent(iconUrl) + "(" + c.lng + "," + c.lat + ")");
   }
   if (!coords.length) return { blob: null, error: "Keine Koordinaten für die Karte." };
 
-  // outdoor-v2 is on MapTiler's free tier and made for outdoor/hiking
-  // use: forest patches in green, dirt paths, water features, contour
-  // lines. Satellite/hybrid styles require their Premium plan (HTTP
-  // 403 on free keys), so this is the sensible default for hunters.
-  // Auto-fits to the markers for multi-position runs; falls back to
-  // an explicit centre+zoom for single-position runs where auto-fit
-  // would yield a degenerate bounding box.
-  const style = "outdoor-v2";
+  // outdoors-v12 is great for forest orientation: green forest patches,
+  // dirt paths, water features, elevation contours. All Mapbox styles
+  // are available on the free tier.
+  const style = "outdoors-v12";
   const size = "640x640@2x";
+  const overlay = overlays.join(",");
   let url;
   if (coords.length === 1) {
-    url = "https://api.maptiler.com/maps/" + style + "/static/" +
-      coords[0].lng + "," + coords[0].lat + ",15/" + size + ".png" +
-      "?key=" + encodeURIComponent(key) +
-      "&markers=" + markers[0];
+    // Single marker: explicit centre+zoom so auto-fit doesn't pick
+    // a degenerate bounding box.
+    url = "https://api.mapbox.com/styles/v1/mapbox/" + style + "/static/" +
+      overlay + "/" + coords[0].lng + "," + coords[0].lat + ",15/" + size +
+      "?access_token=" + encodeURIComponent(token);
   } else {
-    url = "https://api.maptiler.com/maps/" + style + "/static/auto/" + size + ".png" +
-      "?key=" + encodeURIComponent(key) +
-      "&markers=" + markers.join("|") +
+    url = "https://api.mapbox.com/styles/v1/mapbox/" + style + "/static/" +
+      overlay + "/auto/" + size +
+      "?access_token=" + encodeURIComponent(token) +
       "&padding=80";
   }
   try {
     const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     const code = res.getResponseCode();
     if (code !== 200) {
-      return { blob: null, error: "MapTiler HTTP " + code + ": " +
+      return { blob: null, error: "Mapbox HTTP " + code + ": " +
         String(res.getContentText() || "").slice(0, 200) };
     }
     const blob = res.getBlob();
     const ct = blob.getContentType() || "";
     if (ct.indexOf("image/") !== 0) {
-      return { blob: null, error: "MapTiler lieferte " + ct + " statt eines Bildes." };
+      return { blob: null, error: "Mapbox lieferte " + ct + " statt eines Bildes." };
     }
     return { blob: blob.setName("squadmap.png"), error: "" };
   } catch (err) {
-    return { blob: null, error: "MapTiler UrlFetchApp: " + (err && err.message || err) };
+    return { blob: null, error: "Mapbox UrlFetchApp: " + (err && err.message || err) };
   }
 }
 
@@ -3138,50 +3140,18 @@ function menu_testInfomailMap() {
   const props = PropertiesService.getScriptProperties();
   const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
   const geoKey = (props.getProperty("GEOAPIFY_KEY") || "").trim();
-  const tilerKey = (props.getProperty("MAPTILER_KEY") || "").trim();
-  console.log("MAPTILER_KEY gesetzt? " + (tilerKey ? "ja (" + tilerKey.length + " Zeichen)" : "NEIN"));
-  console.log("GEOAPIFY_KEY  gesetzt? " + (geoKey ? "ja (" + geoKey.length + " Zeichen)" : "NEIN"));
-  console.log("MAPS_API_KEY  gesetzt? " + (apiKey ? "ja (" + apiKey.length + " Zeichen)" : "NEIN"));
+  const mboxToken = (props.getProperty("MAPBOX_TOKEN") || "").trim();
+  console.log("MAPBOX_TOKEN gesetzt? " + (mboxToken ? "ja (" + mboxToken.length + " Zeichen)" : "NEIN"));
+  console.log("GEOAPIFY_KEY gesetzt? " + (geoKey ? "ja (" + geoKey.length + " Zeichen)" : "NEIN"));
+  console.log("MAPS_API_KEY gesetzt? " + (apiKey ? "ja (" + apiKey.length + " Zeichen)" : "NEIN"));
 
   // Probe each configured provider end-to-end with a sample marker so
   // the editor log shows exactly which one(s) work and what fails.
   const fakePositions = [{ type: "kanzel", post_id: "demo" }];
   const fakePostsById = { demo: { name: "Nr. 13", area: "Hauptrevier", type: "Kanzel", lat: 53.63065, lng: 12.83461 } };
-  if (tilerKey) {
-    // Stage 1: bare minimum — known-free style, no markers, fixed centre.
-    // This tells us if the key works at all.
-    const u1 = "https://api.maptiler.com/maps/streets-v2/static/12.83,53.63,12/300x300.png?key=" +
-      encodeURIComponent(tilerKey);
-    // Print this URL so you can open it in your browser. If your browser
-    // shows the actual map → it's a Referer-header issue with Apps Script.
-    // If the browser also shows "Invalid key" or similar → the key itself
-    // is the problem.
-    console.log("Open this in your browser to see MapTiler's exact verdict:\n" + u1);
-    try {
-      const r1 = UrlFetchApp.fetch(u1, { muteHttpExceptions: true });
-      console.log("MapTiler stage1 (streets-v2, no markers): HTTP " + r1.getResponseCode());
-    } catch (e) { console.log("MapTiler stage1 throw: " + (e && e.message || e)); }
-
-    // Stage 2: outdoor-v2, fixed centre+zoom, no markers.
-    const u2 = "https://api.maptiler.com/maps/outdoor-v2/static/12.83,53.63,12/300x300.png?key=" +
-      encodeURIComponent(tilerKey);
-    try {
-      const r2 = UrlFetchApp.fetch(u2, { muteHttpExceptions: true });
-      console.log("MapTiler stage2 (outdoor-v2, no markers): HTTP " + r2.getResponseCode());
-    } catch (e) { console.log("MapTiler stage2 throw: " + (e && e.message || e)); }
-
-    // Stage 3: outdoor-v2 with a built-in MapTiler marker (no custom URL).
-    const u3 = "https://api.maptiler.com/maps/outdoor-v2/static/12.83,53.63,12/300x300.png?key=" +
-      encodeURIComponent(tilerKey) +
-      "&markers=12.83,53.63";
-    try {
-      const r3 = UrlFetchApp.fetch(u3, { muteHttpExceptions: true });
-      console.log("MapTiler stage3 (built-in marker): HTTP " + r3.getResponseCode());
-    } catch (e) { console.log("MapTiler stage3 throw: " + (e && e.message || e)); }
-
-    // Stage 4: the real flow.
-    const r = fetchMapTilerMap_(fakePositions, fakePostsById);
-    console.log("MapTiler stage4 (real call) " + (r.blob ? "OK: " + r.blob.getBytes().length + " bytes" : "FEHLER: " + r.error));
+  if (mboxToken) {
+    const r = fetchMapboxMap_(fakePositions, fakePostsById);
+    console.log("Mapbox   " + (r.blob ? "OK: " + r.blob.getBytes().length + " bytes" : "FEHLER: " + r.error));
   }
   if (geoKey) {
     const r = fetchGeoapifyMap_(fakePositions, fakePostsById);
@@ -3303,9 +3273,10 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     body.appendParagraph(" ");
 
     // Map rendering, in priority order:
-    //   1. MapTiler hybrid (satellite + labels) with our preye.org pin PNGs
-    //      rendered natively on the map — best detail, full labels.
-    //   2. Geoapify OSM with built-in pins (2-char label cap, no satellite).
+    //   1. Mapbox outdoors with our preye.org pin PNGs as native markers
+    //      — full post-number labels, even for 3+ char labels like "100"
+    //      or "23a". Free tier 50k req/mo.
+    //   2. Geoapify OSM with built-in pins (2-char label cap).
     //   3. Google Static Maps base + DocumentApp positioned-image composite.
     // Fallback only fires when a provider's key is missing — an active
     // rejection (bad key, quota, etc.) surfaces in the PDF so we can fix it.
@@ -3320,10 +3291,10 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       mapPlaced = true;
     };
 
-    const tiler = fetchMapTilerMap_(positions, postsById);
-    if (tiler.blob) {
-      placeImage(tiler.blob);
-    } else if (/Kein MAPTILER_KEY/.test(tiler.error)) {
+    const mbox = fetchMapboxMap_(positions, postsById);
+    if (mbox.blob) {
+      placeImage(mbox.blob);
+    } else if (/Kein MAPBOX_TOKEN/.test(mbox.error)) {
       const geo = fetchGeoapifyMap_(positions, postsById);
       if (geo.blob) {
         placeImage(geo.blob);
@@ -3349,13 +3320,13 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
           }
           mapPlaced = true;
         } else {
-          mapError = composite.error || geo.error || tiler.error;
+          mapError = composite.error || geo.error || mbox.error;
         }
       } else {
         mapError = geo.error;
       }
     } else {
-      mapError = tiler.error;
+      mapError = mbox.error;
     }
 
     if (mapPlaced) {
