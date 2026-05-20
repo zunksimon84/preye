@@ -1784,6 +1784,44 @@ function infomailMakePdfBlobUrl(base64) {
   }
 }
 
+// Renders the Freigaben checkbox grid from the matrix + the saved
+// selection (null = "first time, default everything on").
+function buildFreigabenSectionHtml(matrix, selected) {
+  if (!Array.isArray(matrix) || !matrix.length) return "";
+  const selectedSet = Array.isArray(selected) ? new Set(selected) : null;
+  const isChecked = (key) => selectedSet ? selectedSet.has(key) : true;
+  const speciesHtml = matrix.map((sp) => {
+    const groupsHtml = sp.groups.map((g) => {
+      const aksHtml = g.aks.map((ak) => {
+        const key = `${sp.id}.${g.id}.${ak.id}`;
+        const on = isChecked(key);
+        return `<label class="freigabe-ak${on ? " freigabe-ak--on" : ""}">
+          <input type="checkbox" class="freigabe-cb" data-key="${escapeHtml(key)}"${on ? " checked" : ""}>
+          <span>${escapeHtml(ak.label)}</span>
+        </label>`;
+      }).join("");
+      return `<div class="freigabe-group">
+        <span class="freigabe-group-label">${escapeHtml(g.label)}</span>
+        <div class="freigabe-aks">${aksHtml}</div>
+      </div>`;
+    }).join("");
+    return `<div class="freigabe-species">
+      <div class="freigabe-species-label">${escapeHtml(sp.label)}</div>
+      ${groupsHtml}
+    </div>`;
+  }).join("");
+  return `
+    <div class="infomail-section infomail-freigaben-section">
+      <div class="infomail-section-heading">🎯 Freigaben</div>
+      <p class="muted infomail-freigaben-hint">
+        Häkchen setzen oder entfernen, was am Jagdtag erlegt werden darf. Wird beim Versenden gespeichert und für die nächste Bearbeitung gemerkt.
+      </p>
+      ${speciesHtml}
+      <p class="muted infomail-freigaben-foot">Raubwild ist generell nicht freigegeben.</p>
+    </div>
+  `;
+}
+
 function openInfomailPreviewModal(preview) {
   const body = $("#infomail-body");
   const warns = [];
@@ -1882,15 +1920,27 @@ function openInfomailPreviewModal(preview) {
         </div>
       `;
 
+    const freigabenHtml = buildFreigabenSectionHtml(
+      preview.freigaben_matrix,
+      preview.freigaben_selected
+    );
+
     // Sandbox the mail body so its inline styles can't bleed into the rest
     // of the page; PDF iframe is unsandboxed because Chromium needs the
     // default permissions to render the embedded viewer.
-    body.innerHTML = warnsHtml + summary +
+    body.innerHTML = warnsHtml + summary + freigabenHtml +
       '<div class="infomail-section">' +
         '<div class="infomail-section-heading">📨 E-Mail-Text</div>' +
         '<iframe id="infomail-preview-iframe" class="infomail-preview-iframe" sandbox="allow-same-origin"></iframe>' +
       '</div>' +
       pdfBlock;
+    // Toggle the "off" visual on each Freigabe pill in real time.
+    document.querySelectorAll(".freigabe-cb").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const lbl = cb.closest(".freigabe-ak");
+        if (lbl) lbl.classList.toggle("freigabe-ak--on", cb.checked);
+      });
+    });
     const iframe = $("#infomail-preview-iframe");
     iframe.srcdoc = preview.sample_html;
     iframe.addEventListener("load", () => {
@@ -1924,10 +1974,14 @@ async function confirmSendInfomails() {
   const oldText = btn.textContent;
   btn.textContent = "Sende …";
   try {
+    const freigabenSelected = Array.from(document.querySelectorAll(".freigabe-cb"))
+      .filter((cb) => cb.checked)
+      .map((cb) => cb.dataset.key);
     const data = await postJson({
       action: "event-infomails-send",
       event_id: state.currentEvent.event.id,
       ansteller_only: !$("#infomail-include-schuetzen").checked,
+      freigaben: freigabenSelected,
     });
     closeInfomailPreviewModal();
     if (data.errors && data.errors.length) {

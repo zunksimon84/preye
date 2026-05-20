@@ -35,7 +35,83 @@ const POST_TYPES = ["Kanzel", "Drückjagdbock", "Leiter"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
-const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer"];
+const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer", "freigaben"];
+
+// Canonical species / gender / AK matrix for the Freigaben section in
+// the Infomail PDF. Stays in this one place so the backend filters and
+// frontend checkboxes can't drift out of sync. The selected-AK list
+// saved per event is a flat array of strings like
+//   "rotwild.hirsche.ak0"
+// An event with no freigaben column (legacy) or with an empty array is
+// rendered as "everything is released" — i.e., the default before the
+// organizer picks anything is identical to the previous hardcoded list.
+const FREIGABEN_MATRIX = [
+  { id: "rotwild", label: "Rotwild", groups: [
+    { id: "hirsche",  label: "Hirsche",     aks: [
+      { id: "ak0", label: "AK 0 (Hirschkalb)" },
+      { id: "ak1", label: "AK 1 (Schmalspießer)" },
+      { id: "ak2", label: "AK 2 (Mittelhirsch)" },
+      { id: "ak3", label: "AK 3 (Althirsch)" },
+    ]},
+    { id: "kuehe",    label: "Hirschkühe",  aks: [
+      { id: "ak0", label: "AK 0 (Hirschkalb)" },
+      { id: "ak1", label: "AK 1 (Schmaltier)" },
+      { id: "ak2", label: "AK 2 (Alttier)" },
+    ]},
+  ]},
+  { id: "damwild", label: "Damwild", groups: [
+    { id: "hirsche",  label: "Hirsche",     aks: [
+      { id: "ak0", label: "AK 0 (Kalb)" },
+      { id: "ak1", label: "AK 1 (Spießer)" },
+      { id: "ak2", label: "AK 2 (Mittelhirsch)" },
+      { id: "ak3", label: "AK 3 (Althirsch)" },
+    ]},
+    { id: "tiere",    label: "Damtiere",    aks: [
+      { id: "ak0", label: "AK 0 (Kalb)" },
+      { id: "ak1", label: "AK 1 (Schmaltier)" },
+      { id: "ak2", label: "AK 2 (Alttier)" },
+    ]},
+  ]},
+  { id: "schwarzwild", label: "Schwarzwild", groups: [
+    { id: "keiler",   label: "Keiler",      aks: [
+      { id: "frischling",   label: "Frischling" },
+      { id: "ueberlaeufer", label: "Überläufer" },
+      { id: "keiler",       label: "Keiler" },
+    ]},
+    { id: "bachen",   label: "Bachen",      aks: [
+      { id: "frischling",   label: "Frischling" },
+      { id: "ueberlaeufer", label: "Überläufer" },
+      { id: "bache",        label: "Bache (Leitbachen verschonen)" },
+    ]},
+  ]},
+  { id: "rehwild", label: "Rehwild", groups: [
+    { id: "boecke",   label: "Rehböcke",    aks: [
+      { id: "ak0", label: "AK 0 (Bockkitz)" },
+      { id: "ak1", label: "AK 1 (Jährling)" },
+      { id: "ak2", label: "AK 2 (Mittelbock)" },
+      { id: "ak3", label: "AK 3 (Altbock)" },
+    ]},
+    { id: "ricken",   label: "Ricken",      aks: [
+      { id: "ak0", label: "AK 0 (Rehkitz)" },
+      { id: "ak1", label: "AK 1 (Schmalreh)" },
+      { id: "ak2", label: "AK 2 (Alttier)" },
+    ]},
+  ]},
+];
+
+// "All AKs released" — the default we use whenever an event has no
+// saved freigaben yet.
+function freigabenAllKeys_() {
+  const out = [];
+  for (const sp of FREIGABEN_MATRIX) {
+    for (const g of sp.groups) {
+      for (const ak of g.aks) {
+        out.push(sp.id + "." + g.id + "." + ak.id);
+      }
+    }
+  }
+  return out;
+}
 const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "language", "token", "status", "role", "dogs", "invited_at", "responded_at", "confirmed_jagdschein", "confirmed_vsg44"];
 
 // JGHV-anerkannte Jagdhundrassen — single source of truth, baked here so
@@ -1705,6 +1781,17 @@ function eventDetail_(params) {
     });
   let nsfList = [];
   try { nsfList = JSON.parse(String(ev.nachsuchenfuehrer || "[]")); } catch (e) {}
+  // freigaben: empty string in the sheet = "not yet configured", we
+  // return null in that case so the frontend can fall back to "all on";
+  // a JSON array (even empty) means the organizer made a choice.
+  let freigabenList = null;
+  const rawFreigaben = String(ev.freigaben || "").trim();
+  if (rawFreigaben) {
+    try {
+      const parsed = JSON.parse(rawFreigaben);
+      if (Array.isArray(parsed)) freigabenList = parsed.map(String);
+    } catch (e) { /* leave as null on parse error */ }
+  }
   return {
     event: {
       id: String(ev.id),
@@ -1726,6 +1813,7 @@ function eventDetail_(params) {
       coordinator_name: String(ev.coordinator_name || ""),
       coordinator_phone: String(ev.coordinator_phone || ""),
       nachsuchenfuehrer: Array.isArray(nsfList) ? nsfList : [],
+      freigaben: freigabenList,
     },
     hunters: hunters,
     squads: squads,
@@ -2266,6 +2354,29 @@ function invitePreview_(params) {
 
 // Strip Google Sheets' Date typing on the four date/time columns so anything
 // that consumes `ev` (the email template, formatters) sees ISO strings.
+// Saves the Freigaben selection (array of "species.group.ak" tokens) to
+// the event row. Tolerates the column not existing yet by relying on
+// ensureSheet_'s additive migration.
+function saveEventFreigaben_(eventId, selected) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const headerWidth = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, headerWidth).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const colId = headers.indexOf("id");
+  const colFreigaben = headers.indexOf("freigaben");
+  if (colId < 0 || colFreigaben < 0) return;
+  const ids = sheet.getRange(2, colId + 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === eventId) {
+      sheet.getRange(i + 2, colFreigaben + 1).setValue(JSON.stringify(selected));
+      return;
+    }
+  }
+}
+
 function normalizeEventDates_(ev) {
   if (!ev) return ev;
   return {
@@ -2673,6 +2784,9 @@ function eventInfomailsPreview_(body) {
       }
     }
   }
+  // Freigaben: send the canonical AK matrix to the client so the
+  // checkboxes can render, plus the saved selection from the event row
+  // (or null → frontend defaults to "all on").
   return {
     ok: true,
     runden: ansteller.length,
@@ -2689,6 +2803,8 @@ function eventInfomailsPreview_(body) {
     sample_html: sampleHtml,
     sample_pdf_base64: samplePdfBase64,
     sample_pdf_name: samplePdfName,
+    freigaben_matrix: FREIGABEN_MATRIX,
+    freigaben_selected: Array.isArray(ev.freigaben) ? ev.freigaben : null,
   };
 }
 
@@ -2711,6 +2827,18 @@ function eventInfomailsSend_(body) {
   // skipped; only the Ansteller (positions[0]) of each Runde receives
   // the mail. The PDF is still built once per Runde regardless.
   const anstellerOnly = truthy_(body.ansteller_only);
+
+  // Freigaben checked in the modal: a flat array like
+  // ["rotwild.hirsche.ak0", "rotwild.kuehe.ak0", …]. Persisted to the
+  // event so re-opening the modal remembers the choice. Null/missing →
+  // PDF builder renders the full matrix (legacy default).
+  const freigabenSelected = Array.isArray(body.freigaben)
+    ? body.freigaben.map(function (k) { return String(k); })
+    : null;
+  if (freigabenSelected) {
+    saveEventFreigaben_(eventId, freigabenSelected);
+    ev.freigaben = freigabenSelected;
+  }
 
   let sent = 0;
   const errors = [];
@@ -3382,40 +3510,43 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     }
     body.appendParagraph(" ");
 
-    // Freigaben — standard AK matrix per species + gender. Hardcoded
-    // for now; can be promoted to a per-event field later if different
-    // hunts need different rules.
+    // Freigaben — pulled from ev.freigaben if the organizer has made a
+    // selection; otherwise defaults to "all AKs released" (the legacy
+    // behaviour). Tokens are "species.group.ak" — the matrix defines
+    // labels, so an empty selection just omits the line.
+    const freigabenSet = {};
+    const freigabenRaw = (ev.freigaben && Array.isArray(ev.freigaben)) ? ev.freigaben : freigabenAllKeys_();
+    freigabenRaw.forEach(function (k) { freigabenSet[k] = true; });
+
     const freigabenTitle = body.appendParagraph("Freigaben");
     freigabenTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
-    const FREIGABEN = [
-      { species: "Rotwild", classes: [
-        { gender: "Hirsche",     aks: "AK 0–3 (Hirschkalb · Schmalspießer · Mittelhirsch · Althirsch)" },
-        { gender: "Hirschkühe",  aks: "AK 0–2 (Hirschkalb · Schmaltier · Alttier)" },
-      ]},
-      { species: "Damwild", classes: [
-        { gender: "Hirsche",     aks: "AK 0–3 (Kalb · Spießer · Mittelhirsch · Althirsch)" },
-        { gender: "Damtiere",    aks: "AK 0–2 (Kalb · Schmaltier · Alttier)" },
-      ]},
-      { species: "Schwarzwild", classes: [
-        { gender: "Keiler",      aks: "Frischling · Überläufer · Keiler" },
-        { gender: "Bachen",      aks: "Frischling · Überläufer · Bache (Leitbachen verschonen)" },
-      ]},
-      { species: "Rehwild", classes: [
-        { gender: "Rehböcke",    aks: "AK 0–3 (Bockkitz · Jährling · Mittelbock · Altbock)" },
-        { gender: "Ricken",      aks: "AK 0–2 (Rehkitz · Schmalreh · Alttier)" },
-      ]},
-    ];
-    FREIGABEN.forEach(function (sp) {
-      const speciesP = body.appendParagraph(sp.species);
+    let anyFreigaben = false;
+    FREIGABEN_MATRIX.forEach(function (sp) {
+      // Skip the species entirely if nothing in it is released.
+      const speciesHasAny = sp.groups.some(function (g) {
+        return g.aks.some(function (ak) { return freigabenSet[sp.id + "." + g.id + "." + ak.id]; });
+      });
+      if (!speciesHasAny) return;
+      anyFreigaben = true;
+      const speciesP = body.appendParagraph(sp.label);
       speciesP.editAsText().setFontFamily("Arial").setFontSize(11).setBold(true).setForegroundColor("#1a5f1a");
-      sp.classes.forEach(function (cl) {
-        const p = body.appendListItem(cl.gender + ": " + cl.aks)
+      sp.groups.forEach(function (g) {
+        const checkedAks = g.aks.filter(function (ak) {
+          return freigabenSet[sp.id + "." + g.id + "." + ak.id];
+        });
+        if (!checkedAks.length) return;
+        const aksText = checkedAks.map(function (ak) { return ak.label; }).join(" · ");
+        const p = body.appendListItem(g.label + ": " + aksText)
           .setGlyphType(DocumentApp.GlyphType.BULLET)
           .setIndentStart(18)
           .setIndentFirstLine(6);
         p.editAsText().setFontFamily("Arial").setFontSize(10);
       });
     });
+    if (!anyFreigaben) {
+      const noneP = body.appendParagraph("Keine Schalenwild-Freigaben für diese Drückjagd.");
+      noneP.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#5a5a5a");
+    }
     const freigabenNote = body.appendParagraph("Hinweis: kein Raubwild freigegeben.");
     freigabenNote.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#5a5a5a");
     body.appendParagraph(" ");
