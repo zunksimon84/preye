@@ -1070,11 +1070,22 @@ function renderTreiberTile(squad) {
   const summary = leader
     ? `Hundeführer: ${escapeHtml(leader)}`
     : '<span class="muted">Hundeführer noch offen</span>';
+  // Compact starting-position line: prefer label, else coords, else nothing.
+  const sp = squad.start_pos;
+  let startLine = "";
+  if (sp) {
+    if (sp.label) {
+      startLine = `<span class="squad-tile-start">📍 ${escapeHtml(sp.label)}</span>`;
+    } else if (sp.lat !== "" && sp.lng !== "") {
+      startLine = `<span class="squad-tile-start">📍 ${Number(sp.lat).toFixed(4)}, ${Number(sp.lng).toFixed(4)}</span>`;
+    }
+  }
   return `
     <button type="button" class="squad-tile treiber-tile" data-sid="${escapeHtml(squad.id)}">
       <span class="squad-tile-name">${escapeHtml(displayTreiberName(squad.name))}</span>
       <span class="squad-tile-ansteller">${summary}</span>
-      <span class="squad-tile-count">${treiberCount} Treiber${treiberCount === 1 ? "" : ""}</span>
+      ${startLine}
+      <span class="squad-tile-count">${treiberCount} Treiber</span>
     </button>
   `;
 }
@@ -1151,10 +1162,26 @@ function openTreiberEditor(squad) {
   const hundefuehrer = getHundefuehrer();
   const treiber = getTreiber();
   const positions = (squad.positions && squad.positions.length) ? squad.positions : [{ hunter: "" }];
+  const sp = squad.start_pos || {};
+  const lat = sp.lat !== undefined && sp.lat !== "" ? Number(sp.lat).toFixed(6) : "";
+  const lng = sp.lng !== undefined && sp.lng !== "" ? Number(sp.lng).toFixed(6) : "";
   body.innerHTML = `
     <p class="squad-modal-hint">
       Reihe 1 ist <strong>der Hundeführer</strong>, alle weiteren sind Treiber.
     </p>
+
+    <fieldset class="ev-fieldset start-pos-fieldset">
+      <legend>Startposition <span class="muted">(wo sich die Gruppe trifft)</span></legend>
+      <div class="sr-coords-grid">
+        <input type="number" id="start-pos-lat" step="0.000001" inputmode="decimal" value="${lat}" placeholder="Breitengrad" />
+        <input type="number" id="start-pos-lng" step="0.000001" inputmode="decimal" value="${lng}" placeholder="Längengrad" />
+      </div>
+      <div class="sr-coords-grid">
+        <input type="text" id="start-pos-label" value="${escapeHtml(sp.label || "")}" maxlength="60" placeholder="Bezeichnung (z.B. Forsthalle)" />
+        <button class="ghost-btn" type="button" id="start-pos-here" title="Aktuelle Position">📍</button>
+      </div>
+    </fieldset>
+
     <div class="schuetzen-list" id="modal-treiber-list">
       ${positions.map((p, i) => renderTreiberRow(p, i, hundefuehrer, treiber)).join("")}
     </div>
@@ -1174,9 +1201,33 @@ function openTreiberEditor(squad) {
     list.insertAdjacentHTML("beforeend", renderTreiberRow(null, idx, hundefuehrer, treiber));
     wireTreiberRow(list.lastElementChild);
   });
+  $("#start-pos-here").addEventListener("click", () => {
+    if (!navigator.geolocation) { showToast("Standort nicht verfügbar", "error"); return; }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      $("#start-pos-lat").value = pos.coords.latitude.toFixed(6);
+      $("#start-pos-lng").value = pos.coords.longitude.toFixed(6);
+      showToast("Position übernommen");
+    }, (err) => showToast("Standort: " + err.message, "error", 4000),
+    { enableHighAccuracy: true, timeout: 8000 });
+  });
   $("#modal-squad-delete").addEventListener("click", () => deleteEditingSquad(squad));
   $("#squad-edit-backdrop").hidden = false;
   $("#squad-edit-modal").hidden = false;
+}
+
+function collectTreiberStartPos() {
+  const latStr = $("#start-pos-lat").value.trim();
+  const lngStr = $("#start-pos-lng").value.trim();
+  const label = $("#start-pos-label").value.trim();
+  const lat = latStr ? Number(latStr) : null;
+  const lng = lngStr ? Number(lngStr) : null;
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+  if (!hasCoords && !label) return null;
+  return {
+    lat: hasCoords ? lat : "",
+    lng: hasCoords ? lng : "",
+    label: label,
+  };
 }
 
 // Treibergruppe row — just a hunter dropdown. Row 0 picks from
@@ -1244,6 +1295,7 @@ async function saveEditingSquad() {
     // The leader (Ansteller / Hundeführer) is whoever sits at the top.
     const ansteller = positions[0]?.hunter || "";
     const briefing = $("#modal-squad-briefing").value.trim();
+    const start_pos = isTreiber ? collectTreiberStartPos() : null;
     await postJson({
       action: "event-squad-save",
       id: squad.id,
@@ -1253,9 +1305,10 @@ async function saveEditingSquad() {
       positions,
       briefing,
       type: squad.type || "ansteller",
+      start_pos,
     });
     invalidateCache("event-detail", { id: state.currentEvent.event.id });
-    Object.assign(squad, { ansteller, positions, briefing });
+    Object.assign(squad, { ansteller, positions, briefing, start_pos });
     renderSquads(); // renders both ansteller and treiber lists
     closeSquadEditor();
     showToast("Gespeichert ✓");

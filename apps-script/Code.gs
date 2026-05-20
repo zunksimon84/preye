@@ -66,7 +66,7 @@ const DOG_BREEDS = [
 // "Ansteller Runden" (Schützen led by an Ansteller) and "Treibergruppen"
 // (Treiber led by a Hundeführer). Both share the same row schema; the
 // "type" column distinguishes them ("ansteller" / "treiber"; empty = ansteller).
-const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions", "type"];
+const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions", "type", "start_pos"];
 const ADDRESS_BOOK_HEADER = ["name", "email", "language"];
 
 // Outgoing "From" address for all GmailApp.sendEmail calls. Must be a
@@ -1524,6 +1524,11 @@ function eventDetail_(params) {
     .map(function (s) {
       let positions = [];
       try { positions = JSON.parse(String(s.positions || "[]")); } catch (e) {}
+      let startPos = null;
+      try {
+        const raw = String(s.start_pos || "").trim();
+        startPos = raw ? JSON.parse(raw) : null;
+      } catch (e) {}
       const groupType = String(s.type || "").trim().toLowerCase() || "ansteller";
       return {
         id: String(s.id),
@@ -1532,6 +1537,7 @@ function eventDetail_(params) {
         ansteller: String(s.ansteller || ""),
         positions: Array.isArray(positions) ? positions : [],
         briefing: String(s.briefing || ""),
+        start_pos: (startPos && typeof startPos === "object") ? startPos : null,
       };
     });
   let nsfList = [];
@@ -2296,6 +2302,23 @@ function eventSquadSave_(body) {
   const ansteller = String(body.ansteller || "").trim();
   const briefing = String(body.briefing || "").trim();
   const groupType = (body.type === "treiber") ? "treiber" : "ansteller";
+
+  // Treibergruppen carry an optional single starting position (where the
+  // group meets before pushing into the area). Ansteller Runden ignore it.
+  let startPosJson = "";
+  if (groupType === "treiber" && body.start_pos && typeof body.start_pos === "object") {
+    const lat = Number(body.start_pos.lat);
+    const lng = Number(body.start_pos.lng);
+    const label = String(body.start_pos.label || "").trim().slice(0, 60);
+    if ((Number.isFinite(lat) && Number.isFinite(lng)) || label) {
+      startPosJson = JSON.stringify({
+        lat: Number.isFinite(lat) ? lat : "",
+        lng: Number.isFinite(lng) ? lng : "",
+        label: label,
+      });
+    }
+  }
+
   // Ansteller-Runden positions carry Kanzel/Klettersitz; Treibergruppen
   // positions are just hunter names. We normalise both shapes here.
   const positions = Array.isArray(body.positions)
@@ -2330,6 +2353,7 @@ function eventSquadSave_(body) {
       positions: positionsJson,
       briefing: briefing,
       type: groupType,
+      start_pos: startPosJson,
     };
     Object.keys(update).forEach(function (k) {
       const c = headers.indexOf(k);
@@ -2359,6 +2383,7 @@ function eventSquadSave_(body) {
     positions: positionsJson,
     briefing: briefing,
     type: groupType,
+    start_pos: startPosJson,
   });
   return { ok: true, id: newId };
 }
