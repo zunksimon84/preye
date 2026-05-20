@@ -2618,17 +2618,21 @@ function eventInfomailsPreview_(body) {
   posts.forEach(function (p) { postsById[p.id] = p; });
 
   let recipients = 0;
+  let anstellerRecipients = 0; // count if Schützen are excluded from the send
   const noEmail = [];
   const notAccepted = [];
   let sample = null; // first eligible recipient — used for the preview render
   for (const squad of ansteller) {
     const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
-    for (const pos of positions) {
+    for (let pi = 0; pi < positions.length; pi++) {
+      const pos = positions[pi];
+      const isAnsteller = pi === 0;
       const h = huntersByName[pos.hunter.toLowerCase()];
       if (!h) { noEmail.push(pos.hunter + " (kein Roster-Eintrag)"); continue; }
       if (!h.email) { noEmail.push(pos.hunter + " (keine E-Mail)"); continue; }
       if (h.status !== "accepted") { notAccepted.push(pos.hunter + " (Status: " + (h.status || "offen") + ")"); continue; }
       recipients++;
+      if (isAnsteller) anstellerRecipients++;
       if (!sample) sample = { squad: squad, positions: positions, pos: pos, hunter: h };
     }
   }
@@ -2673,6 +2677,7 @@ function eventInfomailsPreview_(body) {
     ok: true,
     runden: ansteller.length,
     recipients: recipients,
+    ansteller_recipients: anstellerRecipients,
     no_email: noEmail,
     not_accepted: notAccepted,
     has_maps_key: hasMapKey,
@@ -2702,6 +2707,11 @@ function eventInfomailsSend_(body) {
   const huntersByName = {};
   allHunters.forEach(function (h) { huntersByName[(h.hunter || "").toLowerCase()] = h; });
 
+  // When ansteller_only is set, the Schützen (positions[1..n-1]) are
+  // skipped; only the Ansteller (positions[0]) of each Runde receives
+  // the mail. The PDF is still built once per Runde regardless.
+  const anstellerOnly = truthy_(body.ansteller_only);
+
   let sent = 0;
   const errors = [];
   for (const squad of ansteller) {
@@ -2722,6 +2732,7 @@ function eventInfomailsSend_(body) {
     const subject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(squad.name);
 
     for (let i = 0; i < positions.length; i++) {
+      if (anstellerOnly && i > 0) break; // Only the Ansteller (index 0)
       const pos = positions[i];
       const h = huntersByName[pos.hunter.toLowerCase()];
       if (!h || !h.email || h.status !== "accepted") continue;

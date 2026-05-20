@@ -1764,6 +1764,9 @@ async function sendInfomails() {
   }
 }
 
+// Persisted across openings so re-opening the modal keeps your choice.
+let infomailIncludeSchuetzen = true;
+
 function openInfomailPreviewModal(preview) {
   const body = $("#infomail-body");
   const warns = [];
@@ -1780,15 +1783,34 @@ function openInfomailPreviewModal(preview) {
     ? '<div class="warning-banner">' + warns.map((w) => escapeHtml(w)).join("<br>") + "</div>"
     : "";
 
+  // Cache counts on the modal so the checkbox handler can recompute the
+  // displayed recipient line + send-button label without another fetch.
+  const fullCount = preview.recipients || 0;
+  const anstellerOnlyCount = preview.ansteller_recipients || 0;
+
   const summary = `
-    <p class="invite-hint">
-      Empfänger: <strong>${preview.recipients}</strong> Schütze${preview.recipients === 1 ? "" : "n"} in
-      <strong>${preview.runden}</strong> Ansteller-Runde${preview.runden === 1 ? "" : "n"}.
-      Vorschau für <strong>${escapeHtml(preview.sample_recipient || "")}</strong> —
-      jede:r Empfänger:in bekommt eine personalisierte Variante mit der jeweils eigenen Markierung.
-    </p>
+    <label class="infomail-opt">
+      <input type="checkbox" id="infomail-include-schuetzen" ${infomailIncludeSchuetzen ? "checked" : ""}>
+      <span><strong>Schützen einbeziehen</strong></span>
+      <span class="muted small">(sonst geht die Mail nur an die Ansteller)</span>
+    </label>
+    <p class="invite-hint" id="infomail-recipients-line"></p>
     <p class="muted infomail-subject"><strong>Betreff:</strong> ${escapeHtml(preview.sample_subject || "")}</p>
   `;
+
+  const updateRecipientLine = () => {
+    const inclSchuetzen = $("#infomail-include-schuetzen").checked;
+    infomailIncludeSchuetzen = inclSchuetzen;
+    const n = inclSchuetzen ? fullCount : anstellerOnlyCount;
+    const runden = preview.runden || 0;
+    const line = inclSchuetzen
+      ? `Empfänger: <strong>${n}</strong> Schütze${n === 1 ? "" : "n"} in <strong>${runden}</strong> Ansteller-Runde${runden === 1 ? "" : "n"}.`
+      : `Empfänger: <strong>${n}</strong> Ansteller (Schützen werden nicht angeschrieben).`;
+    $("#infomail-recipients-line").innerHTML = line;
+    const sendBtn = $("#infomail-send");
+    sendBtn.textContent = inclSchuetzen ? "An alle Schützen versenden" : "Nur an Ansteller versenden";
+    sendBtn.disabled = !n;
+  };
 
   if (preview.sample_html) {
     const pdfBlock = preview.sample_pdf_base64
@@ -1823,7 +1845,8 @@ function openInfomailPreviewModal(preview) {
   } else {
     body.innerHTML = warnsHtml + summary + '<p class="muted">Keine zustellbaren Empfänger — bitte erst Zusagen einsammeln.</p>';
   }
-  $("#infomail-send").disabled = !preview.recipients;
+  $("#infomail-include-schuetzen").addEventListener("change", updateRecipientLine);
+  updateRecipientLine();
   $("#infomail-backdrop").hidden = false;
   $("#infomail-modal").hidden = false;
 }
@@ -1843,6 +1866,7 @@ async function confirmSendInfomails() {
     const data = await postJson({
       action: "event-infomails-send",
       event_id: state.currentEvent.event.id,
+      ansteller_only: !$("#infomail-include-schuetzen").checked,
     });
     closeInfomailPreviewModal();
     if (data.errors && data.errors.length) {

@@ -2314,6 +2314,26 @@ body.rsvp-page #rsvp-topbar {
   padding: 14px;
 }
 .infomail-subject { margin: 6px 0 10px; }
+.infomail-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  background: #fcfcf8;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.infomail-opt input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #16a34a;
+}
+.infomail-opt .small { font-size: 12.5px; }
 .infomail-section-title {
   margin: 18px 0 6px;
   font-size: 13px;
