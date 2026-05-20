@@ -1709,39 +1709,96 @@ async function handlePostCsv(file) {
 // runde's stands. The map is fetched server-side from the Static-Maps API
 // (key stored in Script Properties) and attached as an inline image.
 
+// Open the preview modal: fetch a fully-rendered sample of the first
+// eligible recipient's mail (map embedded as data: URI) and show it in
+// an isolated iframe, then let the organizer send to everyone.
 async function sendInfomails() {
   if (!state.currentEvent) return;
   const btn = $("#send-infomails-btn");
   if (btn.disabled) return;
   btn.disabled = true;
   const oldText = btn.textContent;
-  btn.textContent = "Prüfe …";
+  btn.textContent = "Lade …";
   try {
     const preview = await postJson({
       action: "event-infomails-preview",
       event_id: state.currentEvent.event.id,
     });
     if (preview.error) throw new Error(preview.error);
+    openInfomailPreviewModal(preview);
+  } catch (err) {
+    showToast(err.message || "Fehler", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
 
-    const lines = [];
-    lines.push(`Versand an ${preview.recipients} Schütze${preview.recipients === 1 ? "" : "n"} in ${preview.runden} Ansteller-Runde${preview.runden === 1 ? "" : "n"}.`);
-    if (preview.no_email && preview.no_email.length) {
-      lines.push(`\nWird übersprungen (keine E-Mail bzw. nicht im Roster):\n• ${preview.no_email.join("\n• ")}`);
-    }
-    if (preview.not_accepted && preview.not_accepted.length) {
-      lines.push(`\nWird übersprungen (noch keine Zusage):\n• ${preview.not_accepted.join("\n• ")}`);
-    }
-    if (!preview.has_maps_key) {
-      lines.push('\n⚠ Kein Maps-API-Key gesetzt — die Mails gehen ohne Karte raus. Setze den Key in der Sheet-Leiste unter 📧 E-Mail → „Maps API Key setzen".');
-    }
-    lines.push("\nJetzt versenden?");
-    if (!confirm(lines.join("\n"))) return;
+function openInfomailPreviewModal(preview) {
+  const body = $("#infomail-body");
+  const warns = [];
+  if (!preview.has_maps_key) {
+    warns.push('⚠ Kein Maps-API-Key gesetzt — die Mails gehen ohne Karte raus.');
+  }
+  if (preview.no_email && preview.no_email.length) {
+    warns.push("Wird übersprungen (keine E-Mail / nicht im Roster): " + preview.no_email.join(", "));
+  }
+  if (preview.not_accepted && preview.not_accepted.length) {
+    warns.push("Wird übersprungen (noch keine Zusage): " + preview.not_accepted.join(", "));
+  }
+  const warnsHtml = warns.length
+    ? '<div class="warning-banner">' + warns.map((w) => escapeHtml(w)).join("<br>") + "</div>"
+    : "";
 
-    btn.textContent = "Sende …";
+  const summary = `
+    <p class="invite-hint">
+      Empfänger: <strong>${preview.recipients}</strong> Schütze${preview.recipients === 1 ? "" : "n"} in
+      <strong>${preview.runden}</strong> Ansteller-Runde${preview.runden === 1 ? "" : "n"}.
+      Vorschau für <strong>${escapeHtml(preview.sample_recipient || "")}</strong> —
+      jede:r Empfänger:in bekommt eine personalisierte Variante mit der jeweils eigenen Markierung.
+    </p>
+    <p class="muted infomail-subject"><strong>Betreff:</strong> ${escapeHtml(preview.sample_subject || "")}</p>
+  `;
+
+  if (preview.sample_html) {
+    // Isolate the mail HTML in a sandboxed iframe so its inline styles
+    // don't bleed into the rest of the page.
+    body.innerHTML = warnsHtml + summary +
+      '<iframe id="infomail-preview-iframe" class="infomail-preview-iframe" sandbox="allow-same-origin"></iframe>';
+    const iframe = $("#infomail-preview-iframe");
+    iframe.srcdoc = preview.sample_html;
+    // Auto-grow the iframe to fit its content once rendered.
+    iframe.addEventListener("load", () => {
+      try {
+        const h = iframe.contentDocument.body.scrollHeight;
+        iframe.style.height = (h + 20) + "px";
+      } catch (e) { /* cross-origin or sandbox quirks — ignore */ }
+    });
+  } else {
+    body.innerHTML = warnsHtml + summary + '<p class="muted">Keine zustellbaren Empfänger — bitte erst Zusagen einsammeln.</p>';
+  }
+  $("#infomail-send").disabled = !preview.recipients;
+  $("#infomail-backdrop").hidden = false;
+  $("#infomail-modal").hidden = false;
+}
+
+function closeInfomailPreviewModal() {
+  $("#infomail-modal").hidden = true;
+  $("#infomail-backdrop").hidden = true;
+}
+
+async function confirmSendInfomails() {
+  if (!state.currentEvent) return;
+  const btn = $("#infomail-send");
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Sende …";
+  try {
     const data = await postJson({
       action: "event-infomails-send",
       event_id: state.currentEvent.event.id,
     });
+    closeInfomailPreviewModal();
     if (data.errors && data.errors.length) {
       const failed = data.errors.map((e) => `${e.hunter}: ${e.error}`).slice(0, 5).join("\n");
       showToast(`Versendet: ${data.sent} · Fehler: ${data.errors.length}\n${failed}`, "error", 8000);
@@ -2054,6 +2111,10 @@ function wireUi() {
   $("#new-squad-btn").addEventListener("click", addSquad);
   $("#new-treiber-btn").addEventListener("click", addTreibergruppe);
   $("#send-infomails-btn").addEventListener("click", sendInfomails);
+  $("#infomail-close").addEventListener("click", closeInfomailPreviewModal);
+  $("#infomail-cancel").addEventListener("click", closeInfomailPreviewModal);
+  $("#infomail-backdrop").addEventListener("click", closeInfomailPreviewModal);
+  $("#infomail-send").addEventListener("click", confirmSendInfomails);
   $("#ev-nsf-add").addEventListener("click", () => addNsfRow());
   $("#hunters-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".hunter-remove");

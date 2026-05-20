@@ -2507,26 +2507,53 @@ function eventInfomailsPreview_(body) {
   if (!eventId) return { error: "event_id required" };
   const detail = eventDetail_({ id: eventId });
   if (detail.error) return detail;
+  const ev = normalizeEventDates_(detail.event);
   const ansteller = (detail.squads || []).filter(function (s) { return (s.type || "ansteller") === "ansteller"; });
   const hunters = detail.hunters || [];
   const huntersByName = {};
   hunters.forEach(function (h) { huntersByName[(h.hunter || "").toLowerCase()] = h; });
+  const posts = readPosts_();
+  const postsById = {};
+  posts.forEach(function (p) { postsById[p.id] = p; });
 
   let recipients = 0;
   const noEmail = [];
   const notAccepted = [];
+  let sample = null; // first eligible recipient — used for the preview render
   for (const squad of ansteller) {
-    for (const pos of (squad.positions || [])) {
-      if (!pos.hunter) continue;
+    const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
+    for (const pos of positions) {
       const h = huntersByName[pos.hunter.toLowerCase()];
       if (!h) { noEmail.push(pos.hunter + " (kein Roster-Eintrag)"); continue; }
       if (!h.email) { noEmail.push(pos.hunter + " (keine E-Mail)"); continue; }
       if (h.status !== "accepted") { notAccepted.push(pos.hunter + " (Status: " + (h.status || "offen") + ")"); continue; }
       recipients++;
+      if (!sample) sample = { squad: squad, positions: positions, pos: pos, hunter: h };
     }
   }
   const props = PropertiesService.getScriptProperties();
   const hasMapsKey = !!(props.getProperty("MAPS_API_KEY") || "").trim();
+
+  // Build the actual HTML the first eligible recipient would see; embed the
+  // map as a data: URI so the preview renders without needing to follow the
+  // cid: reference (which only works inside e-mail clients).
+  let sampleHtml = "";
+  let sampleRecipient = "";
+  let sampleSubject = "";
+  if (sample) {
+    sampleHtml = buildInfoMailHtml_(ev, sample.squad, sample.positions, sample.pos, postsById);
+    sampleRecipient = sample.hunter.hunter + " <" + sample.hunter.email + ">";
+    sampleSubject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(sample.squad.name);
+    if (hasMapsKey) {
+      const baseMarkers = squadBaseMarkers_(sample.positions, postsById);
+      const recipientCoord = positionCoords_(sample.pos, postsById);
+      const blob = fetchSquadMap_(baseMarkers, recipientCoord);
+      if (blob) {
+        const dataUri = "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes());
+        sampleHtml = sampleHtml.split("cid:squadmap").join(dataUri);
+      }
+    }
+  }
   return {
     ok: true,
     runden: ansteller.length,
@@ -2534,6 +2561,9 @@ function eventInfomailsPreview_(body) {
     no_email: noEmail,
     not_accepted: notAccepted,
     has_maps_key: hasMapsKey,
+    sample_recipient: sampleRecipient,
+    sample_subject: sampleSubject,
+    sample_html: sampleHtml,
   };
 }
 

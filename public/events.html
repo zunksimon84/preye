@@ -155,7 +155,7 @@
           <h3 class="ev-section-title">Ansteller Runden</h3>
           <div class="squads-toolbar">
             <button id="new-squad-btn" type="button" class="primary-btn small">+ Neue Ansteller Runde</button>
-            <button id="send-infomails-btn" type="button" class="ghost-btn">Infomail erstellen</button>
+            <button id="send-infomails-btn" type="button" class="primary-btn small infomail-btn">Infomail erstellen</button>
             <span id="squads-hint" class="muted"></span>
           </div>
           <div id="squads-list" class="squads-grid"></div>
@@ -357,6 +357,19 @@
         <button id="template-save" type="button" class="primary-btn">Speichern</button>
         <button id="template-reset" type="button" class="ghost-btn">Auf Standard zurücksetzen</button>
         <button id="template-cancel" type="button" class="cancel-btn">Abbrechen</button>
+      </div>
+    </section>
+
+    <div id="infomail-backdrop" hidden></div>
+    <section id="infomail-modal" hidden aria-modal="true" role="dialog" aria-labelledby="infomail-title">
+      <header>
+        <h2 id="infomail-title">Infomail-Vorschau</h2>
+        <button id="infomail-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div id="infomail-body" class="infomail-body"></div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="infomail-send" type="button" class="primary-btn infomail-btn">An alle Schützen versenden</button>
+        <button id="infomail-cancel" type="button" class="cancel-btn">Abbrechen</button>
       </div>
     </section>
 
