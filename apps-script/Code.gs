@@ -2737,15 +2737,15 @@ function squadRosterLabel_(pos, postsById, fallbackIndex) {
   return String.fromCharCode(65 + fallbackIndex);
 }
 
-// Builds a quickchart.io URL that returns a pin-shaped PNG with arbitrary
-// text rendered inside it. Replaces Google's deprecated Image Charts API
-// (`chart.googleapis.com/chart?chst=d_map_pin_letter`) which Static Maps
-// used to accept directly. The `|` separators inside the chld parameter
-// must be URL-encoded so Static Maps can split the outer marker spec on
-// its own `|` cleanly.
+// Builds a dummyimage.com URL that returns a rectangular PNG with the
+// given text rendered on it. Used as the marker icon in the Static
+// Maps fetch so each pin can show the full post number (e.g., "13")
+// instead of the one-char limit imposed by Static Maps' built-in
+// markers. dummyimage.com responds in <100 ms with a real
+// `Content-Type: image/png`, which Static Maps' icon fetcher accepts.
 function markerIconUrl_(text, fillHex, textHex) {
-  const chld = encodeURIComponent(String(text) + "|" + fillHex + "|" + textHex);
-  return "https://quickchart.io/chart?chst=d_map_pin_letter&chld=" + chld;
+  return "https://dummyimage.com/56x56/" + fillHex + "/" + textHex + ".png?text=" +
+    encodeURIComponent(String(text));
 }
 
 function squadBaseMarkers_(positions, postsById) {
