@@ -3152,6 +3152,11 @@ function menu_testInfomailMap() {
     // This tells us if the key works at all.
     const u1 = "https://api.maptiler.com/maps/streets-v2/static/12.83,53.63,12/300x300.png?key=" +
       encodeURIComponent(tilerKey);
+    // Print this URL so you can open it in your browser. If your browser
+    // shows the actual map → it's a Referer-header issue with Apps Script.
+    // If the browser also shows "Invalid key" or similar → the key itself
+    // is the problem.
+    console.log("Open this in your browser to see MapTiler's exact verdict:\n" + u1);
     try {
       const r1 = UrlFetchApp.fetch(u1, { muteHttpExceptions: true });
       console.log("MapTiler stage1 (streets-v2, no markers): HTTP " + r1.getResponseCode());
