@@ -2424,11 +2424,32 @@ body.rsvp-page #rsvp-topbar {
 }
 .infomail-pdf-fallback { margin: 0; font-size: 13px; }
 
-/* Freigaben checkbox grid — one block per species, each with its
- * gender rows (Hirsche/Hirschkühe/etc.) and the AKs as clickable
- * pill checkboxes. Mobile-friendly: pills wrap. */
-.infomail-freigaben-hint { margin: -4px 0 12px; font-size: 12.5px; }
-.infomail-freigaben-foot { margin: 8px 0 0; font-size: 12.5px; font-style: italic; }
+/* Freigaben — per-event editor on the event detail page (below
+ * Kontakte). One block per species, gender rows (Hirsche/Hirschkühe/…)
+ * with the AKs as clickable pill checkboxes. Auto-saves on toggle. */
+.ev-freigaben {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  background: #fafaf6;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.ev-freigaben .ev-section-title {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.freigabe-save-status {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
+  font-style: normal;
+}
+.freigabe-hint { margin: 0 0 12px; font-size: 12.5px; }
+.freigabe-foot { margin: 8px 0 0; font-size: 12.5px; font-style: italic; }
 .freigabe-species { margin: 0 0 12px; }
 .freigabe-species:last-of-type { margin-bottom: 0; }
 .freigabe-species-label {

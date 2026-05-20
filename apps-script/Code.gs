@@ -255,6 +255,10 @@ function doPost(e) {
       const r = eventInfomailsSend_(body);
       return json_(r, r.error ? 400 : 200);
     }
+    if (action === "event-freigaben-save") {
+      const r = eventFreigabenSave_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
     if (action === "event-delete") {
       const r = eventDelete_(body);
       return json_(r, r.error ? 400 : 200);
@@ -1817,6 +1821,7 @@ function eventDetail_(params) {
     },
     hunters: hunters,
     squads: squads,
+    freigaben_matrix: FREIGABEN_MATRIX,
   };
 }
 
@@ -2354,6 +2359,19 @@ function invitePreview_(params) {
 
 // Strip Google Sheets' Date typing on the four date/time columns so anything
 // that consumes `ev` (the email template, formatters) sees ISO strings.
+// Endpoint: save just the Freigaben selection for an event without
+// touching anything else on the row. Used by the per-event Freigaben
+// editor that lives on the event detail page.
+function eventFreigabenSave_(body) {
+  const eventId = String(body.event_id || "").trim();
+  if (!eventId) return { error: "event_id required" };
+  const selected = Array.isArray(body.freigaben)
+    ? body.freigaben.map(function (k) { return String(k); })
+    : [];
+  saveEventFreigaben_(eventId, selected);
+  return { ok: true };
+}
+
 // Saves the Freigaben selection (array of "species.group.ak" tokens) to
 // the event row. Tolerates the column not existing yet by relying on
 // ensureSheet_'s additive migration.

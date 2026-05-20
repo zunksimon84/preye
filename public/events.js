@@ -456,6 +456,7 @@ function renderEventDetail() {
     ${event.briefing ? `<p class="ev-briefing">${escapeHtml(event.briefing)}</p>` : ""}
   `;
   renderContactsBlock(event);
+  renderFreigabenBlock(event, state.currentEvent.freigaben_matrix);
   renderHuntersList(hunters);
   // Squads section is always visible now (no tabs), so load the posts data
   // it needs on every event open.
@@ -1784,11 +1785,19 @@ function infomailMakePdfBlobUrl(base64) {
   }
 }
 
-// Renders the Freigaben checkbox grid from the matrix + the saved
-// selection (null = "first time, default everything on").
-function buildFreigabenSectionHtml(matrix, selected) {
-  if (!Array.isArray(matrix) || !matrix.length) return "";
-  const selectedSet = Array.isArray(selected) ? new Set(selected) : null;
+// Renders the per-event Freigaben editor as a section in the event
+// detail page (below the Kontakte block). The checkbox state auto-saves
+// to the backend with a short debounce so the organizer can keep editing
+// without hitting a Save button — the Infomail PDF picks up whatever's
+// stored on the event row when it's eventually sent.
+let freigabenSaveTimer = null;
+function renderFreigabenBlock(event, matrix) {
+  const el = $("#event-freigaben");
+  if (!el || !Array.isArray(matrix) || !matrix.length) {
+    if (el) { el.hidden = true; el.innerHTML = ""; }
+    return;
+  }
+  const selectedSet = Array.isArray(event.freigaben) ? new Set(event.freigaben) : null;
   const isChecked = (key) => selectedSet ? selectedSet.has(key) : true;
   const speciesHtml = matrix.map((sp) => {
     const groupsHtml = sp.groups.map((g) => {
@@ -1810,16 +1819,56 @@ function buildFreigabenSectionHtml(matrix, selected) {
       ${groupsHtml}
     </div>`;
   }).join("");
-  return `
-    <div class="infomail-section infomail-freigaben-section">
-      <div class="infomail-section-heading">🎯 Freigaben</div>
-      <p class="muted infomail-freigaben-hint">
-        Häkchen setzen oder entfernen, was am Jagdtag erlegt werden darf. Wird beim Versenden gespeichert und für die nächste Bearbeitung gemerkt.
-      </p>
-      ${speciesHtml}
-      <p class="muted infomail-freigaben-foot">Raubwild ist generell nicht freigegeben.</p>
-    </div>
+  el.hidden = false;
+  el.innerHTML = `
+    <h3 class="ev-section-title">Freigaben
+      <span class="muted">(erscheinen in der Infomail)</span>
+      <span class="freigabe-save-status" id="freigabe-save-status"></span>
+    </h3>
+    <p class="muted freigabe-hint">
+      Häkchen setzen, was am Jagdtag erlegt werden darf — wird automatisch gespeichert und in der nächsten Infomail-PDF verwendet.
+    </p>
+    ${speciesHtml}
+    <p class="muted freigabe-foot">Raubwild ist generell nicht freigegeben.</p>
   `;
+  // Toggle the on/off pill class + schedule a debounced save.
+  el.querySelectorAll(".freigabe-cb").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const lbl = cb.closest(".freigabe-ak");
+      if (lbl) lbl.classList.toggle("freigabe-ak--on", cb.checked);
+      scheduleFreigabenSave(event.id);
+    });
+  });
+}
+
+function scheduleFreigabenSave(eventId) {
+  clearTimeout(freigabenSaveTimer);
+  const status = $("#freigabe-save-status");
+  if (status) status.textContent = "Speichere …";
+  freigabenSaveTimer = setTimeout(async () => {
+    const selected = Array.from(document.querySelectorAll(".freigabe-cb"))
+      .filter((cb) => cb.checked)
+      .map((cb) => cb.dataset.key);
+    try {
+      await postJson({
+        action: "event-freigaben-save",
+        event_id: eventId,
+        freigaben: selected,
+      });
+      // Mirror locally so the next loadEventDetail doesn't blank the
+      // current selection during a stale-while-revalidate refresh.
+      if (state.currentEvent && state.currentEvent.event.id === eventId) {
+        state.currentEvent.event.freigaben = selected;
+      }
+      invalidateCache("event-detail", { id: eventId });
+      if (status) {
+        status.textContent = "Gespeichert ✓";
+        setTimeout(() => { if (status) status.textContent = ""; }, 1500);
+      }
+    } catch (err) {
+      if (status) status.textContent = "Fehler: " + (err.message || err);
+    }
+  }, 600);
 }
 
 function openInfomailPreviewModal(preview) {
@@ -1920,27 +1969,15 @@ function openInfomailPreviewModal(preview) {
         </div>
       `;
 
-    const freigabenHtml = buildFreigabenSectionHtml(
-      preview.freigaben_matrix,
-      preview.freigaben_selected
-    );
-
     // Sandbox the mail body so its inline styles can't bleed into the rest
     // of the page; PDF iframe is unsandboxed because Chromium needs the
     // default permissions to render the embedded viewer.
-    body.innerHTML = warnsHtml + summary + freigabenHtml +
+    body.innerHTML = warnsHtml + summary +
       '<div class="infomail-section">' +
         '<div class="infomail-section-heading">📨 E-Mail-Text</div>' +
         '<iframe id="infomail-preview-iframe" class="infomail-preview-iframe" sandbox="allow-same-origin"></iframe>' +
       '</div>' +
       pdfBlock;
-    // Toggle the "off" visual on each Freigabe pill in real time.
-    document.querySelectorAll(".freigabe-cb").forEach((cb) => {
-      cb.addEventListener("change", () => {
-        const lbl = cb.closest(".freigabe-ak");
-        if (lbl) lbl.classList.toggle("freigabe-ak--on", cb.checked);
-      });
-    });
     const iframe = $("#infomail-preview-iframe");
     iframe.srcdoc = preview.sample_html;
     iframe.addEventListener("load", () => {
@@ -1974,14 +2011,10 @@ async function confirmSendInfomails() {
   const oldText = btn.textContent;
   btn.textContent = "Sende …";
   try {
-    const freigabenSelected = Array.from(document.querySelectorAll(".freigabe-cb"))
-      .filter((cb) => cb.checked)
-      .map((cb) => cb.dataset.key);
     const data = await postJson({
       action: "event-infomails-send",
       event_id: state.currentEvent.event.id,
       ansteller_only: !$("#infomail-include-schuetzen").checked,
-      freigaben: freigabenSelected,
     });
     closeInfomailPreviewModal();
     if (data.errors && data.errors.length) {
