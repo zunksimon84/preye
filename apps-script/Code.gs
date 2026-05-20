@@ -2728,23 +2728,24 @@ function postNumberString_(pos, postsById) {
   return m ? m[1] : "";
 }
 
-// Single-char map marker label: prefers the post's last digit so the
-// marker matches the number shown in the PDF roster table (e.g., a
-// "3" pin on the map points to "Nr. 13" in the table). Falls back to
-// A/B/C/... if the post has no recognisable number.
-function squadMarkerLabel_(pos, postsById, fallbackIndex) {
-  const num = postNumberString_(pos, postsById);
-  if (num) return num[num.length - 1];
-  return String.fromCharCode(65 + fallbackIndex);
-}
-
-// The label shown in the PDF roster table's "#" column — the full
-// post number when we have one, else the same A/B/C fallback as the
-// map marker, so the two columns always stay consistent.
+// Label shown both on the map pin and in the PDF roster's "Nr." column.
+// The full post number when we have one (e.g., "13"), else A/B/C as a
+// fallback so something distinguishable still appears.
 function squadRosterLabel_(pos, postsById, fallbackIndex) {
   const num = postNumberString_(pos, postsById);
   if (num) return num;
   return String.fromCharCode(65 + fallbackIndex);
+}
+
+// Builds a quickchart.io URL that returns a pin-shaped PNG with arbitrary
+// text rendered inside it. Replaces Google's deprecated Image Charts API
+// (`chart.googleapis.com/chart?chst=d_map_pin_letter`) which Static Maps
+// used to accept directly. The `|` separators inside the chld parameter
+// must be URL-encoded so Static Maps can split the outer marker spec on
+// its own `|` cleanly.
+function markerIconUrl_(text, fillHex, textHex) {
+  const chld = encodeURIComponent(String(text) + "|" + fillHex + "|" + textHex);
+  return "https://quickchart.io/chart?chst=d_map_pin_letter&chld=" + chld;
 }
 
 function squadBaseMarkers_(positions, postsById) {
@@ -2752,8 +2753,9 @@ function squadBaseMarkers_(positions, postsById) {
   for (let i = 0; i < positions.length; i++) {
     const c = positionCoords_(positions[i], postsById);
     if (!c) continue;
-    const label = squadMarkerLabel_(positions[i], postsById, i);
-    out.push("color:yellow|label:" + label + "|" + c.lat + "," + c.lng);
+    const labelText = squadRosterLabel_(positions[i], postsById, i);
+    const iconUrl = markerIconUrl_(labelText, "FFFF00", "000000");
+    out.push("icon:" + iconUrl + "|" + c.lat + "," + c.lng);
   }
   return out;
 }
@@ -2920,8 +2922,8 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       img.setHeight(targetWidth * ratio);
       img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
       const capText = recipientPos
-        ? "Dein Stand ist rot, die Stände Deiner Runde gelb — die Zahl auf dem Pin entspricht der letzten Ziffer der Standnummer."
-        : "Die Stände der Runde sind gelb markiert — die Zahl auf dem Pin entspricht der letzten Ziffer der Standnummer.";
+        ? "Dein Stand ist rot markiert, die übrigen Stände Deiner Runde gelb — die Zahl auf jedem Pin entspricht der Standnummer."
+        : "Die Stände der Runde sind gelb markiert — die Zahl auf jedem Pin entspricht der Standnummer.";
       const cap = body.appendParagraph(capText);
       cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
       cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
