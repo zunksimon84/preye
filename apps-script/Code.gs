@@ -1241,19 +1241,25 @@ function onOpen() {
 // only way to grant the scope is to run a function from the editor once.
 // After this runs successfully, the existing deployment picks up the
 // new scopes — no re-deploy needed.
+//
+// Reports via console.log + return value (visible in the editor's
+// execution log). Avoids ui.alert because that dialog appears in the
+// bound spreadsheet tab — if you're in the editor it just blocks
+// invisibly until you go switch tabs.
 function menu_authorizeInfomailPdf() {
-  const ui = SpreadsheetApp.getUi();
   let doc;
   try {
     doc = DocumentApp.create("_authorize_test_" + Date.now());
     DriveApp.getFileById(doc.getId()).setTrashed(true);
-    ui.alert("Docs- & Drive-Zugriff freigeschaltet ✓\n\nDu kannst jetzt im Tool Infomails versenden.");
+    console.log("Docs- & Drive-Zugriff freigeschaltet ✓");
+    return { ok: true, message: "Docs- & Drive-Zugriff freigeschaltet." };
   } catch (err) {
-    ui.alert("Fehler: " + (err && err.message || err) +
-      "\n\nFalls ein Berechtigungsdialog erscheint, einmal genehmigen und die Funktion erneut starten.");
+    const msg = (err && err.message || err);
+    console.log("Fehler: " + msg + " — Falls ein Berechtigungsdialog erscheint, einmal genehmigen und die Funktion erneut starten.");
     if (doc) {
       try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (e) {}
     }
+    return { ok: false, error: String(msg) };
   }
 }
 
@@ -2717,18 +2723,29 @@ function fetchSquadMap_(baseMarkerSpecs, recipientCoord) {
 }
 
 // Run this from the Apps Script editor to diagnose why the PDF has no
-// map. Reports the API key status, fetches a sample tile, and surfaces
-// the raw response if anything went wrong.
+// map. Logs the result so you see it in the editor's execution log
+// without depending on a UI alert (which would block invisibly when
+// run from the editor — the alert lives in the spreadsheet tab).
 function menu_testInfomailMap() {
-  const ui = SpreadsheetApp.getUi();
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
+  console.log("MAPS_API_KEY gesetzt? " + (apiKey ? "ja (" + apiKey.length + " Zeichen)" : "NEIN"));
   const result = fetchSquadMap_(
     ["color:yellow|label:A|53.63065,12.83461"],
     { lat: 53.63100, lng: 12.83500 }
   );
   if (result.blob) {
-    ui.alert("Map-Fetch OK ✓\n\nGröße: " + result.blob.getBytes().length + " bytes\nContent-Type: " + result.blob.getContentType());
+    const out = {
+      ok: true,
+      bytes: result.blob.getBytes().length,
+      content_type: result.blob.getContentType(),
+    };
+    console.log("Map-Fetch OK: " + JSON.stringify(out));
+    return out;
   } else {
-    ui.alert("Map-Fetch fehlgeschlagen ✗\n\n" + (result.error || "(kein Fehler-Text)"));
+    const out = { ok: false, error: result.error || "(kein Fehler-Text)" };
+    console.log("Map-Fetch fehlgeschlagen: " + out.error);
+    return out;
   }
 }
 
