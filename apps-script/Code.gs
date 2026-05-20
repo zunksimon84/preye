@@ -171,6 +171,14 @@ function doPost(e) {
       const r = eventSquadDelete_(body);
       return json_(r, r.error ? 400 : 200);
     }
+    if (action === "event-infomails-preview") {
+      const r = eventInfomailsPreview_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-infomails-send") {
+      const r = eventInfomailsSend_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
     if (action === "event-delete") {
       const r = eventDelete_(body);
       return json_(r, r.error ? 400 : 200);
@@ -1214,6 +1222,7 @@ function onOpen() {
     .addToUi();
   ui.createMenu("📧 E-Mail")
     .addItem("Test-E-Mail an mich senden", "menu_testEmail")
+    .addItem("Maps API Key setzen (Infomails-Karten)", "menu_setMapsApiKey")
     .addToUi();
 }
 
@@ -1224,6 +1233,18 @@ function onOpen() {
 // Diagnostic — logs the list of "Send mail as" aliases the script can use.
 // Run from the editor: Run ▶ → menu_listAliases, then open "Executions"
 // (Ausführungen) in the left sidebar and read the log output.
+// One-time setter for the Static-Maps API key. Stored in Script Properties
+// so the build can fetch satellite maps for the per-Schütze info mails.
+function menu_setMapsApiKey() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt("Maps API Key", "Bitte gib den Google-Maps-API-Key ein (wird in den Script-Properties gespeichert):", ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const k = (r.getResponseText() || "").trim();
+  if (!k) { ui.alert("Kein Key eingegeben."); return; }
+  PropertiesService.getScriptProperties().setProperty("MAPS_API_KEY", k);
+  ui.alert("Gespeichert. Info-Mails können jetzt eine Karte einbetten.");
+}
+
 function menu_listAliases() {
   const me = Session.getActiveUser().getEmail();
   let aliases = [];
@@ -2473,6 +2494,265 @@ function eventSquadSave_(body) {
     start_pos: startPosJson,
   });
   return { ok: true, id: newId };
+}
+
+// ---------- Per-Schütze info mails (2 weeks before the hunt) ----------
+// One e-mail per accepted Schütze in every Ansteller Runde. The mail
+// lists the runde's roster (recipient bolded) and embeds a satellite map
+// with the runde's stands — recipient's stand red, the others yellow —
+// fetched from the Google Static-Maps API.
+
+function eventInfomailsPreview_(body) {
+  const eventId = String(body.event_id || "").trim();
+  if (!eventId) return { error: "event_id required" };
+  const detail = eventDetail_({ id: eventId });
+  if (detail.error) return detail;
+  const ansteller = (detail.squads || []).filter(function (s) { return (s.type || "ansteller") === "ansteller"; });
+  const hunters = detail.hunters || [];
+  const huntersByName = {};
+  hunters.forEach(function (h) { huntersByName[(h.hunter || "").toLowerCase()] = h; });
+
+  let recipients = 0;
+  const noEmail = [];
+  const notAccepted = [];
+  for (const squad of ansteller) {
+    for (const pos of (squad.positions || [])) {
+      if (!pos.hunter) continue;
+      const h = huntersByName[pos.hunter.toLowerCase()];
+      if (!h) { noEmail.push(pos.hunter + " (kein Roster-Eintrag)"); continue; }
+      if (!h.email) { noEmail.push(pos.hunter + " (keine E-Mail)"); continue; }
+      if (h.status !== "accepted") { notAccepted.push(pos.hunter + " (Status: " + (h.status || "offen") + ")"); continue; }
+      recipients++;
+    }
+  }
+  const props = PropertiesService.getScriptProperties();
+  const hasMapsKey = !!(props.getProperty("MAPS_API_KEY") || "").trim();
+  return {
+    ok: true,
+    runden: ansteller.length,
+    recipients: recipients,
+    no_email: noEmail,
+    not_accepted: notAccepted,
+    has_maps_key: hasMapsKey,
+  };
+}
+
+function eventInfomailsSend_(body) {
+  const eventId = String(body.event_id || "").trim();
+  if (!eventId) return { error: "event_id required" };
+  const detail = eventDetail_({ id: eventId });
+  if (detail.error) return detail;
+
+  const ev = normalizeEventDates_(detail.event);
+  const allHunters = detail.hunters || [];
+  const ansteller = (detail.squads || []).filter(function (s) { return (s.type || "ansteller") === "ansteller"; });
+  const posts = readPosts_();
+  const postsById = {};
+  posts.forEach(function (p) { postsById[p.id] = p; });
+  const huntersByName = {};
+  allHunters.forEach(function (h) { huntersByName[(h.hunter || "").toLowerCase()] = h; });
+
+  let sent = 0;
+  const errors = [];
+  for (const squad of ansteller) {
+    const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
+    if (!positions.length) continue;
+
+    // Pre-compute the squad's map once per runde; recipient-specific
+    // highlighting is done by appending one extra red marker.
+    const baseMapMarkers = squadBaseMarkers_(positions, postsById);
+
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      const h = huntersByName[pos.hunter.toLowerCase()];
+      if (!h || !h.email || h.status !== "accepted") continue;
+
+      try {
+        const recipientCoord = positionCoords_(pos, postsById);
+        const html = buildInfoMailHtml_(ev, squad, positions, pos, postsById);
+        const subject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(squad.name);
+        const opts = { from: FROM_EMAIL, htmlBody: html };
+        const mapBlob = fetchSquadMap_(baseMapMarkers, recipientCoord);
+        if (mapBlob) opts.inlineImages = { squadmap: mapBlob };
+        GmailApp.sendEmail(h.email, subject, htmlToPlain_(html), opts);
+        sent++;
+      } catch (err) {
+        errors.push({ hunter: pos.hunter, error: String(err && err.message || err) });
+      }
+    }
+  }
+  return { ok: true, sent: sent, errors: errors };
+}
+
+function positionCoords_(pos, postsById) {
+  if (pos.type === "kanzel" && pos.post_id && postsById[pos.post_id]) {
+    const p = postsById[pos.post_id];
+    return { lat: p.lat, lng: p.lng };
+  }
+  if (pos.type === "klettersitz" && pos.lat !== "" && pos.lng !== "") {
+    return { lat: Number(pos.lat), lng: Number(pos.lng) };
+  }
+  return null;
+}
+
+function positionLabel_(pos, postsById) {
+  if (pos.type === "kanzel" && pos.post_id && postsById[pos.post_id]) {
+    const p = postsById[pos.post_id];
+    const suffix = (p.type && p.type !== "Kanzel") ? " · " + (p.type === "Drückjagdbock" ? "DJB" : p.type) : "";
+    return p.name + " (" + p.area + ")" + suffix;
+  }
+  if (pos.type === "klettersitz") {
+    const label = pos.label || "Klettersitz";
+    const coord = (pos.lat !== "" && pos.lng !== "") ? " — " + pos.lat.toFixed(5) + ", " + pos.lng.toFixed(5) : "";
+    return label + coord;
+  }
+  return "(Position offen)";
+}
+
+function squadBaseMarkers_(positions, postsById) {
+  const out = [];
+  for (let i = 0; i < positions.length; i++) {
+    const c = positionCoords_(positions[i], postsById);
+    if (!c) continue;
+    // Sequential A,B,C labels so the marker matches the order shown in the
+    // email's roster (Static Maps only supports single-char labels).
+    const label = String.fromCharCode(65 + i);
+    out.push("color:yellow|label:" + label + "|" + c.lat + "," + c.lng);
+  }
+  return out;
+}
+
+function fetchSquadMap_(baseMarkerSpecs, recipientCoord) {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
+  if (!apiKey) return null;
+  if (!baseMarkerSpecs.length && !recipientCoord) return null;
+  const params = [
+    "size=640x480",
+    "maptype=hybrid",
+    "scale=2",
+  ];
+  for (const m of baseMarkerSpecs) {
+    params.push("markers=" + encodeURIComponent(m));
+  }
+  if (recipientCoord) {
+    params.push("markers=" + encodeURIComponent("color:red|size:mid|" + recipientCoord.lat + "," + recipientCoord.lng));
+  }
+  params.push("key=" + encodeURIComponent(apiKey));
+  const url = "https://maps.googleapis.com/maps/api/staticmap?" + params.join("&");
+  try {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return null;
+    return res.getBlob().setName("squadmap.png");
+  } catch (err) {
+    return null;
+  }
+}
+
+function displayRundeNameServer_(name) {
+  const s = String(name || "").trim();
+  const m = /^(Ansteller Runde)\s+(\d+)\s*$/i.exec(s);
+  if (!m) return s || "Ansteller Runde";
+  // Reuse the same Roman-numeral table the frontend uses.
+  const R = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"];
+  const n = parseInt(m[2], 10);
+  return m[1] + " " + (R[n - 1] || String(n));
+}
+
+function htmlEscape_(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function htmlToPlain_(html) {
+  return String(html || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function buildInfoMailHtml_(ev, squad, positions, recipientPos, postsById) {
+  const recipient = recipientPos.hunter || "";
+  const forename = forenameFor_(recipient);
+  const eventDate = formatGermanDate_(ev.date);
+  const rundeName = displayRundeNameServer_(squad.name);
+  const ansteller = (positions[0] && positions[0].hunter) || squad.ansteller || "";
+  const myLabel = positionLabel_(recipientPos, postsById);
+  const myCoords = positionCoords_(recipientPos, postsById);
+  const myMapLink = myCoords
+    ? '<a href="https://www.google.com/maps?q=' + myCoords.lat + ',' + myCoords.lng + '" style="color:#1a5f1a;">In Google Maps öffnen</a>'
+    : "";
+
+  const rosterRows = positions.map(function (p, i) {
+    const isMe = p.hunter === recipient;
+    const label = String.fromCharCode(65 + i);
+    const stand = positionLabel_(p, postsById);
+    const role = i === 0 ? " — Ansteller" : "";
+    const cells =
+      '<td style="padding:6px 10px;border:1px solid #ddd;font-weight:700;color:#7a5a00;">' + label + '</td>' +
+      '<td style="padding:6px 10px;border:1px solid #ddd;' + (isMe ? "font-weight:700;background:#fff2c0;" : "") + '">' + htmlEscape_(p.hunter) + htmlEscape_(role) + '</td>' +
+      '<td style="padding:6px 10px;border:1px solid #ddd;color:#3a3a3a;">' + htmlEscape_(stand) + '</td>';
+    return '<tr>' + cells + '</tr>';
+  }).join("");
+
+  const treffpunktLine = ev.treffpunkt
+    ? '<p style="margin:4px 0;"><strong>Treffpunkt:</strong> ' + htmlEscape_(ev.treffpunkt) +
+      (ev.treffpunkt_lat !== "" && ev.treffpunkt_lng !== ""
+        ? ' (<a href="https://www.google.com/maps?q=' + ev.treffpunkt_lat + ',' + ev.treffpunkt_lng + '" style="color:#1a5f1a;">Karte</a>)'
+        : "") + "</p>"
+    : "";
+
+  return [
+    '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Helvetica Neue\',\'Segoe UI\',sans-serif;font-weight:400;line-height:1.55;color:#232323;font-size:15px;max-width:680px;">',
+    '<p>Hallo <strong>' + htmlEscape_(forename) + '</strong>,</p>',
+    '<p>am <strong>' + htmlEscape_(eventDate) + '</strong> findet die Drückjagd <strong>' + htmlEscape_(ev.name) + '</strong> statt. Hier Deine Position und Deine Ansteller-Runde:</p>',
+    '<h3 style="margin:18px 0 4px;">' + htmlEscape_(rundeName) + ' (Ansteller: ' + htmlEscape_(ansteller) + ')</h3>',
+    '<p style="margin:4px 0;"><strong>Dein Stand:</strong> ' + htmlEscape_(myLabel) + '</p>',
+    myMapLink ? '<p style="margin:2px 0 12px;">' + myMapLink + '</p>' : "",
+    '<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #ddd;font-size:14px;margin:8px 0 14px;">',
+    '<thead><tr style="background:#f3f8df;color:#1a5f1a;">',
+    '<th style="padding:6px 10px;border:1px solid #ddd;text-align:left;">#</th>',
+    '<th style="padding:6px 10px;border:1px solid #ddd;text-align:left;">Schütze</th>',
+    '<th style="padding:6px 10px;border:1px solid #ddd;text-align:left;">Stand</th>',
+    '</tr></thead><tbody>' + rosterRows + '</tbody></table>',
+    '<p style="margin:6px 0 2px;color:#5a5a5a;font-size:13px;">Karte: Dein Stand ist rot markiert, die anderen Stände Deiner Runde gelb.</p>',
+    '<img src="cid:squadmap" alt="Karte der Ansteller-Runde" style="max-width:100%;border:1px solid #ddd;border-radius:6px;display:block;margin:8px 0 14px;">',
+    treffpunktLine,
+    ev.treff_time ? '<p style="margin:4px 0;"><strong>Treffzeit:</strong> ' + htmlEscape_(ev.treff_time) + ' Uhr</p>' : "",
+    ev.start_time ? '<p style="margin:4px 0;"><strong>Beginn:</strong> ' + htmlEscape_(ev.start_time) + ' Uhr</p>' : "",
+    ev.end_time ? '<p style="margin:4px 0;"><strong>Ende:</strong> ' + htmlEscape_(ev.end_time) + ' Uhr</p>' : "",
+    contactsBlockHtml_(ev),
+    '<p style="margin:16px 0 6px;">Waidmannsheil!<br>— ' + htmlEscape_(ev.organizer || "Dein Organisator") + '</p>',
+    '</div>',
+  ].join("");
+}
+
+function contactsBlockHtml_(ev) {
+  const lines = [];
+  if (ev.vet_name || ev.vet_phone) {
+    lines.push('<li><strong>Tierarzt:</strong> ' + htmlEscape_([ev.vet_name, ev.vet_phone].filter(Boolean).join(" — ")) + '</li>');
+  }
+  if (ev.coordinator_name || ev.coordinator_phone) {
+    lines.push('<li><strong>Nachsuchen-Koordinator:</strong> ' + htmlEscape_([ev.coordinator_name, ev.coordinator_phone].filter(Boolean).join(" — ")) + '</li>');
+  }
+  const nsf = Array.isArray(ev.nachsuchenfuehrer) ? ev.nachsuchenfuehrer.filter(function (p) { return p.name || p.phone; }) : [];
+  if (nsf.length) {
+    const items = nsf.map(function (p) {
+      return '<li>' + htmlEscape_([p.name, p.phone].filter(Boolean).join(" — ")) + '</li>';
+    }).join("");
+    lines.push('<li><strong>Nachsuchenführer:</strong><ul style="margin:2px 0 0 0;padding-left:20px;">' + items + '</ul></li>');
+  }
+  if (!lines.length) return "";
+  return '<h4 style="margin:14px 0 4px;color:#5a5a5a;">Kontakte am Jagdtag</h4><ul style="margin:0;padding-left:20px;font-size:14px;">' + lines.join("") + '</ul>';
 }
 
 // Deletes an event row plus every row in event_hunters / event_squads that

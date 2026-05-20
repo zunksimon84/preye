@@ -1703,6 +1703,59 @@ async function handlePostCsv(file) {
   }
 }
 
+// ---------- Per-Schütze Infomails ----------
+// One mail per accepted Schütze in every Ansteller Runde, containing the
+// runde's roster (recipient bolded) + an embedded satellite map of the
+// runde's stands. The map is fetched server-side from the Static-Maps API
+// (key stored in Script Properties) and attached as an inline image.
+
+async function sendInfomails() {
+  if (!state.currentEvent) return;
+  const btn = $("#send-infomails-btn");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Prüfe …";
+  try {
+    const preview = await postJson({
+      action: "event-infomails-preview",
+      event_id: state.currentEvent.event.id,
+    });
+    if (preview.error) throw new Error(preview.error);
+
+    const lines = [];
+    lines.push(`Versand an ${preview.recipients} Schütze${preview.recipients === 1 ? "" : "n"} in ${preview.runden} Ansteller-Runde${preview.runden === 1 ? "" : "n"}.`);
+    if (preview.no_email && preview.no_email.length) {
+      lines.push(`\nWird übersprungen (keine E-Mail bzw. nicht im Roster):\n• ${preview.no_email.join("\n• ")}`);
+    }
+    if (preview.not_accepted && preview.not_accepted.length) {
+      lines.push(`\nWird übersprungen (noch keine Zusage):\n• ${preview.not_accepted.join("\n• ")}`);
+    }
+    if (!preview.has_maps_key) {
+      lines.push('\n⚠ Kein Maps-API-Key gesetzt — die Mails gehen ohne Karte raus. Setze den Key in der Sheet-Leiste unter 📧 E-Mail → „Maps API Key setzen".');
+    }
+    lines.push("\nJetzt versenden?");
+    if (!confirm(lines.join("\n"))) return;
+
+    btn.textContent = "Sende …";
+    const data = await postJson({
+      action: "event-infomails-send",
+      event_id: state.currentEvent.event.id,
+    });
+    if (data.errors && data.errors.length) {
+      const failed = data.errors.map((e) => `${e.hunter}: ${e.error}`).slice(0, 5).join("\n");
+      showToast(`Versendet: ${data.sent} · Fehler: ${data.errors.length}\n${failed}`, "error", 8000);
+    } else {
+      showToast(`${data.sent} Infomail${data.sent === 1 ? "" : "s"} versendet ✓`);
+    }
+  } catch (err) {
+    showToast(err.message || "Fehler", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
 // ---------- Edit existing event ----------
 // Opens a modal pre-filled with the current event's data. If any
 // invitation has already been sent (hunter.invited_at set), a warning
@@ -2000,6 +2053,7 @@ function wireUi() {
   });
   $("#new-squad-btn").addEventListener("click", addSquad);
   $("#new-treiber-btn").addEventListener("click", addTreibergruppe);
+  $("#send-infomails-btn").addEventListener("click", sendInfomails);
   $("#ev-nsf-add").addEventListener("click", () => addNsfRow());
   $("#hunters-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".hunter-remove");
