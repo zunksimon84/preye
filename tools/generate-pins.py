@@ -28,7 +28,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 PIN_W = 64               # width of the actual pin
 PIN_H = 88               # height of the actual pin
 TIP_Y = 86               # y-coord of the pin's tip
-SHIFT_UP = TIP_Y // 2    # how far above the lat/lng the tip should sit
+SHIFT_UP = 20            # how far above the lat/lng the tip should sit
 W = PIN_W
 H = 2 * (TIP_Y + SHIFT_UP)  # canvas tall enough that the anchor lands SHIFT_UP px below the tip
 CX = PIN_W // 2          # horizontal centre of canvas
