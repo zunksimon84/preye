@@ -169,6 +169,13 @@ async function respond(choice, role, dogs) {
     const payload = { action: "rsvp-respond", token, choice };
     if (role) payload.role = role;
     if (dogs && dogs.length) payload.dogs = dogs;
+    // Forward the two liability confirmations for the server-side audit
+    // trail. The UI gate already enforces this on accept; we just mirror
+    // the state into the payload so the backend can timestamp it.
+    if (choice === "accept") {
+      payload.confirmed_jagdschein = $("#rsvp-confirm-jagdschein").checked;
+      payload.confirmed_vsg44 = $("#rsvp-confirm-vsg").checked;
+    }
     const res = await fetch(cfg.APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },

@@ -36,7 +36,7 @@ const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
 const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer"];
-const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "language", "token", "status", "role", "dogs", "invited_at", "responded_at"];
+const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "language", "token", "status", "role", "dogs", "invited_at", "responded_at", "confirmed_jagdschein", "confirmed_vsg44"];
 
 // JGHV-anerkannte Jagdhundrassen — single source of truth, baked here so
 // the backend can validate what the RSVP page submits. "Sonstige" lets a
@@ -2405,28 +2405,55 @@ function rsvpRespond_(body) {
     }
   }
 
+  // Liability paper trail: on accept we expect both confirmations
+  // (valid Jagdschein + VSG 4.4 acknowledged). Each is written as the
+  // ISO timestamp of the response, or left blank if missing. Declines
+  // clear any previously-recorded confirmations because they no longer
+  // apply.
+  const now = new Date().toISOString();
+  const confirmedJs = (choice === "accepted" && truthy_(body.confirmed_jagdschein)) ? now : "";
+  const confirmedVsg = (choice === "accepted" && truthy_(body.confirmed_vsg44)) ? now : "";
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { error: "not found" };
-  const rows = sheet.getRange(2, 1, lastRow - 1, EVENT_HUNTER_HEADER.length).getValues();
-  const headers = sheet.getRange(1, 1, 1, EVENT_HUNTER_HEADER.length).getValues()[0]
+  const headerWidth = sheet.getLastColumn();
+  const rows = sheet.getRange(2, 1, lastRow - 1, headerWidth).getValues();
+  const headers = sheet.getRange(1, 1, 1, headerWidth).getValues()[0]
     .map(function (s) { return String(s).trim(); });
   const colToken = headers.indexOf("token");
   const colStatus = headers.indexOf("status");
   const colRole = headers.indexOf("role");
   const colDogs = headers.indexOf("dogs");
   const colResponded = headers.indexOf("responded_at");
+  const colConfirmedJs = headers.indexOf("confirmed_jagdschein");
+  const colConfirmedVsg = headers.indexOf("confirmed_vsg44");
   for (let i = 0; i < rows.length; i++) {
     if (String(rows[i][colToken]) === token) {
       sheet.getRange(i + 2, colStatus + 1).setValue(choice);
       if (colRole >= 0) sheet.getRange(i + 2, colRole + 1).setValue(role);
       if (colDogs >= 0) sheet.getRange(i + 2, colDogs + 1).setValue(choice === "accepted" ? JSON.stringify(dogs) : "");
-      sheet.getRange(i + 2, colResponded + 1).setValue(new Date().toISOString());
-      return { ok: true, status: choice, role: role, dogs: dogs };
+      sheet.getRange(i + 2, colResponded + 1).setValue(now);
+      if (colConfirmedJs >= 0) sheet.getRange(i + 2, colConfirmedJs + 1).setValue(confirmedJs);
+      if (colConfirmedVsg >= 0) sheet.getRange(i + 2, colConfirmedVsg + 1).setValue(confirmedVsg);
+      return {
+        ok: true,
+        status: choice,
+        role: role,
+        dogs: dogs,
+        confirmed_jagdschein: !!confirmedJs,
+        confirmed_vsg44: !!confirmedVsg,
+      };
     }
   }
   return { error: "not found" };
+}
+
+function truthy_(v) {
+  if (v === true) return true;
+  const s = String(v || "").trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes" || s === "ja" || s === "on";
 }
 
 function eventSquadSave_(body) {
