@@ -99,6 +99,32 @@ const FREIGABEN_MATRIX = [
   ]},
 ];
 
+// Compact "AK 0–3" / "AK 0, 2" label for the PDF Freigaben section.
+// AK-numbered groups (id matches /^ak\d+$/) get the range syntax;
+// non-numbered groups (Schwarzwild's Frischling/Überläufer/Bache,…)
+// fall back to a dot-separated list of full labels.
+function formatAkSelection_(group, checkedAks) {
+  if (!checkedAks.length) return "";
+  const allNumbered = group.aks.every(function (ak) { return /^ak\d+$/.test(ak.id); });
+  if (!allNumbered) {
+    return checkedAks.map(function (ak) { return ak.label; }).join(" · ");
+  }
+  const nums = checkedAks
+    .map(function (ak) { return parseInt(ak.id.slice(2), 10); })
+    .sort(function (a, b) { return a - b; });
+  const ranges = [];
+  let start = nums[0];
+  let prev = nums[0];
+  for (let i = 1; i < nums.length; i++) {
+    if (nums[i] === prev + 1) { prev = nums[i]; continue; }
+    ranges.push(start === prev ? String(start) : start + "–" + prev);
+    start = nums[i];
+    prev = nums[i];
+  }
+  ranges.push(start === prev ? String(start) : start + "–" + prev);
+  return "AK " + ranges.join(", ");
+}
+
 // "All AKs released" — the default we use whenever an event has no
 // saved freigaben yet.
 function freigabenAllKeys_() {
@@ -3554,7 +3580,7 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
           return freigabenSet[sp.id + "." + g.id + "." + ak.id];
         });
         if (!checkedAks.length) return;
-        const aksText = checkedAks.map(function (ak) { return ak.label; }).join(" · ");
+        const aksText = formatAkSelection_(g, checkedAks);
         const p = body.appendListItem(g.label + ": " + aksText)
           .setGlyphType(DocumentApp.GlyphType.BULLET)
           .setIndentStart(18)
