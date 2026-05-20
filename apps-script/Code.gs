@@ -2714,9 +2714,10 @@ function positionLabel_(pos, postsById) {
   return "(Position offen)";
 }
 
-// Extracts the post's numeric ID from its name (e.g., "Nr. 13" → "13",
-// "DJB 5" → "5", "Klettersitz Süd" → ""). Used to label markers and
-// roster rows with the actual post number rather than sequential letters.
+// Extracts the post's numeric ID + optional sub-position suffix from
+// its name. Examples: "Nr. 13" → "13", "Nr. 5a" → "5a", "DJB 7" → "7",
+// "Klettersitz Süd" → "". The lowercase a/b suffix is preserved so
+// pin lookup still finds the right asset (markers/5a.png).
 function postNumberString_(pos, postsById) {
   let nm = "";
   if (pos.type === "kanzel" && pos.post_id && postsById[pos.post_id]) {
@@ -2724,8 +2725,9 @@ function postNumberString_(pos, postsById) {
   } else if (pos.type === "klettersitz" && pos.label) {
     nm = String(pos.label);
   }
-  const m = /(\d+)/.exec(nm);
-  return m ? m[1] : "";
+  const m = /(\d+)([ab])?/i.exec(nm);
+  if (!m) return "";
+  return m[1] + (m[2] ? m[2].toLowerCase() : "");
 }
 
 // Label shown both on the map pin and in the PDF roster's "Nr." column.
@@ -2737,15 +2739,16 @@ function squadRosterLabel_(pos, postsById, fallbackIndex) {
   return String.fromCharCode(65 + fallbackIndex);
 }
 
-// Builds a dummyimage.com URL that returns a rectangular PNG with the
-// given text rendered on it. Used as the marker icon in the Static
-// Maps fetch so each pin can show the full post number (e.g., "13")
-// instead of the one-char limit imposed by Static Maps' built-in
-// markers. dummyimage.com responds in <100 ms with a real
-// `Content-Type: image/png`, which Static Maps' icon fetcher accepts.
-function markerIconUrl_(text, fillHex, textHex) {
-  return "https://dummyimage.com/56x56/" + fillHex + "/" + textHex + ".png?text=" +
-    encodeURIComponent(String(text));
+// Pre-rendered teardrop PNGs (1..80 + 1a..80b + A..H letter fallbacks)
+// live in public/markers/ on the static site. Static Maps' icon
+// fetcher pulls them by URL — much more reliable than a dynamic image
+// service (quickchart returned HTTP 400 for d_map_pin_letter, and
+// dummyimage produces flat rectangles). The generator that produces
+// these PNGs is tools/generate-pins.py.
+const MARKER_BASE_URL = "https://preye.org/markers/";
+
+function markerIconUrl_(text) {
+  return MARKER_BASE_URL + encodeURIComponent(String(text)) + ".png";
 }
 
 function squadBaseMarkers_(positions, postsById) {
@@ -2754,8 +2757,7 @@ function squadBaseMarkers_(positions, postsById) {
     const c = positionCoords_(positions[i], postsById);
     if (!c) continue;
     const labelText = squadRosterLabel_(positions[i], postsById, i);
-    const iconUrl = markerIconUrl_(labelText, "FFFF00", "000000");
-    out.push("icon:" + iconUrl + "|" + c.lat + "," + c.lng);
+    out.push("icon:" + markerIconUrl_(labelText) + "|" + c.lat + "," + c.lng);
   }
   return out;
 }
