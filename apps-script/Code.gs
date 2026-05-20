@@ -1235,6 +1235,28 @@ function onOpen() {
 // (Ausführungen) in the left sidebar and read the log output.
 // One-time setter for the Static-Maps API key. Stored in Script Properties
 // so the build can fetch satellite maps for the per-Schütze info mails.
+// Manually trigger the documents/Drive OAuth consent so the deployed web
+// app can call DocumentApp.create() / DriveApp.getFileById() when building
+// the Infomail PDF. Web-app POSTs never show the consent screen, so the
+// only way to grant the scope is to run a function from the editor once.
+// After this runs successfully, the existing deployment picks up the
+// new scopes — no re-deploy needed.
+function menu_authorizeInfomailPdf() {
+  const ui = SpreadsheetApp.getUi();
+  let doc;
+  try {
+    doc = DocumentApp.create("_authorize_test_" + Date.now());
+    DriveApp.getFileById(doc.getId()).setTrashed(true);
+    ui.alert("Docs- & Drive-Zugriff freigeschaltet ✓\n\nDu kannst jetzt im Tool Infomails versenden.");
+  } catch (err) {
+    ui.alert("Fehler: " + (err && err.message || err) +
+      "\n\nFalls ein Berechtigungsdialog erscheint, einmal genehmigen und die Funktion erneut starten.");
+    if (doc) {
+      try { DriveApp.getFileById(doc.getId()).setTrashed(true); } catch (e) {}
+    }
+  }
+}
+
 function menu_setMapsApiKey() {
   const ui = SpreadsheetApp.getUi();
   const r = ui.prompt("Maps API Key", "Bitte gib den Google-Maps-API-Key ein (wird in den Script-Properties gespeichert):", ui.ButtonSet.OK_CANCEL);
