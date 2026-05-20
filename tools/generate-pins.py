@@ -14,16 +14,23 @@ OUT_DIR = Path(__file__).resolve().parent.parent / "public" / "markers"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Canvas + pin geometry. We render the pin in the top portion of a
-# tall canvas and pad the bottom with transparent space so that the
-# pin's tip sits at the GEOMETRIC CENTRE of the canvas — Mapbox (and
-# most static-map services) anchor custom icons at the centre of the
-# image, so this trick makes the tip land exactly on the supplied
-# lat/lng instead of half a pin-height to the south.
+# tall canvas and pad the bottom with transparent space so the
+# center-anchor used by Mapbox lands a specific distance BELOW the
+# pin's tip — this shifts the visible pin upward in the rendered
+# map so its lowest point (the tip) sits where its highest point
+# (the top of the head) used to be.
+#
+# Geometry derivation:
+#   image-center-Y in canvas = TIP_Y + SHIFT_UP
+#   canvas height H          = 2 × (TIP_Y + SHIFT_UP)
+# With SHIFT_UP = TIP_Y, the pin floats one full pin-height above
+# the coordinate it's marking, leaving the marker location visible.
 PIN_W = 64               # width of the actual pin
 PIN_H = 88               # height of the actual pin
-TIP_Y = 86               # y-coord of the pin's tip (anchor point)
+TIP_Y = 86               # y-coord of the pin's tip
+SHIFT_UP = TIP_Y         # how far above the lat/lng the tip should sit
 W = PIN_W
-H = 2 * TIP_Y            # canvas tall enough that tip ends up at centre
+H = 2 * (TIP_Y + SHIFT_UP)  # canvas tall enough that the anchor lands SHIFT_UP px below the tip
 CX = PIN_W // 2          # horizontal centre of canvas
 CY_HEAD = 30             # vertical centre of head circle
 R_OUT = 28               # outline radius
