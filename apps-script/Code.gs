@@ -2803,15 +2803,17 @@ function fetchGeoapifyMap_(positions, postsById) {
     if (!c) continue;
     coords.push(c);
     const label = squadRosterLabel_(positions[i], postsById, i);
-    // Geoapify marker syntax: `lonlat:LNG,LAT;k:v;k:v;…`. `type:material`
-    // is the Google-style teardrop pin; `text:` puts the label inside the
-    // pin head (up to 5 chars, which fits "80b"). Colors are URL-encoded.
+    // Geoapify marker syntax: `lonlat:LNG,LAT;key:value;…`. The `text`
+    // field is capped at 2 characters server-side, so labels like "80b"
+    // get truncated to "80" (the full label still appears in the PDF's
+    // Nr. column — the pin just shows the number). Field order matches
+    // Geoapify's documented example to avoid validator quirks.
+    const pinText = String(label).slice(0, 2);
     markers.push("lonlat:" + c.lng + "," + c.lat +
+      ";color:%23ffe100" +
+      ";size:large" +
       ";type:material" +
-      ";color:%23FFE100" +
-      ";textcolor:%23000000" +
-      ";textsize:large" +
-      ";text:" + encodeURIComponent(label));
+      ";text:" + encodeURIComponent(pinText));
   }
   if (!coords.length) return { blob: null, error: "Keine Koordinaten für die Karte." };
 
@@ -3048,7 +3050,24 @@ function fetchSquadMap_(baseMarkerSpecs, recipientCoord) {
 function menu_testInfomailMap() {
   const props = PropertiesService.getScriptProperties();
   const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
+  const geoKey = (props.getProperty("GEOAPIFY_KEY") || "").trim();
   console.log("MAPS_API_KEY gesetzt? " + (apiKey ? "ja (" + apiKey.length + " Zeichen)" : "NEIN"));
+  console.log("GEOAPIFY_KEY gesetzt? " + (geoKey ? "ja (" + geoKey.length + " Zeichen)" : "NEIN"));
+
+  // Probe the real Geoapify path with a sample marker so we can see
+  // what URL goes out and what comes back. Posts a fake position so it
+  // works even if no real Runde exists yet.
+  if (geoKey) {
+    const fakePositions = [{ type: "kanzel", post_id: "demo" }];
+    const fakePostsById = { demo: { name: "Nr. 13", area: "Hauptrevier", type: "Kanzel", lat: 53.63065, lng: 12.83461 } };
+    const r = fetchGeoapifyMap_(fakePositions, fakePostsById);
+    if (r.blob) {
+      console.log("Geoapify OK: " + r.blob.getBytes().length + " bytes, " + r.blob.getContentType());
+    } else {
+      console.log("Geoapify FEHLER: " + r.error);
+    }
+  }
+
 
   // Build a sample marker spec the way the live code does so we can
   // see exactly what icon URL is being passed to Static Maps.
