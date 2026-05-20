@@ -1222,7 +1222,8 @@ function onOpen() {
     .addToUi();
   ui.createMenu("📧 E-Mail")
     .addItem("Test-E-Mail an mich senden", "menu_testEmail")
-    .addItem("Maps API Key setzen (Infomails-Karten)", "menu_setMapsApiKey")
+    .addItem("Maps API Key setzen (Google Static Maps)", "menu_setMapsApiKey")
+    .addItem("Geoapify-Key setzen (Karten + Pins)", "menu_setGeoapifyKey")
     .addToUi();
 }
 
@@ -1271,6 +1272,27 @@ function menu_setMapsApiKey() {
   if (!k) { ui.alert("Kein Key eingegeben."); return; }
   PropertiesService.getScriptProperties().setProperty("MAPS_API_KEY", k);
   ui.alert("Gespeichert. Info-Mails können jetzt eine Karte einbetten.");
+}
+
+// Stores the Geoapify API key. Once set, the Infomail PDF builder
+// switches from the Google-composite path to a single Geoapify Static
+// Maps call — OSM-bright base map + native teardrop pins with the
+// post number rendered on each. Free tier: 3 000 requests/day. Sign
+// up at https://www.geoapify.com/ (no card required).
+function menu_setGeoapifyKey() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt(
+    "Geoapify Key",
+    "API-Key von geoapify.com (Free-Tier reicht für unsere Mengen).\n\n" +
+    "Damit werden die Infomail-Karten über OSM gerendert und die Pins mit " +
+    "der Standnummer direkt auf der Karte gezeichnet.",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const k = (r.getResponseText() || "").trim();
+  if (!k) { ui.alert("Kein Key eingegeben."); return; }
+  PropertiesService.getScriptProperties().setProperty("GEOAPIFY_KEY", k);
+  ui.alert("Geoapify-Key gespeichert. Beim nächsten Infomail-Versand werden die Pins direkt auf der Karte gerendert.");
 }
 
 function menu_listAliases() {
@@ -2759,6 +2781,79 @@ function markerIconUrl_(text) {
   return MARKER_BASE_URL + encodeURIComponent(String(text)) + ".png";
 }
 
+// Fetches a single PNG of the squad's stands rendered on an OSM-based
+// map. Geoapify natively supports teardrop pin markers with arbitrary
+// text labels — no client-side compositing needed, unlike Google
+// Static Maps which blocks custom icon URLs on this GCP project.
+// Free tier is 3 000 req/day, more than enough for our use.
+function fetchGeoapifyMap_(positions, postsById) {
+  const props = PropertiesService.getScriptProperties();
+  const key = (props.getProperty("GEOAPIFY_KEY") || "").trim();
+  if (!key) return { blob: null, error: "Kein GEOAPIFY_KEY hinterlegt (Menü 📧 E-Mail → Geoapify-Key setzen)." };
+
+  const coords = [];
+  const markers = [];
+  for (let i = 0; i < positions.length; i++) {
+    const c = positionCoords_(positions[i], postsById);
+    if (!c) continue;
+    coords.push(c);
+    const label = squadRosterLabel_(positions[i], postsById, i);
+    // Geoapify marker syntax: `lonlat:LNG,LAT;k:v;k:v;…`. `type:material`
+    // is the Google-style teardrop pin; `text:` puts the label inside the
+    // pin head (up to 5 chars, which fits "80b"). Colors are URL-encoded.
+    markers.push("lonlat:" + c.lng + "," + c.lat +
+      ";type:material" +
+      ";color:%23FFE100" +
+      ";textcolor:%23000000" +
+      ";textsize:large" +
+      ";text:" + encodeURIComponent(label));
+  }
+  if (!coords.length) return { blob: null, error: "Keine Koordinaten für die Karte." };
+
+  const params = [
+    "style=osm-bright",
+    "width=640",
+    "height=640",
+    "scaleFactor=2",
+    "format=png",
+  ];
+  if (coords.length === 1) {
+    params.push("center=lonlat:" + coords[0].lng + "," + coords[0].lat);
+    params.push("zoom=15");
+  } else {
+    // Auto-fit via a rect area covering all positions with a small
+    // forest-sized padding so pins don't hug the image edge.
+    const lats = coords.map(function (c) { return c.lat; });
+    const lngs = coords.map(function (c) { return c.lng; });
+    const pad = 0.002; // ~200 m
+    params.push("area=rect:" +
+      (Math.min.apply(null, lngs) - pad) + "," +
+      (Math.min.apply(null, lats) - pad) + "," +
+      (Math.max.apply(null, lngs) + pad) + "," +
+      (Math.max.apply(null, lats) + pad));
+  }
+  markers.forEach(function (m) { params.push("marker=" + m); });
+  params.push("apiKey=" + encodeURIComponent(key));
+
+  const url = "https://maps.geoapify.com/v1/staticmap?" + params.join("&");
+  try {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const code = res.getResponseCode();
+    if (code !== 200) {
+      return { blob: null, error: "Geoapify HTTP " + code + ": " +
+        String(res.getContentText() || "").slice(0, 200) };
+    }
+    const blob = res.getBlob();
+    const ct = blob.getContentType() || "";
+    if (ct.indexOf("image/") !== 0) {
+      return { blob: null, error: "Geoapify lieferte " + ct + " statt eines Bildes." };
+    }
+    return { blob: blob.setName("squadmap.png"), error: "" };
+  } catch (err) {
+    return { blob: null, error: "Geoapify UrlFetchApp: " + (err && err.message || err) };
+  }
+}
+
 // Fetches a pre-rendered pin PNG from the static site. Per-execution
 // memo cache so the same label (e.g., when two Runden share a stand
 // number) only costs one round-trip.
@@ -3063,41 +3158,58 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     });
     body.appendParagraph(" ");
 
-    // Map: fetch a plain base map, place it left-aligned at full text
-    // width, then overlay our pre-rendered teardrop PNGs as positioned
-    // images at each post's projected pixel coordinates. (Static Maps'
-    // built-in `icon:` parameter is blocked on this GCP project, so we
-    // composite the markers ourselves.)
-    const mapResult = fetchBaseMapAndPositions_(positions, postsById);
-    if (mapResult.blob) {
-      const inlineImg = body.appendImage(mapResult.blob);
-      inlineImg.setWidth(MAP_TARGET_WIDTH_PT);
-      inlineImg.setHeight(MAP_TARGET_WIDTH_PT); // square map → square display
-      const mapPara = inlineImg.getParent().asParagraph();
-      // Left-align the map so the positioned-image offsets, which are
-      // relative to the paragraph's start corner, map cleanly onto the
-      // image's pixel grid. Centering would shift the anchor.
-      mapPara.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
-      const ptPerPx = MAP_TARGET_WIDTH_PT / mapResult.renderedSize;
-      // Drop each pin so its bottom-centre lands exactly on the pixel
-      // coord (mirrors how a real map pin "points" at its location).
-      for (let pi = 0; pi < mapResult.pins.length; pi++) {
-        const pin = mapResult.pins[pi];
-        const pinBlob = fetchMarkerBlob_(pin.label);
-        if (!pinBlob) continue;
-        const posImg = mapPara.addPositionedImage(pinBlob);
-        posImg.setWidth(PIN_WIDTH_PT);
-        posImg.setHeight(PIN_HEIGHT_PT);
-        posImg.setLayout(DocumentApp.PositionedLayout.ABOVE_TEXT);
-        posImg.setLeftOffset(pin.pxX * ptPerPx - PIN_WIDTH_PT / 2);
-        posImg.setTopOffset(pin.pxY * ptPerPx - PIN_HEIGHT_PT);
+    // Map rendering. Prefer Geoapify (OSM base + native teardrop pins
+    // with the post number on each) since it returns one composed PNG
+    // and the detail level fits forest orientation. Falls back to the
+    // Google Static Maps + DocumentApp positioned-image composite when
+    // no Geoapify key is set yet.
+    let mapPlaced = false;
+    let mapError = "";
+    const geo = fetchGeoapifyMap_(positions, postsById);
+    if (geo.blob) {
+      const img = body.appendImage(geo.blob);
+      const ratio = img.getHeight() / img.getWidth();
+      img.setWidth(MAP_TARGET_WIDTH_PT);
+      img.setHeight(MAP_TARGET_WIDTH_PT * ratio);
+      img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+      mapPlaced = true;
+    } else if (/Kein GEOAPIFY_KEY/.test(geo.error)) {
+      // No Geoapify key yet — fall back to the Google composite.
+      const composite = fetchBaseMapAndPositions_(positions, postsById);
+      if (composite.blob) {
+        const inlineImg = body.appendImage(composite.blob);
+        inlineImg.setWidth(MAP_TARGET_WIDTH_PT);
+        inlineImg.setHeight(MAP_TARGET_WIDTH_PT);
+        const mapPara = inlineImg.getParent().asParagraph();
+        mapPara.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
+        const ptPerPx = MAP_TARGET_WIDTH_PT / composite.renderedSize;
+        for (let pi = 0; pi < composite.pins.length; pi++) {
+          const pin = composite.pins[pi];
+          const pinBlob = fetchMarkerBlob_(pin.label);
+          if (!pinBlob) continue;
+          const posImg = mapPara.addPositionedImage(pinBlob);
+          posImg.setWidth(PIN_WIDTH_PT);
+          posImg.setHeight(PIN_HEIGHT_PT);
+          posImg.setLayout(DocumentApp.PositionedLayout.ABOVE_TEXT);
+          posImg.setLeftOffset(pin.pxX * ptPerPx - PIN_WIDTH_PT / 2);
+          posImg.setTopOffset(pin.pxY * ptPerPx - PIN_HEIGHT_PT);
+        }
+        mapPlaced = true;
+      } else {
+        mapError = composite.error || geo.error;
       }
-      const capText = "Die Stände der Runde sind als Pins markiert — die Zahl auf jedem Pin entspricht der Standnummer.";
-      const cap = body.appendParagraph(capText);
-      cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
-      cap.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
     } else {
-      const warn = body.appendParagraph("⚠ Karte nicht eingebettet — " + (mapResult.error || "unbekannter Fehler"));
+      // Geoapify actively rejected (bad key, billing, etc.) — surface
+      // the reason rather than silently falling back.
+      mapError = geo.error;
+    }
+
+    if (mapPlaced) {
+      const cap = body.appendParagraph("Die Stände der Runde sind als Pins markiert — die Zahl auf jedem Pin entspricht der Standnummer.");
+      cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
+      cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    } else {
+      const warn = body.appendParagraph("⚠ Karte nicht eingebettet — " + (mapError || "unbekannter Fehler"));
       warn.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#a85a00");
     }
     body.appendParagraph(" ");
