@@ -3071,14 +3071,117 @@ function eventSquadDelete_(body) {
   const sheet = ensureSheet_(ss, SHEETS.event_squads, EVENT_SQUAD_HEADER);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { error: "not found" };
-  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (let i = 0; i < ids.length; i++) {
-    if (String(ids[i][0]).trim() === id) {
-      sheet.deleteRow(i + 2);
-      return { ok: true };
+  const headerWidth = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, headerWidth).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const colId = headers.indexOf("id");
+  const colEvent = headers.indexOf("event_id");
+  const colName = headers.indexOf("name");
+  const colType = headers.indexOf("type");
+  const rows = sheet.getRange(2, 1, lastRow - 1, headerWidth).getValues();
+
+  let deletedRow = -1;
+  let deletedEventId = "";
+  let deletedType = "";
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][colId]).trim() === id) {
+      deletedRow = i + 2;
+      deletedEventId = String(rows[i][colEvent] || "").trim();
+      deletedType = String(rows[i][colType] || "ansteller").trim().toLowerCase();
+      break;
     }
   }
-  return { error: "not found" };
+  if (deletedRow < 0) return { error: "not found" };
+  sheet.deleteRow(deletedRow);
+
+  // Renumber the remaining squads of the same type for this event so the
+  // sequence stays I, II, III, … with no gaps. (Deleting "Treibergruppe I"
+  // promotes "Treibergruppe II" to "Treibergruppe I", and so on.)
+  const renamed = renumberSquadsForEvent_(sheet, deletedEventId, deletedType);
+  return { ok: true, renumbered: renamed };
+}
+
+// Given the event_squads sheet, an event id, and a squad type
+// ("ansteller" or "treiber"), renames every squad of that type/event so
+// the Roman-numeral suffix runs I, II, III, … 1..N. The relative order
+// (by current numeric value, then by id as a tiebreaker for any name
+// that didn't parse) is preserved.
+function renumberSquadsForEvent_(sheet, eventId, type) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const headerWidth = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, headerWidth).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const colId = headers.indexOf("id");
+  const colEvent = headers.indexOf("event_id");
+  const colName = headers.indexOf("name");
+  const colType = headers.indexOf("type");
+  if (colName < 0) return 0;
+
+  const prefix = (type === "treiber") ? "Treibergruppe" : "Ansteller Runde";
+  const rowParser = new RegExp("^" + prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+([IVXLCDM]+|\\d+)\\s*$", "i");
+  const rows = sheet.getRange(2, 1, lastRow - 1, headerWidth).getValues();
+  const same = [];
+  for (let i = 0; i < rows.length; i++) {
+    const ev = String(rows[i][colEvent] || "").trim();
+    const tp = String(rows[i][colType] || "ansteller").trim().toLowerCase();
+    if (ev !== eventId || tp !== type) continue;
+    const nm = String(rows[i][colName] || "").trim();
+    const m = rowParser.exec(nm);
+    const num = m
+      ? (/^\d+$/.test(m[1]) ? parseInt(m[1], 10) : fromRoman_(m[1]))
+      : 99999; // unparseable names sink to the bottom
+    same.push({
+      row: i + 2,
+      currentName: nm,
+      currentNum: num,
+      id: String(rows[i][colId] || "").trim(),
+    });
+  }
+  // Stable order: numeric, then id.
+  same.sort(function (a, b) {
+    if (a.currentNum !== b.currentNum) return a.currentNum - b.currentNum;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  let changes = 0;
+  for (let i = 0; i < same.length; i++) {
+    const wanted = prefix + " " + toRoman_(i + 1);
+    if (same[i].currentName !== wanted) {
+      sheet.getRange(same[i].row, colName + 1).setValue(wanted);
+      changes++;
+    }
+  }
+  return changes;
+}
+
+// Roman-numeral helpers shared by the renumbering logic. Mirror the
+// frontend implementations so the produced names match what the UI
+// generates for fresh squads.
+function toRoman_(n) {
+  const R = [
+    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let out = "";
+  let v = Math.max(1, parseInt(n, 10) || 0);
+  for (let i = 0; i < R.length; i++) {
+    while (v >= R[i][0]) { out += R[i][1]; v -= R[i][0]; }
+  }
+  return out;
+}
+
+function fromRoman_(s) {
+  const map = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  const str = String(s || "").toUpperCase();
+  let result = 0;
+  for (let i = 0; i < str.length; i++) {
+    const cur = map[str[i]] || 0;
+    const next = map[str[i + 1]] || 0;
+    if (next && cur < next) result -= cur;
+    else result += cur;
+  }
+  return result;
 }
 
 function addressBookList_() {

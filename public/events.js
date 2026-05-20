@@ -1363,7 +1363,10 @@ async function saveEditingSquad() {
 }
 
 async function deleteEditingSquad(squad) {
-  if (!confirm(`„${displayRundeName(squad.name)}" wirklich löschen?`)) return;
+  const label = squad.type === "treiber"
+    ? displayTreiberName(squad.name)
+    : displayRundeName(squad.name);
+  if (!confirm(`„${label}" wirklich löschen? Die übrigen werden anschließend neu durchnummeriert.`)) return;
   try {
     await postJson({ action: "event-squad-delete", id: squad.id });
     invalidateCache("event-detail", { id: state.currentEvent.event.id });
