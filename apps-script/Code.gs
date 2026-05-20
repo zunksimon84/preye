@@ -457,7 +457,7 @@ function readPosts_() {
 // Manual or CSV import of a single hunting post (Kanzel / Drückjagdbock /
 // Leiter). Backend authority on type + area validation so the sheet doesn't
 // fill with free-form junk.
-const POST_AREAS = ["Hauptrevier", "Ost", "Nord", "Nordrand", "Babke", "Langenhagen", "Schwarzenhof"];
+const POST_AREAS = ["Hauptrevier", "Ost", "Nord", "Nordrand", "Babke", "Langenhagen", "Schwarzenhof", "Serrahn"];
 
 function postAdd_(body) {
   const name = String(body.name || "").trim();
@@ -478,7 +478,7 @@ function postAdd_(body) {
   // (HR-01, O-02, …) extend cleanly to the new areas.
   const prefix = {
     "Hauptrevier": "HR", "Ost": "O", "Nord": "N", "Nordrand": "NR",
-    "Babke": "BA", "Langenhagen": "LH", "Schwarzenhof": "SH",
+    "Babke": "BA", "Langenhagen": "LH", "Schwarzenhof": "SH", "Serrahn": "SE",
   }[area] || "P";
   const id = prefix + "-" + Date.now().toString(36).toUpperCase();
   appendByName_(sheet, {
@@ -2208,6 +2208,7 @@ const REVIER_FOR_AREA = {
   "Babke": "NPA-Müritz",
   "Langenhagen": "NPA-Müritz",
   "Schwarzenhof": "NPA-Müritz",
+  "Serrahn": "NPA-Müritz",
 };
 
 function revierFromTeilgebiete_(raw) {

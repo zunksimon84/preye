@@ -1746,6 +1746,7 @@ function openEventEditor() {
               <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Babke"${tgCheck("Babke")} /> Babke</label>
               <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Langenhagen"${tgCheck("Langenhagen")} /> Langenhagen</label>
               <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Schwarzenhof"${tgCheck("Schwarzenhof")} /> Schwarzenhof</label>
+              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Serrahn"${tgCheck("Serrahn")} /> Serrahn</label>
             </div>
           </div>
         </div>
