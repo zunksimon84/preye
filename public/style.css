@@ -2158,6 +2158,16 @@ body.rsvp-page #rsvp-topbar {
 
 .ev-section--treiber .ev-section-title { border-bottom-color: #93a7b9; }
 
+/* Bright blue for the Treibergruppe create button so the action visibly
+   belongs to the (calmer slate-blue) Treibergruppen section. */
+#new-treiber-btn {
+  background: #03a9f4;
+  border-color: #0288d1;
+  color: #fff;
+}
+#new-treiber-btn:hover { background: #29b6f6; }
+#new-treiber-btn:disabled { opacity: 0.6; }
+
 /* Hint shown inside a Treibergruppe row when no acceptances yet. */
 .sr-empty {
   margin: 4px 0 0 32px;
