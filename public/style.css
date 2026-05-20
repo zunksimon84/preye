@@ -2146,6 +2146,33 @@ body.rsvp-page #rsvp-topbar {
 .squad-tile-count { font-size: 12px; color: #2d3a05; opacity: 0.8; margin-top: auto; }
 .squad-tile-ansteller .muted { color: #4a4d52; }
 
+/* Member roster inside each tile — every name visible at a glance. */
+.tile-members {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.tile-member {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  justify-content: space-between;
+}
+.tile-member-name { font-weight: 500; }
+.tile-member--leader .tile-member-name { font-weight: 700; }
+.tile-member-role {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #2d3a05;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.treiber-tile .tile-member-role { color: #1e2a36; opacity: 0.7; }
+
 /* Treibergruppe tiles — soft slate-blue so they read as a separate kind
    of group from the lime Ansteller Runden. */
 .treiber-tile {

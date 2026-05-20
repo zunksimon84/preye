@@ -1064,13 +1064,17 @@ function displayTreiberName(name) {
 }
 
 function renderTreiberTile(squad) {
-  const leader = (squad.positions && squad.positions[0] && squad.positions[0].hunter)
-    || squad.ansteller || "";
-  const totalCount = (squad.positions || []).filter((p) => p && p.hunter).length;
-  const memberCount = Math.max(totalCount - 1, 0);
-  const summary = leader
-    ? `Treiberführer: ${escapeHtml(leader)}`
-    : '<span class="muted">Treiberführer noch offen</span>';
+  const positions = (squad.positions || []).filter((p) => p && p.hunter);
+  // Look up each member's role from the accepted-hunters list so the
+  // tile can show "Klaus (Treiber)" vs "Bernd (Hundeführer)".
+  const accepted = state.currentEvent?.hunters || [];
+  const roleOf = (name) => {
+    const h = accepted.find((x) => x.hunter === name);
+    return h ? (h.role || "") : "";
+  };
+  const members = positions.map((p, i) =>
+    renderTileMember(p.hunter, i === 0 ? "Treiberführer" : roleOf(p.hunter), i === 0)
+  ).join("");
   const sp = squad.start_pos;
   let startLine = "";
   if (sp) {
@@ -1083,31 +1087,34 @@ function renderTreiberTile(squad) {
   return `
     <button type="button" class="squad-tile treiber-tile" data-sid="${escapeHtml(squad.id)}">
       <span class="squad-tile-name">${escapeHtml(displayTreiberName(squad.name))}</span>
-      <span class="squad-tile-ansteller">${summary}</span>
       ${startLine}
-      <span class="squad-tile-count">${memberCount} Mitglied${memberCount === 1 ? "" : "er"}</span>
+      ${positions.length
+        ? `<div class="tile-members">${members}</div>`
+        : '<span class="squad-tile-ansteller muted">Noch leer — Mitglieder hinzufügen</span>'}
     </button>
   `;
 }
 
-// Compact tile in the grid. Click → openSquadEditor.
+// Compact tile in the grid. Click → openSquadEditor. Lists every member
+// by name (leader bolded) so the overview reads like a roster at a glance.
 function renderSquadTile(squad) {
-  // The Ansteller is the first Schütze; falls back to the stored ansteller
-  // field for squads created before the merge.
-  const ansteller = (squad.positions && squad.positions[0] && squad.positions[0].hunter)
-    || squad.ansteller || "";
-  const schuetzenCount = (squad.positions || []).filter((p) => p && p.hunter).length;
-  const others = Math.max(schuetzenCount - 1, 0);
-  const summary = ansteller
-    ? `Ansteller: ${escapeHtml(ansteller)}`
-    : '<span class="muted">Ansteller noch offen</span>';
+  const positions = (squad.positions || []).filter((p) => p && p.hunter);
+  const members = positions.map((p, i) => renderTileMember(p.hunter, i === 0 ? "Ansteller" : "", i === 0)).join("");
   return `
     <button type="button" class="squad-tile" data-sid="${escapeHtml(squad.id)}">
       <span class="squad-tile-name">${escapeHtml(displayRundeName(squad.name))}</span>
-      <span class="squad-tile-ansteller">${summary}</span>
-      <span class="squad-tile-count">${schuetzenCount} Schütze${schuetzenCount === 1 ? "" : "n"}${others ? ` (+${others} weitere)` : ""}</span>
+      ${positions.length
+        ? `<div class="tile-members">${members}</div>`
+        : '<span class="squad-tile-ansteller muted">Noch leer — Schützen hinzufügen</span>'}
     </button>
   `;
+}
+
+function renderTileMember(name, roleLabel, isLeader) {
+  return `<div class="tile-member${isLeader ? " tile-member--leader" : ""}">` +
+         `<span class="tile-member-name">${escapeHtml(name)}</span>` +
+         (roleLabel ? `<span class="tile-member-role">${escapeHtml(roleLabel)}</span>` : "") +
+         `</div>`;
 }
 
 let editingSquadId = null;
