@@ -2677,11 +2677,13 @@ function squadBaseMarkers_(positions, postsById) {
   return out;
 }
 
+// Returns { blob, error } so callers can surface WHY the map is missing
+// instead of silently dropping it.
 function fetchSquadMap_(baseMarkerSpecs, recipientCoord) {
   const props = PropertiesService.getScriptProperties();
   const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
-  if (!apiKey) return null;
-  if (!baseMarkerSpecs.length && !recipientCoord) return null;
+  if (!apiKey) return { blob: null, error: "Kein MAPS_API_KEY in den Script-Properties hinterlegt (menu_setMapsApiKey ausführen)." };
+  if (!baseMarkerSpecs.length && !recipientCoord) return { blob: null, error: "Keine Koordinaten für die Karte (Stände ohne lat/lng?)." };
   const params = [
     "size=640x480",
     "maptype=hybrid",
@@ -2697,10 +2699,36 @@ function fetchSquadMap_(baseMarkerSpecs, recipientCoord) {
   const url = "https://maps.googleapis.com/maps/api/staticmap?" + params.join("&");
   try {
     const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (res.getResponseCode() !== 200) return null;
-    return res.getBlob().setName("squadmap.png");
+    const code = res.getResponseCode();
+    if (code !== 200) {
+      const snippet = String(res.getContentText() || "").slice(0, 200);
+      return { blob: null, error: "Static-Maps-Aufruf HTTP " + code + ": " + snippet };
+    }
+    const blob = res.getBlob();
+    const ct = blob.getContentType() || "";
+    if (ct.indexOf("image/") !== 0) {
+      const snippet = String(res.getContentText() || "").slice(0, 200);
+      return { blob: null, error: "Static-Maps lieferte " + ct + " statt eines Bildes: " + snippet };
+    }
+    return { blob: blob.setName("squadmap.png"), error: "" };
   } catch (err) {
-    return null;
+    return { blob: null, error: "UrlFetchApp-Fehler: " + (err && err.message || err) };
+  }
+}
+
+// Run this from the Apps Script editor to diagnose why the PDF has no
+// map. Reports the API key status, fetches a sample tile, and surfaces
+// the raw response if anything went wrong.
+function menu_testInfomailMap() {
+  const ui = SpreadsheetApp.getUi();
+  const result = fetchSquadMap_(
+    ["color:yellow|label:A|53.63065,12.83461"],
+    { lat: 53.63100, lng: 12.83500 }
+  );
+  if (result.blob) {
+    ui.alert("Map-Fetch OK ✓\n\nGröße: " + result.blob.getBytes().length + " bytes\nContent-Type: " + result.blob.getContentType());
+  } else {
+    ui.alert("Map-Fetch fehlgeschlagen ✗\n\n" + (result.error || "(kein Fehler-Text)"));
   }
 }
 
@@ -2779,9 +2807,9 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     // the table below, so the recipient can identify each position.
     const baseMarkers = squadBaseMarkers_(positions, postsById);
     const recipientCoord = positionCoords_(recipientPos, postsById);
-    const mapBlob = fetchSquadMap_(baseMarkers, recipientCoord);
-    if (mapBlob) {
-      const img = body.appendImage(mapBlob);
+    const mapResult = fetchSquadMap_(baseMarkers, recipientCoord);
+    if (mapResult.blob) {
+      const img = body.appendImage(mapResult.blob);
       const targetWidth = 515; // pt at letter-page margins above
       const ratio = img.getHeight() / img.getWidth();
       img.setWidth(targetWidth);
@@ -2790,6 +2818,10 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       const cap = body.appendParagraph("Dein Stand ist rot, die Stände Deiner Runde gelb (A, B, C …).");
       cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
       cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    } else {
+      // Make the failure visible inside the PDF so we know why no map showed up.
+      const warn = body.appendParagraph("⚠ Karte nicht eingebettet — " + (mapResult.error || "unbekannter Fehler"));
+      warn.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#a85a00");
     }
     body.appendParagraph(" ");
 
