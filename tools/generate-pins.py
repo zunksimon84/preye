@@ -13,16 +13,23 @@ from PIL import Image, ImageDraw, ImageFont
 OUT_DIR = Path(__file__).resolve().parent.parent / "public" / "markers"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Canvas + pin geometry. Static Maps recommends ≤ 64 px on the longest
-# edge for icon performance; we go a bit taller (88) to fit the tail
-# without squishing the head.
-W, H = 64, 88
-CX = 32                  # horizontal centre of canvas
+# Canvas + pin geometry. We render the pin in the top portion of a
+# tall canvas and pad the bottom with transparent space so that the
+# pin's tip sits at the GEOMETRIC CENTRE of the canvas — Mapbox (and
+# most static-map services) anchor custom icons at the centre of the
+# image, so this trick makes the tip land exactly on the supplied
+# lat/lng instead of half a pin-height to the south.
+PIN_W = 64               # width of the actual pin
+PIN_H = 88               # height of the actual pin
+TIP_Y = 86               # y-coord of the pin's tip (anchor point)
+W = PIN_W
+H = 2 * TIP_Y            # canvas tall enough that tip ends up at centre
+CX = PIN_W // 2          # horizontal centre of canvas
 CY_HEAD = 30             # vertical centre of head circle
 R_OUT = 28               # outline radius
 R_IN = 26                # fill radius (smaller by stroke width)
-APEX_OUT = (CX, 86)      # outline apex (bottom of pin)
-APEX_IN = (CX, 82)       # fill apex (inset by stroke)
+APEX_OUT = (CX, TIP_Y)   # outline apex (bottom of pin)
+APEX_IN = (CX, TIP_Y - 4)  # fill apex (inset by stroke)
 
 FILL = (255, 222, 0, 255)
 STROKE = (0, 0, 0, 255)
