@@ -1761,13 +1761,29 @@ function openInfomailPreviewModal(preview) {
   `;
 
   if (preview.sample_html) {
-    // Isolate the mail HTML in a sandboxed iframe so its inline styles
-    // don't bleed into the rest of the page.
+    const pdfBlock = preview.sample_pdf_base64
+      ? `
+        <h4 class="infomail-section-title">PDF-Anhang (Karte + Standbesetzung)</h4>
+        <iframe id="infomail-pdf-iframe" class="infomail-preview-iframe infomail-preview-pdf"
+                src="data:application/pdf;base64,${preview.sample_pdf_base64}#zoom=page-width"
+                title="Infomail-PDF"></iframe>
+        <p class="muted infomail-pdf-note">
+          Falls die PDF-Vorschau nicht angezeigt wird:
+          <a href="data:application/pdf;base64,${preview.sample_pdf_base64}"
+             download="${escapeHtml(preview.sample_pdf_name || "infomail-vorschau.pdf")}">PDF herunterladen</a>.
+        </p>
+      `
+      : '<p class="muted infomail-pdf-note">⚠ PDF konnte nicht erzeugt werden (kein Maps-API-Key?). Die Mail würde ohne Anhang verschickt.</p>';
+
+    // Sandbox the mail body so its inline styles can't bleed into the rest
+    // of the page; PDF iframe is unsandboxed because Chromium needs the
+    // default permissions to render the embedded viewer.
     body.innerHTML = warnsHtml + summary +
-      '<iframe id="infomail-preview-iframe" class="infomail-preview-iframe" sandbox="allow-same-origin"></iframe>';
+      '<h4 class="infomail-section-title">E-Mail-Text</h4>' +
+      '<iframe id="infomail-preview-iframe" class="infomail-preview-iframe" sandbox="allow-same-origin"></iframe>' +
+      pdfBlock;
     const iframe = $("#infomail-preview-iframe");
     iframe.srcdoc = preview.sample_html;
-    // Auto-grow the iframe to fit its content once rendered.
     iframe.addEventListener("load", () => {
       try {
         const h = iframe.contentDocument.body.scrollHeight;

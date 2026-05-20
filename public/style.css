@@ -2314,6 +2314,14 @@ body.rsvp-page #rsvp-topbar {
   padding: 14px;
 }
 .infomail-subject { margin: 6px 0 10px; }
+.infomail-section-title {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .infomail-preview-iframe {
   width: 100%;
   min-height: 480px;
@@ -2321,6 +2329,16 @@ body.rsvp-page #rsvp-topbar {
   border-radius: 8px;
   background: #fff;
 }
+.infomail-preview-pdf {
+  min-height: 640px;
+  height: 70vh;
+  background: #f2f3f5;
+}
+.infomail-pdf-note {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+}
+.infomail-pdf-note a { color: #16a34a; font-weight: 600; }
 
 /* Hint shown inside a Treibergruppe row when no acceptances yet. */
 .sr-empty {

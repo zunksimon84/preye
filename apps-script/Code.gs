@@ -2534,23 +2534,29 @@ function eventInfomailsPreview_(body) {
   const props = PropertiesService.getScriptProperties();
   const hasMapsKey = !!(props.getProperty("MAPS_API_KEY") || "").trim();
 
-  // Build the actual HTML the first eligible recipient would see; embed the
-  // map as a data: URI so the preview renders without needing to follow the
-  // cid: reference (which only works inside e-mail clients).
+  // Render the first eligible recipient's actual email body + the PDF that
+  // would be attached. The PDF is shipped to the client as base64 so it can
+  // be embedded in an <iframe> data: URL preview.
   let sampleHtml = "";
   let sampleRecipient = "";
   let sampleSubject = "";
+  let samplePdfBase64 = "";
+  let samplePdfName = "";
   if (sample) {
-    sampleHtml = buildInfoMailHtml_(ev, sample.squad, sample.positions, sample.pos, postsById);
+    sampleHtml = buildInfoMailBodyHtml_(ev, sample.squad, sample.pos);
     sampleRecipient = sample.hunter.hunter + " <" + sample.hunter.email + ">";
     sampleSubject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(sample.squad.name);
     if (hasMapsKey) {
-      const baseMarkers = squadBaseMarkers_(sample.positions, postsById);
-      const recipientCoord = positionCoords_(sample.pos, postsById);
-      const blob = fetchSquadMap_(baseMarkers, recipientCoord);
-      if (blob) {
-        const dataUri = "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes());
-        sampleHtml = sampleHtml.split("cid:squadmap").join(dataUri);
+      try {
+        const pdfBlob = buildInfoMailPdf_(ev, sample.squad, sample.positions, sample.pos, postsById);
+        if (pdfBlob) {
+          samplePdfBase64 = Utilities.base64Encode(pdfBlob.getBytes());
+          samplePdfName = pdfBlob.getName();
+        }
+      } catch (err) {
+        // Surface PDF generation failures as a warning rather than blocking
+        // the preview — admin can still see the email body.
+        notAccepted.push("PDF-Vorschau fehlgeschlagen: " + (err && err.message || err));
       }
     }
   }
@@ -2564,6 +2570,8 @@ function eventInfomailsPreview_(body) {
     sample_recipient: sampleRecipient,
     sample_subject: sampleSubject,
     sample_html: sampleHtml,
+    sample_pdf_base64: samplePdfBase64,
+    sample_pdf_name: samplePdfName,
   };
 }
 
@@ -2588,22 +2596,17 @@ function eventInfomailsSend_(body) {
     const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
     if (!positions.length) continue;
 
-    // Pre-compute the squad's map once per runde; recipient-specific
-    // highlighting is done by appending one extra red marker.
-    const baseMapMarkers = squadBaseMarkers_(positions, postsById);
-
     for (let i = 0; i < positions.length; i++) {
       const pos = positions[i];
       const h = huntersByName[pos.hunter.toLowerCase()];
       if (!h || !h.email || h.status !== "accepted") continue;
 
       try {
-        const recipientCoord = positionCoords_(pos, postsById);
-        const html = buildInfoMailHtml_(ev, squad, positions, pos, postsById);
+        const html = buildInfoMailBodyHtml_(ev, squad, pos);
         const subject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(squad.name);
         const opts = { from: FROM_EMAIL, htmlBody: html };
-        const mapBlob = fetchSquadMap_(baseMapMarkers, recipientCoord);
-        if (mapBlob) opts.inlineImages = { squadmap: mapBlob };
+        const pdfBlob = buildInfoMailPdf_(ev, squad, positions, pos, postsById);
+        if (pdfBlob) opts.attachments = [pdfBlob];
         GmailApp.sendEmail(h.email, subject, htmlToPlain_(html), opts);
         sent++;
       } catch (err) {
@@ -2710,6 +2713,146 @@ function htmlToPlain_(html) {
     .trim();
 }
 
+// Build the per-Schütze PDF: title + event meta + the embedded
+// satellite map + a roster table (recipient bolded) + Kontakte. Returns a
+// Blob ready to attach. Uses DocumentApp + Drive's HTML→PDF conversion;
+// the temp Google-Doc is trashed right after we have the PDF bytes.
+function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
+  const rundeLabel = displayRundeNameServer_(squad.name);
+  const cleanName = function (s) { return String(s || "").replace(/[\\\/?%*:|"<>]/g, " "); };
+  const filename = "Infomail " + cleanName(ev.name) + " — " + cleanName(rundeLabel) + " — " +
+    cleanName(recipientPos.hunter || "");
+  const doc = DocumentApp.create(filename);
+  const docId = doc.getId();
+  try {
+    const body = doc.getBody();
+    body.setMarginTop(36).setMarginBottom(36).setMarginLeft(40).setMarginRight(40);
+
+    // Title block.
+    const title = body.appendParagraph(ev.name);
+    title.editAsText().setFontFamily("Arial").setFontSize(20).setBold(true);
+    const sub = body.appendParagraph(rundeLabel + " — " + (recipientPos.hunter || ""));
+    sub.editAsText().setFontFamily("Arial").setFontSize(13).setBold(false).setForegroundColor("#1a5f1a");
+
+    // Event meta block.
+    const metaLines = [];
+    metaLines.push("Datum: " + formatGermanDate_(ev.date));
+    if (ev.treffpunkt) metaLines.push("Treffpunkt: " + ev.treffpunkt);
+    const timeBits = [];
+    if (ev.treff_time) timeBits.push("Treff " + ev.treff_time);
+    if (ev.start_time) timeBits.push("Beginn " + ev.start_time);
+    if (ev.end_time) timeBits.push("Ende " + ev.end_time);
+    if (timeBits.length) metaLines.push(timeBits.join("  ·  "));
+    const ansteller = (positions[0] && positions[0].hunter) || squad.ansteller || "";
+    metaLines.push("Ansteller: " + ansteller);
+    const myStand = positionLabel_(recipientPos, postsById);
+    metaLines.push("Dein Stand: " + myStand);
+    metaLines.forEach(function (line) {
+      const p = body.appendParagraph(line);
+      p.editAsText().setFontFamily("Arial").setFontSize(11);
+    });
+    body.appendParagraph(" ");
+
+    // Map (centered, full-width). Marker letters here match the row letters in
+    // the table below, so the recipient can identify each position.
+    const baseMarkers = squadBaseMarkers_(positions, postsById);
+    const recipientCoord = positionCoords_(recipientPos, postsById);
+    const mapBlob = fetchSquadMap_(baseMarkers, recipientCoord);
+    if (mapBlob) {
+      const img = body.appendImage(mapBlob);
+      const targetWidth = 515; // pt at letter-page margins above
+      const ratio = img.getHeight() / img.getWidth();
+      img.setWidth(targetWidth);
+      img.setHeight(targetWidth * ratio);
+      img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+      const cap = body.appendParagraph("Dein Stand ist rot, die Stände Deiner Runde gelb (A, B, C …).");
+      cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
+      cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    }
+    body.appendParagraph(" ");
+
+    // Roster table.
+    const rosterTitle = body.appendParagraph("Ansteller-Runde");
+    rosterTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
+    const table = body.appendTable();
+    table.setBorderColor("#cccccc").setBorderWidth(0.5);
+    const header = table.appendTableRow();
+    const headerCells = ["#", "Schütze", "Stand"];
+    headerCells.forEach(function (cell) {
+      const c = header.appendTableCell(cell);
+      c.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#1a5f1a");
+      c.setBackgroundColor("#f3f8df");
+    });
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i];
+      const isMe = p.hunter === recipientPos.hunter;
+      const row = table.appendTableRow();
+      const letterCell = row.appendTableCell(String.fromCharCode(65 + i));
+      letterCell.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#7a5a00");
+      const hunterCell = row.appendTableCell(p.hunter + (i === 0 ? "  (Ansteller)" : ""));
+      const ht = hunterCell.editAsText().setFontFamily("Arial").setFontSize(10);
+      if (isMe) { ht.setBold(true); hunterCell.setBackgroundColor("#fff2c0"); }
+      const standCell = row.appendTableCell(positionLabel_(p, postsById));
+      standCell.editAsText().setFontFamily("Arial").setFontSize(10).setForegroundColor("#3a3a3a");
+    }
+    body.appendParagraph(" ");
+
+    // Kontakte.
+    const contactsTitle = body.appendParagraph("Kontakte am Jagdtag");
+    contactsTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
+    function appendBullet(text) {
+      const p = body.appendListItem(text)
+        .setGlyphType(DocumentApp.GlyphType.BULLET)
+        .setIndentStart(18)
+        .setIndentFirstLine(6);
+      p.editAsText().setFontFamily("Arial").setFontSize(11);
+    }
+    if (ev.vet_name || ev.vet_phone) {
+      appendBullet("Tierarzt: " + [ev.vet_name, ev.vet_phone].filter(Boolean).join(" — "));
+    }
+    if (ev.coordinator_name || ev.coordinator_phone) {
+      appendBullet("Nachsuchen-Koordinator: " + [ev.coordinator_name, ev.coordinator_phone].filter(Boolean).join(" — "));
+    }
+    const nsf = Array.isArray(ev.nachsuchenfuehrer) ? ev.nachsuchenfuehrer : [];
+    for (const p of nsf) {
+      if (!p.name && !p.phone) continue;
+      appendBullet("Nachsuchenführer: " + [p.name, p.phone].filter(Boolean).join(" — "));
+    }
+    body.appendParagraph(" ");
+    const sig = body.appendParagraph("Waidmannsheil! — " + (ev.organizer || "Dein Organisator"));
+    sig.editAsText().setFontFamily("Arial").setFontSize(11).setItalic(true);
+
+    doc.saveAndClose();
+    const pdfBlob = DriveApp.getFileById(docId).getAs("application/pdf").setName(filename + ".pdf");
+    return pdfBlob;
+  } finally {
+    try { DriveApp.getFileById(docId).setTrashed(true); } catch (err) { /* swallow */ }
+  }
+}
+
+// Tight HTML body — the real content lives in the PDF attachment.
+function buildInfoMailBodyHtml_(ev, squad, recipientPos) {
+  const forename = forenameFor_(recipientPos.hunter || "");
+  const rundeLabel = displayRundeNameServer_(squad.name);
+  const dateLabel = formatGermanDate_(ev.date);
+  return [
+    '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Helvetica Neue\',\'Segoe UI\',sans-serif;font-weight:400;line-height:1.55;color:#232323;font-size:15px;max-width:640px;">',
+    '<p>Hallo <strong>' + htmlEscape_(forename) + '</strong>,</p>',
+    '<p>am <strong>' + htmlEscape_(dateLabel) + '</strong> findet die Drückjagd <strong>' + htmlEscape_(ev.name) + '</strong> statt.</p>',
+    '<p>Du bist in der <strong>' + htmlEscape_(rundeLabel) + '</strong> eingeteilt. Im angehängten PDF findest Du:</p>',
+    '<ul style="margin:4px 0 12px 22px;">',
+    '<li>Deine Standnummer und die der anderen Schützen Deiner Runde,</li>',
+    '<li>eine Karte des Reviers mit allen Ständen Deiner Runde markiert,</li>',
+    '<li>Treffpunkt, Zeiten und die Kontakte am Jagdtag.</li>',
+    '</ul>',
+    '<p>Bitte schau Dir das Dokument vor der Anfahrt einmal in Ruhe an.</p>',
+    '<p>Waidmannsheil!<br>— ' + htmlEscape_(ev.organizer || "Dein Organisator") + '</p>',
+    '</div>',
+  ].join("");
+}
+
+// (Legacy — kept so the existing HTML preview path still compiles. The
+// production send path uses the PDF builder above.)
 function buildInfoMailHtml_(ev, squad, positions, recipientPos, postsById) {
   const recipient = recipientPos.hunter || "";
   const forename = forenameFor_(recipient);
