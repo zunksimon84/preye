@@ -3382,6 +3382,44 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     }
     body.appendParagraph(" ");
 
+    // Freigaben — standard AK matrix per species + gender. Hardcoded
+    // for now; can be promoted to a per-event field later if different
+    // hunts need different rules.
+    const freigabenTitle = body.appendParagraph("Freigaben");
+    freigabenTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
+    const FREIGABEN = [
+      { species: "Rotwild", classes: [
+        { gender: "Hirsche",     aks: "AK 0–3 (Hirschkalb · Schmalspießer · Mittelhirsch · Althirsch)" },
+        { gender: "Hirschkühe",  aks: "AK 0–2 (Hirschkalb · Schmaltier · Alttier)" },
+      ]},
+      { species: "Damwild", classes: [
+        { gender: "Hirsche",     aks: "AK 0–3 (Kalb · Spießer · Mittelhirsch · Althirsch)" },
+        { gender: "Damtiere",    aks: "AK 0–2 (Kalb · Schmaltier · Alttier)" },
+      ]},
+      { species: "Schwarzwild", classes: [
+        { gender: "Keiler",      aks: "Frischling · Überläufer · Keiler" },
+        { gender: "Bachen",      aks: "Frischling · Überläufer · Bache (Leitbachen verschonen)" },
+      ]},
+      { species: "Rehwild", classes: [
+        { gender: "Rehböcke",    aks: "AK 0–3 (Bockkitz · Jährling · Mittelbock · Altbock)" },
+        { gender: "Ricken",      aks: "AK 0–2 (Rehkitz · Schmalreh · Alttier)" },
+      ]},
+    ];
+    FREIGABEN.forEach(function (sp) {
+      const speciesP = body.appendParagraph(sp.species);
+      speciesP.editAsText().setFontFamily("Arial").setFontSize(11).setBold(true).setForegroundColor("#1a5f1a");
+      sp.classes.forEach(function (cl) {
+        const p = body.appendListItem(cl.gender + ": " + cl.aks)
+          .setGlyphType(DocumentApp.GlyphType.BULLET)
+          .setIndentStart(18)
+          .setIndentFirstLine(6);
+        p.editAsText().setFontFamily("Arial").setFontSize(10);
+      });
+    });
+    const freigabenNote = body.appendParagraph("Hinweis: kein Raubwild freigegeben.");
+    freigabenNote.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#5a5a5a");
+    body.appendParagraph(" ");
+
     // Kontakte.
     const contactsTitle = body.appendParagraph("Kontakte am Jagdtag");
     contactsTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
