@@ -1766,6 +1766,23 @@ async function sendInfomails() {
 
 // Persisted across openings so re-opening the modal keeps your choice.
 let infomailIncludeSchuetzen = true;
+// Active object URL for the PDF preview, revoked on close to free memory.
+let infomailPdfBlobUrl = null;
+
+function infomailMakePdfBlobUrl(base64) {
+  // Chrome/Firefox/Safari block data:application/pdf in iframes, but a
+  // Blob URL of the same bytes renders fine. Decode base64 → bytes →
+  // Blob → object URL.
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    return URL.createObjectURL(blob);
+  } catch (err) {
+    return null;
+  }
+}
 
 function openInfomailPreviewModal(preview) {
   const body = $("#infomail-body");
@@ -1812,20 +1829,28 @@ function openInfomailPreviewModal(preview) {
     sendBtn.disabled = !n;
   };
 
+  // Mint a fresh Blob URL for the PDF preview every time we open the
+  // modal — revoke the previous one first so we don't leak memory if
+  // the user opens the modal repeatedly.
+  if (infomailPdfBlobUrl) { URL.revokeObjectURL(infomailPdfBlobUrl); infomailPdfBlobUrl = null; }
+  if (preview.sample_pdf_base64) {
+    infomailPdfBlobUrl = infomailMakePdfBlobUrl(preview.sample_pdf_base64);
+  }
+
   if (preview.sample_html) {
-    const pdfBlock = preview.sample_pdf_base64
+    const pdfBlock = infomailPdfBlobUrl
       ? `
         <h4 class="infomail-section-title">PDF-Anhang (Karte + Standbesetzung)</h4>
         <iframe id="infomail-pdf-iframe" class="infomail-preview-iframe infomail-preview-pdf"
-                src="data:application/pdf;base64,${preview.sample_pdf_base64}#zoom=page-width"
+                src="${infomailPdfBlobUrl}#zoom=page-width"
                 title="Infomail-PDF"></iframe>
         <p class="muted infomail-pdf-note">
           Falls die PDF-Vorschau nicht angezeigt wird:
-          <a href="data:application/pdf;base64,${preview.sample_pdf_base64}"
+          <a href="${infomailPdfBlobUrl}" target="_blank" rel="noopener"
              download="${escapeHtml(preview.sample_pdf_name || "infomail-vorschau.pdf")}">PDF herunterladen</a>.
         </p>
       `
-      : '<p class="muted infomail-pdf-note">⚠ PDF konnte nicht erzeugt werden (kein Maps-API-Key?). Die Mail würde ohne Anhang verschickt.</p>';
+      : '<p class="muted infomail-pdf-note">⚠ PDF konnte nicht erzeugt werden (kein Karten-Key?). Die Mail würde ohne Anhang verschickt.</p>';
 
     // Sandbox the mail body so its inline styles can't bleed into the rest
     // of the page; PDF iframe is unsandboxed because Chromium needs the
@@ -1854,6 +1879,10 @@ function openInfomailPreviewModal(preview) {
 function closeInfomailPreviewModal() {
   $("#infomail-modal").hidden = true;
   $("#infomail-backdrop").hidden = true;
+  if (infomailPdfBlobUrl) {
+    URL.revokeObjectURL(infomailPdfBlobUrl);
+    infomailPdfBlobUrl = null;
+  }
 }
 
 async function confirmSendInfomails() {
