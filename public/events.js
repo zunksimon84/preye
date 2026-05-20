@@ -517,7 +517,7 @@ function updateInviteStatus() {
   if (!total) {
     status.textContent = "";
   } else if (unsent === 0) {
-    status.textContent = `Alle ${total} Einladungen versendet.`;
+    status.textContent = `${total} Einladung${total === 1 ? "" : "en"} versendet.`;
   } else {
     status.textContent = `${unsent} ausstehend (${total - unsent} bereits versendet).`;
   }
@@ -632,7 +632,7 @@ function updateInviteRecipientsLine() {
   if (!total) {
     line = "Noch keine Jäger mit E-Mail — versenden ist erst möglich, wenn welche eingetragen sind.";
   } else if (!sendable.length) {
-    line = `Alle ${total} Einladungen wurden bereits versendet — Senden überträgt keine neuen E-Mails.`;
+    line = `${total} Einladung${total === 1 ? "" : "en"} bereits versendet — Senden überträgt keine neuen E-Mails.`;
   } else {
     const counts = { de: 0, en: 0 };
     sendable.forEach((h) => { counts[h.language === "en" ? "en" : "de"]++; });
