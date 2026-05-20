@@ -2740,24 +2740,158 @@ function squadRosterLabel_(pos, postsById, fallbackIndex) {
 }
 
 // Pre-rendered teardrop PNGs (1..80 + 1a..80b + A..H letter fallbacks)
-// live in public/markers/ on the static site. Static Maps' icon
-// fetcher pulls them by URL — much more reliable than a dynamic image
-// service (quickchart returned HTTP 400 for d_map_pin_letter, and
-// dummyimage produces flat rectangles). The generator that produces
-// these PNGs is tools/generate-pins.py.
+// live in public/markers/ on the static site. Google's Static Maps
+// API has disabled the `icon:` parameter on this GCP project, so we
+// can't have Static Maps render them directly. Instead we fetch a
+// plain base map and overlay these PNGs ourselves as positioned images
+// inside the PDF. The generator is tools/generate-pins.py.
 const MARKER_BASE_URL = "https://preye.org/markers/";
+
+// Base map geometry — these constants drive both the Static Maps fetch
+// and the lat/lng → PDF-point projection used to position the pins.
+const MAP_SIZE_PX = 640;     // unscaled width/height requested from Static Maps
+const MAP_SCALE = 2;          // Static Maps scale=2 → 1280×1280 rendered image
+const MAP_TARGET_WIDTH_PT = 515;  // width when placed in the PDF (full text body width)
+const PIN_WIDTH_PT = 26;      // pin PNG display width in the PDF
+const PIN_HEIGHT_PT = 36;     // height: 88/64 aspect rounded to fit
 
 function markerIconUrl_(text) {
   return MARKER_BASE_URL + encodeURIComponent(String(text)) + ".png";
 }
 
+// Fetches a pre-rendered pin PNG from the static site. Per-execution
+// memo cache so the same label (e.g., when two Runden share a stand
+// number) only costs one round-trip.
+const __MARKER_BLOB_CACHE = {};
+function fetchMarkerBlob_(label) {
+  const key = String(label || "");
+  if (!key) return null;
+  if (__MARKER_BLOB_CACHE[key]) return __MARKER_BLOB_CACHE[key];
+  try {
+    const res = UrlFetchApp.fetch(markerIconUrl_(key), { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return null;
+    const blob = res.getBlob().setName("pin-" + key + ".png");
+    __MARKER_BLOB_CACHE[key] = blob;
+    return blob;
+  } catch (err) {
+    return null;
+  }
+}
+
+// Mercator world coordinate at zoom 0 (tile-size = 256 px). Multiplying
+// by 2^zoom gives the global pixel offset; subtracting the map-centre's
+// world coord gives the pin's pixel position relative to the centre of
+// the rendered map.
+function mercatorWorld_(lat, lng) {
+  const tile = 256;
+  const x = (lng + 180) / 360 * tile;
+  const siny = Math.sin(lat * Math.PI / 180);
+  const sinyC = Math.min(Math.max(siny, -0.9999), 0.9999);
+  const y = tile * (0.5 - Math.log((1 + sinyC) / (1 - sinyC)) / (4 * Math.PI));
+  return { x: x, y: y };
+}
+
+// Picks the highest zoom (most detail) at which every position still
+// fits inside the rendered map with some padding. Caps at 17 because
+// at 18+ terrain tiles lose the forest shading that hunters rely on.
+function pickZoom_(coords, paddingPx) {
+  if (coords.length === 1) return 15;
+  const lats = coords.map(function (c) { return c.lat; });
+  const lngs = coords.map(function (c) { return c.lng; });
+  const minLat = Math.min.apply(null, lats);
+  const maxLat = Math.max.apply(null, lats);
+  const minLng = Math.min.apply(null, lngs);
+  const maxLng = Math.max.apply(null, lngs);
+  const wA = mercatorWorld_(maxLat, minLng);
+  const wB = mercatorWorld_(minLat, maxLng);
+  const dx = Math.abs(wB.x - wA.x);
+  const dy = Math.abs(wB.y - wA.y);
+  if (dx === 0 && dy === 0) return 15;
+  const usable = MAP_SIZE_PX - 2 * paddingPx;
+  // 256 * 2^z must be >= world_span * usable / 256, simplified:
+  const zx = Math.log2(usable / dx);
+  const zy = Math.log2(usable / dy);
+  return Math.min(17, Math.max(10, Math.floor(Math.min(zx, zy))));
+}
+
+// Fetches a plain base map (no markers) at a centre+zoom chosen to fit
+// all positions, and computes each pin's pixel position inside the
+// rendered image. Returns the blob plus the projected pixel positions
+// + the rendered image dimensions. The PDF builder uses these to drop
+// pin PNGs onto the map at the right spots.
+function fetchBaseMapAndPositions_(positions, postsById) {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = (props.getProperty("MAPS_API_KEY") || "").trim();
+  if (!apiKey) return { error: "Kein MAPS_API_KEY in den Script-Properties hinterlegt." };
+  const coords = [];
+  const labels = [];
+  for (let i = 0; i < positions.length; i++) {
+    const c = positionCoords_(positions[i], postsById);
+    if (!c) continue;
+    coords.push(c);
+    labels.push(squadRosterLabel_(positions[i], postsById, i));
+  }
+  if (!coords.length) return { error: "Keine Koordinaten für die Karte." };
+  const centerLat = (Math.min.apply(null, coords.map(function (c) { return c.lat; })) +
+                     Math.max.apply(null, coords.map(function (c) { return c.lat; }))) / 2;
+  const centerLng = (Math.min.apply(null, coords.map(function (c) { return c.lng; })) +
+                     Math.max.apply(null, coords.map(function (c) { return c.lng; }))) / 2;
+  // Padding leaves room for the pin's "tail" pointing down at the coord;
+  // PIN_HEIGHT_PT is the pixel-equivalent buffer at the chosen scale.
+  const paddingPx = Math.ceil(PIN_HEIGHT_PT * (MAP_SIZE_PX * MAP_SCALE) / MAP_TARGET_WIDTH_PT);
+  const zoom = pickZoom_(coords, paddingPx);
+
+  const url = "https://maps.googleapis.com/maps/api/staticmap?" + [
+    "center=" + centerLat + "," + centerLng,
+    "zoom=" + zoom,
+    "size=" + MAP_SIZE_PX + "x" + MAP_SIZE_PX,
+    "maptype=terrain",
+    "scale=" + MAP_SCALE,
+    "key=" + encodeURIComponent(apiKey),
+  ].join("&");
+  let res;
+  try {
+    res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  } catch (err) {
+    return { error: "UrlFetchApp: " + (err && err.message || err) };
+  }
+  if (res.getResponseCode() !== 200) {
+    return { error: "Static-Maps HTTP " + res.getResponseCode() + ": " +
+                    String(res.getContentText() || "").slice(0, 200) };
+  }
+  const ct = res.getBlob().getContentType() || "";
+  if (ct.indexOf("image/") !== 0) {
+    return { error: "Static-Maps lieferte " + ct + " statt eines Bildes." };
+  }
+  const mapBlob = res.getBlob().setName("squadmap.png");
+
+  // Project each pin's coord into rendered-image pixels (taking scale
+  // into account), so the caller knows where to drop the pin PNGs.
+  const scale = Math.pow(2, zoom);
+  const centerWorld = mercatorWorld_(centerLat, centerLng);
+  const renderedSize = MAP_SIZE_PX * MAP_SCALE;
+  const pins = coords.map(function (c, i) {
+    const w = mercatorWorld_(c.lat, c.lng);
+    const dx = (w.x - centerWorld.x) * scale;
+    const dy = (w.y - centerWorld.y) * scale;
+    return {
+      label: labels[i],
+      pxX: (MAP_SIZE_PX / 2 + dx) * MAP_SCALE,
+      pxY: (MAP_SIZE_PX / 2 + dy) * MAP_SCALE,
+    };
+  });
+  return { blob: mapBlob, pins: pins, renderedSize: renderedSize, zoom: zoom, error: "" };
+}
+
+// Kept for backwards compatibility with menu_testInfomailMap. The real
+// rendering path now goes through fetchBaseMapAndPositions_ above.
 function squadBaseMarkers_(positions, postsById) {
   const out = [];
   for (let i = 0; i < positions.length; i++) {
     const c = positionCoords_(positions[i], postsById);
     if (!c) continue;
-    const labelText = squadRosterLabel_(positions[i], postsById, i);
-    out.push("icon:" + markerIconUrl_(labelText) + "|" + c.lat + "," + c.lng);
+    out.push("color:yellow|label:" + (squadRosterLabel_(positions[i], postsById, i)[0] || "A") +
+             "|" + c.lat + "," + c.lng);
   }
   return out;
 }
@@ -2929,26 +3063,40 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     });
     body.appendParagraph(" ");
 
-    // Map (centered, full-width). Marker letters here match the row letters in
-    // the table below, so a Schütze can identify each position by name.
-    const baseMarkers = squadBaseMarkers_(positions, postsById);
-    const recipientCoord = recipientPos ? positionCoords_(recipientPos, postsById) : null;
-    const mapResult = fetchSquadMap_(baseMarkers, recipientCoord);
+    // Map: fetch a plain base map, place it left-aligned at full text
+    // width, then overlay our pre-rendered teardrop PNGs as positioned
+    // images at each post's projected pixel coordinates. (Static Maps'
+    // built-in `icon:` parameter is blocked on this GCP project, so we
+    // composite the markers ourselves.)
+    const mapResult = fetchBaseMapAndPositions_(positions, postsById);
     if (mapResult.blob) {
-      const img = body.appendImage(mapResult.blob);
-      const targetWidth = 515; // pt at letter-page margins above
-      const ratio = img.getHeight() / img.getWidth();
-      img.setWidth(targetWidth);
-      img.setHeight(targetWidth * ratio);
-      img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-      const capText = recipientPos
-        ? "Dein Stand ist rot markiert, die übrigen Stände Deiner Runde gelb — die Zahl auf jedem Pin entspricht der Standnummer."
-        : "Die Stände der Runde sind gelb markiert — die Zahl auf jedem Pin entspricht der Standnummer.";
+      const inlineImg = body.appendImage(mapResult.blob);
+      inlineImg.setWidth(MAP_TARGET_WIDTH_PT);
+      inlineImg.setHeight(MAP_TARGET_WIDTH_PT); // square map → square display
+      const mapPara = inlineImg.getParent().asParagraph();
+      // Left-align the map so the positioned-image offsets, which are
+      // relative to the paragraph's start corner, map cleanly onto the
+      // image's pixel grid. Centering would shift the anchor.
+      mapPara.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
+      const ptPerPx = MAP_TARGET_WIDTH_PT / mapResult.renderedSize;
+      // Drop each pin so its bottom-centre lands exactly on the pixel
+      // coord (mirrors how a real map pin "points" at its location).
+      for (let pi = 0; pi < mapResult.pins.length; pi++) {
+        const pin = mapResult.pins[pi];
+        const pinBlob = fetchMarkerBlob_(pin.label);
+        if (!pinBlob) continue;
+        const posImg = mapPara.addPositionedImage(pinBlob);
+        posImg.setWidth(PIN_WIDTH_PT);
+        posImg.setHeight(PIN_HEIGHT_PT);
+        posImg.setLayout(DocumentApp.PositionedLayout.ABOVE_TEXT);
+        posImg.setLeftOffset(pin.pxX * ptPerPx - PIN_WIDTH_PT / 2);
+        posImg.setTopOffset(pin.pxY * ptPerPx - PIN_HEIGHT_PT);
+      }
+      const capText = "Die Stände der Runde sind als Pins markiert — die Zahl auf jedem Pin entspricht der Standnummer.";
       const cap = body.appendParagraph(capText);
       cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
-      cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+      cap.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
     } else {
-      // Make the failure visible inside the PDF so we know why no map showed up.
       const warn = body.appendParagraph("⚠ Karte nicht eingebettet — " + (mapResult.error || "unbekannter Fehler"));
       warn.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#a85a00");
     }
