@@ -48,53 +48,56 @@ const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_de
 const FREIGABEN_MATRIX = [
   { id: "rotwild", label: "Rotwild", groups: [
     { id: "hirsche",  label: "Hirsche",     aks: [
-      { id: "ak0", label: "AK 0 (Hirschkalb)" },
-      { id: "ak1", label: "AK 1 (Schmalspießer)" },
-      { id: "ak2", label: "AK 2 (Mittelhirsch)" },
-      { id: "ak3", label: "AK 3 (Althirsch)" },
+      { id: "ak0", label: "AK 0" },
+      { id: "ak1", label: "AK 1" },
+      { id: "ak2", label: "AK 2" },
+      { id: "ak3", label: "AK 3" },
+      { id: "ak4", label: "AK 4" },
     ]},
     { id: "kuehe",    label: "Hirschkühe",  aks: [
-      { id: "ak0", label: "AK 0 (Hirschkalb)" },
-      { id: "ak1", label: "AK 1 (Schmaltier)" },
-      { id: "ak2", label: "AK 2 (Alttier)" },
+      { id: "ak0", label: "AK 0" },
+      { id: "ak1", label: "AK 1" },
+      { id: "ak2", label: "AK 2" },
     ]},
   ]},
   { id: "damwild", label: "Damwild", groups: [
     { id: "hirsche",  label: "Hirsche",     aks: [
-      { id: "ak0", label: "AK 0 (Kalb)" },
-      { id: "ak1", label: "AK 1 (Spießer)" },
-      { id: "ak2", label: "AK 2 (Mittelhirsch)" },
-      { id: "ak3", label: "AK 3 (Althirsch)" },
+      { id: "ak0", label: "AK 0" },
+      { id: "ak1", label: "AK 1" },
+      { id: "ak2", label: "AK 2" },
+      { id: "ak3", label: "AK 3" },
+      { id: "ak4", label: "AK 4" },
     ]},
     { id: "tiere",    label: "Damtiere",    aks: [
-      { id: "ak0", label: "AK 0 (Kalb)" },
-      { id: "ak1", label: "AK 1 (Schmaltier)" },
-      { id: "ak2", label: "AK 2 (Alttier)" },
+      { id: "ak0", label: "AK 0" },
+      { id: "ak1", label: "AK 1" },
+      { id: "ak2", label: "AK 2" },
     ]},
   ]},
   { id: "schwarzwild", label: "Schwarzwild", groups: [
     { id: "keiler",   label: "Keiler",      aks: [
-      { id: "frischling",   label: "Frischling" },
-      { id: "ueberlaeufer", label: "Überläufer" },
-      { id: "keiler",       label: "Keiler" },
+      { id: "frischling",   label: "AK 0" },
+      { id: "ueberlaeufer", label: "AK 1" },
+      { id: "keiler",       label: "AK 2" },
     ]},
     { id: "bachen",   label: "Bachen",      aks: [
-      { id: "frischling",   label: "Frischling" },
-      { id: "ueberlaeufer", label: "Überläufer" },
-      { id: "bache",        label: "Bache (Leitbachen verschonen)" },
+      { id: "frischling",   label: "AK 0" },
+      { id: "ueberlaeufer", label: "AK 1" },
+      { id: "bache",        label: "AK 2" },
     ]},
   ]},
   { id: "rehwild", label: "Rehwild", groups: [
     { id: "boecke",   label: "Rehböcke",    aks: [
-      { id: "ak0", label: "AK 0 (Bockkitz)" },
-      { id: "ak1", label: "AK 1 (Jährling)" },
-      { id: "ak2", label: "AK 2 (Mittelbock)" },
-      { id: "ak3", label: "AK 3 (Altbock)" },
+      { id: "ak0", label: "AK 0" },
+      { id: "ak1", label: "AK 1" },
+      { id: "ak2", label: "AK 2" },
+      { id: "ak3", label: "AK 3" },
+      { id: "ak4", label: "AK 4" },
     ]},
     { id: "ricken",   label: "Ricken",      aks: [
-      { id: "ak0", label: "AK 0 (Rehkitz)" },
-      { id: "ak1", label: "AK 1 (Schmalreh)" },
-      { id: "ak2", label: "AK 2 (Alttier)" },
+      { id: "ak0", label: "AK 0" },
+      { id: "ak1", label: "AK 1" },
+      { id: "ak2", label: "AK 2" },
     ]},
   ]},
 ];
@@ -3593,7 +3596,9 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       const noneP = body.appendParagraph("Keine Schalenwild-Freigaben für diese Drückjagd.");
       noneP.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#5a5a5a");
     }
-    const freigabenNote = body.appendParagraph("Hinweis: kein Raubwild freigegeben.");
+    const freigabenNote = body.appendParagraph(
+      "Hinweis: kein Raubwild freigegeben. Leitbachen verschonen."
+    );
     freigabenNote.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#5a5a5a");
     body.appendParagraph(" ");
 
