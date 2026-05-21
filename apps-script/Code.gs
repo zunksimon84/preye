@@ -3437,8 +3437,8 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
   // Page math: letter (612×792 pt) − margins → 548 × 736 usable.
   const MARGIN_X   = 32;
   const MARGIN_Y   = 28;
-  const MAP_W_PT   = 250;        // square Mapbox image → ~250 pt tall
-  const LEFT_COL   = 290;        // info+Freigaben column
+  const MAP_W_PT   = 295;        // square Mapbox image → ~295 pt tall (about a quarter of the page)
+  const LEFT_COL   = 245;        // info+Freigaben column (548 usable − map width)
 
   function styleParagraph(p, opts) {
     opts = opts || {};
