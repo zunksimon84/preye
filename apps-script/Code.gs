@@ -3412,16 +3412,13 @@ function htmlToPlain_(html) {
     .trim();
 }
 
-// Build the per-Runde PDF: title + event meta + the embedded
-// satellite map + a roster table + Kontakte. Returns a Blob ready to
-// attach. Uses DocumentApp + Drive's HTML→PDF conversion; the temp
-// Google-Doc is trashed right after we have the PDF bytes.
+// Single-page Infomail PDF. Layout: title strip on top, a 2-column
+// header band (info + Freigaben on the left, map on the right), the
+// runde roster table full-width below, then a compact Kontakte
+// block, and a signature line at the foot.
 //
-// recipientPos is optional. When provided, the recipient's stand is
-// highlighted red on the map and the matching roster row is bolded —
-// used for per-Schütze personalisation. When null, the same PDF is
-// shared by everyone in the Runde (huge speedup, since one DocumentApp
-// round-trip serves N recipients instead of one per Schütze).
+// Design tokens — kept at the top so a future tweak (different accent,
+// tighter spacing, larger fonts) is a one-spot change.
 function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
   const rundeLabel = displayRundeNameServer_(squad.name);
   const cleanName = function (s) { return String(s || "").replace(/[\\\/?%*:|"<>]/g, " "); };
@@ -3430,200 +3427,240 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     : "Infomail " + cleanName(ev.name) + " — " + cleanName(rundeLabel);
   const doc = DocumentApp.create(filename);
   const docId = doc.getId();
+
+  const FONT       = "Helvetica";
+  const INK        = "#1a1a1a"; // primary text
+  const SOFT       = "#6b7280"; // labels & meta
+  const ACCENT     = "#2d5a3d"; // single muted-forest-green accent
+  const BORDER     = "#e5e7eb"; // hairline borders
+  const SOFT_BG    = "#fafafa"; // subtle table-header background
+  // Page math: letter (612×792 pt) − margins → 548 × 736 usable.
+  const MARGIN_X   = 32;
+  const MARGIN_Y   = 28;
+  const MAP_W_PT   = 250;        // square Mapbox image → ~250 pt tall
+  const LEFT_COL   = 290;        // info+Freigaben column
+
+  function styleParagraph(p, opts) {
+    opts = opts || {};
+    const t = p.editAsText().setFontFamily(FONT).setFontSize(opts.size || 10);
+    t.setForegroundColor(opts.color || INK);
+    t.setBold(!!opts.bold);
+    t.setItalic(!!opts.italic);
+    p.setSpacingBefore(opts.before == null ? 0 : opts.before);
+    p.setSpacingAfter(opts.after == null ? 0 : opts.after);
+    p.setLineSpacing(opts.line || 1.2);
+    if (opts.align) p.setAlignment(opts.align);
+    return p;
+  }
+
+  // Append a paragraph inside a TableCell. The cell starts with one
+  // auto-created empty paragraph; we reuse that for the very first
+  // append and fall through to appendParagraph thereafter.
+  function appendInCell(cell, text, opts) {
+    let para;
+    if (!cell.__firstUsed) {
+      para = cell.getChild(0).asParagraph();
+      para.setText(text);
+      cell.__firstUsed = true;
+    } else {
+      para = cell.appendParagraph(text);
+    }
+    return styleParagraph(para, opts);
+  }
+
+  // ALL-CAPS hairline label above each meta value (DATUM, TREFFPUNKT…).
+  function appendCellLabel(cell, text) {
+    return appendInCell(cell, text, {
+      size: 7.5, bold: true, color: SOFT, before: 8, after: 1, line: 1.0,
+    });
+  }
+  function appendCellValue(cell, text) {
+    return appendInCell(cell, text, { size: 10, color: INK, line: 1.25 });
+  }
+
   try {
     const body = doc.getBody();
-    body.setMarginTop(36).setMarginBottom(36).setMarginLeft(40).setMarginRight(40);
+    body.setMarginTop(MARGIN_Y).setMarginBottom(MARGIN_Y)
+        .setMarginLeft(MARGIN_X).setMarginRight(MARGIN_X);
 
-    // Title block.
-    const title = body.appendParagraph(ev.name);
-    title.editAsText().setFontFamily("Arial").setFontSize(20).setBold(true);
-    const subText = recipientPos ? rundeLabel + " — " + (recipientPos.hunter || "") : rundeLabel;
+    // === Title strip ===========================================
+    // Reuse the body's auto-first-paragraph for the title.
+    const title = body.getChild(0).asParagraph();
+    title.setText(ev.name);
+    styleParagraph(title, { size: 18, bold: true, color: INK, before: 0, after: 2, line: 1.1 });
+
+    const subText = recipientPos
+      ? rundeLabel + " · " + (recipientPos.hunter || "")
+      : rundeLabel + " · " + formatGermanDate_(ev.date);
     const sub = body.appendParagraph(subText);
-    sub.editAsText().setFontFamily("Arial").setFontSize(13).setBold(false).setForegroundColor("#1a5f1a");
+    styleParagraph(sub, { size: 10.5, color: ACCENT, before: 0, after: 10, line: 1.1 });
 
-    // Event meta block.
-    const metaLines = [];
-    metaLines.push("Datum: " + formatGermanDate_(ev.date));
-    if (ev.treffpunkt) metaLines.push("Treffpunkt: " + ev.treffpunkt);
-    const timeBits = [];
-    if (ev.treff_time) timeBits.push("Treff " + ev.treff_time);
-    if (ev.start_time) timeBits.push("Beginn " + ev.start_time);
-    if (ev.end_time) timeBits.push("Ende " + ev.end_time);
-    if (timeBits.length) metaLines.push(timeBits.join("  ·  "));
-    const ansteller = (positions[0] && positions[0].hunter) || squad.ansteller || "";
-    metaLines.push("Ansteller: " + ansteller);
-    if (recipientPos) {
-      metaLines.push("Dein Stand: " + positionLabel_(recipientPos, postsById));
-    }
-    metaLines.forEach(function (line) {
-      const p = body.appendParagraph(line);
-      p.editAsText().setFontFamily("Arial").setFontSize(11);
+    // === Two-column header band ================================
+    const headerTable = body.appendTable();
+    headerTable.setBorderColor("#ffffff").setBorderWidth(0);
+    const headerRow = headerTable.appendTableRow();
+    const leftCell = headerRow.appendTableCell();
+    const rightCell = headerRow.appendTableCell();
+    headerTable.setColumnWidth(0, LEFT_COL);
+    headerTable.setColumnWidth(1, MAP_W_PT);
+    [leftCell, rightCell].forEach(function (c) {
+      c.setPaddingTop(0).setPaddingBottom(0);
     });
-    body.appendParagraph(" ");
+    leftCell.setPaddingLeft(0).setPaddingRight(14);
+    rightCell.setPaddingLeft(0).setPaddingRight(0);
 
-    // Map rendering, in priority order:
-    //   1. Mapbox outdoors with our preye.org pin PNGs as native markers
-    //      — full post-number labels, even for 3+ char labels like "100"
-    //      or "23a". Free tier 50k req/mo.
-    //   2. Geoapify OSM with built-in pins (2-char label cap).
-    //   3. Google Static Maps base + DocumentApp positioned-image composite.
-    // Fallback only fires when a provider's key is missing — an active
-    // rejection (bad key, quota, etc.) surfaces in the PDF so we can fix it.
-    let mapPlaced = false;
+    // --- Left column: DATUM, TREFFPUNKT, ZEITEN, ANSTELLER, (DEIN STAND), FREIGABEN ---
+    appendCellLabel(leftCell, "DATUM");
+    appendCellValue(leftCell, formatGermanDate_(ev.date));
+
+    if (ev.treffpunkt) {
+      appendCellLabel(leftCell, "TREFFPUNKT");
+      appendCellValue(leftCell, ev.treffpunkt);
+    }
+
+    const timeBits = [];
+    if (ev.treff_time)  timeBits.push("Treff "  + ev.treff_time);
+    if (ev.start_time)  timeBits.push("Beginn " + ev.start_time);
+    if (ev.end_time)    timeBits.push("Ende "   + ev.end_time);
+    if (timeBits.length) {
+      appendCellLabel(leftCell, "ZEITEN");
+      appendCellValue(leftCell, timeBits.join("  ·  "));
+    }
+
+    const anstellerName = (positions[0] && positions[0].hunter) || squad.ansteller || "";
+    if (anstellerName) {
+      appendCellLabel(leftCell, "ANSTELLER");
+      appendCellValue(leftCell, anstellerName);
+    }
+    if (recipientPos) {
+      appendCellLabel(leftCell, "DEIN STAND");
+      appendCellValue(leftCell, positionLabel_(recipientPos, postsById));
+    }
+
+    // Freigaben (compact: one line per species, gender ranges inline).
+    appendCellLabel(leftCell, "FREIGABEN");
+    const freigabenSet = {};
+    const freigabenRaw = (ev.freigaben && Array.isArray(ev.freigaben)) ? ev.freigaben : freigabenAllKeys_();
+    freigabenRaw.forEach(function (k) { freigabenSet[k] = true; });
+
+    let anyFreigaben = false;
+    FREIGABEN_MATRIX.forEach(function (sp) {
+      const groupBits = sp.groups.map(function (g) {
+        const checked = g.aks.filter(function (ak) { return freigabenSet[sp.id + "." + g.id + "." + ak.id]; });
+        if (!checked.length) return null;
+        return g.label + " " + formatAkSelection_(g, checked);
+      }).filter(Boolean);
+      if (!groupBits.length) return;
+      anyFreigaben = true;
+      const line = sp.label + " — " + groupBits.join(", ");
+      appendInCell(leftCell, line, { size: 9.5, color: INK, line: 1.25, before: 1 });
+    });
+    if (!anyFreigaben) {
+      appendInCell(leftCell, "Keine Freigaben.", {
+        size: 9.5, italic: true, color: SOFT, line: 1.25,
+      });
+    }
+    appendInCell(leftCell, "Kein Raubwild · Leitbachen verschonen.", {
+      size: 8, italic: true, color: SOFT, before: 4, line: 1.2,
+    });
+
+    // --- Right column: map ---
+    // Hide the cell's auto-paragraph and embed the image into it.
+    const mapPara = rightCell.getChild(0).asParagraph();
+    styleParagraph(mapPara, { size: 8, line: 1.0 });
+    mapPara.setText("");
+
+    let mapBlob = null;
     let mapError = "";
-    const placeImage = function (blob) {
-      const img = body.appendImage(blob);
-      const ratio = img.getHeight() / img.getWidth();
-      img.setWidth(MAP_TARGET_WIDTH_PT);
-      img.setHeight(MAP_TARGET_WIDTH_PT * ratio);
-      img.getParent().asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-      mapPlaced = true;
-    };
-
     const mbox = fetchMapboxMap_(positions, postsById);
     if (mbox.blob) {
-      placeImage(mbox.blob);
+      mapBlob = mbox.blob;
     } else if (/Kein MAPBOX_TOKEN/.test(mbox.error)) {
       const geo = fetchGeoapifyMap_(positions, postsById);
-      if (geo.blob) {
-        placeImage(geo.blob);
-      } else if (/Kein GEOAPIFY_KEY/.test(geo.error)) {
-        const composite = fetchBaseMapAndPositions_(positions, postsById);
-        if (composite.blob) {
-          const inlineImg = body.appendImage(composite.blob);
-          inlineImg.setWidth(MAP_TARGET_WIDTH_PT);
-          inlineImg.setHeight(MAP_TARGET_WIDTH_PT);
-          const mapPara = inlineImg.getParent().asParagraph();
-          mapPara.setAlignment(DocumentApp.HorizontalAlignment.LEFT);
-          const ptPerPx = MAP_TARGET_WIDTH_PT / composite.renderedSize;
-          for (let pi = 0; pi < composite.pins.length; pi++) {
-            const pin = composite.pins[pi];
-            const pinBlob = fetchMarkerBlob_(pin.label);
-            if (!pinBlob) continue;
-            const posImg = mapPara.addPositionedImage(pinBlob);
-            posImg.setWidth(PIN_WIDTH_PT);
-            posImg.setHeight(PIN_HEIGHT_PT);
-            posImg.setLayout(DocumentApp.PositionedLayout.ABOVE_TEXT);
-            posImg.setLeftOffset(pin.pxX * ptPerPx - PIN_WIDTH_PT / 2);
-            posImg.setTopOffset(pin.pxY * ptPerPx - PIN_HEIGHT_PT);
-          }
-          mapPlaced = true;
-        } else {
-          mapError = composite.error || geo.error || mbox.error;
-        }
-      } else {
-        mapError = geo.error;
-      }
+      if (geo.blob) mapBlob = geo.blob;
+      else mapError = geo.error;
     } else {
       mapError = mbox.error;
     }
 
-    if (mapPlaced) {
-      const cap = body.appendParagraph("Die Stände der Runde sind als Pins markiert — die Zahl auf jedem Pin entspricht der Standnummer.");
-      cap.editAsText().setFontFamily("Arial").setFontSize(9).setItalic(true).setForegroundColor("#5a5a5a");
-      cap.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    if (mapBlob) {
+      const img = mapPara.appendInlineImage(mapBlob);
+      const ratio = img.getHeight() / img.getWidth();
+      img.setWidth(MAP_W_PT);
+      img.setHeight(MAP_W_PT * ratio);
+      const cap = rightCell.appendParagraph("Pinzahl = Standnummer");
+      styleParagraph(cap, {
+        size: 7.5, italic: true, color: SOFT, before: 4, line: 1.0,
+        align: DocumentApp.HorizontalAlignment.CENTER,
+      });
     } else {
-      const warn = body.appendParagraph("⚠ Karte nicht eingebettet — " + (mapError || "unbekannter Fehler"));
-      warn.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#a85a00");
+      mapPara.setText("⚠ Karte: " + (mapError || "unbekannter Fehler"));
+      styleParagraph(mapPara, { size: 9, italic: true, color: "#a85a00", line: 1.2 });
     }
-    body.appendParagraph(" ");
 
-    // Roster table.
-    const rosterTitle = body.appendParagraph("Ansteller-Runde");
-    rosterTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
+    // === Roster table (full width) =============================
+    const rosterLabel = body.appendParagraph("RUNDE");
+    styleParagraph(rosterLabel, {
+      size: 7.5, bold: true, color: SOFT, before: 14, after: 4, line: 1.0,
+    });
+
     const table = body.appendTable();
-    table.setBorderColor("#cccccc").setBorderWidth(0.5);
-    const header = table.appendTableRow();
-    const headerCells = ["Nr.", "Schütze", "Stand"];
-    headerCells.forEach(function (cell) {
-      const c = header.appendTableCell(cell);
-      c.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#1a5f1a");
-      c.setBackgroundColor("#f3f8df");
+    table.setBorderColor(BORDER).setBorderWidth(0.5);
+    const head = table.appendTableRow();
+    ["Nr.", "Schütze", "Stand"].forEach(function (h) {
+      const c = head.appendTableCell(h);
+      const p = c.getChild(0).asParagraph();
+      styleParagraph(p, { size: 8, bold: true, color: SOFT, line: 1.0 });
+      c.setBackgroundColor(SOFT_BG);
+      c.setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(8).setPaddingRight(8);
     });
     for (let i = 0; i < positions.length; i++) {
       const p = positions[i];
       const isMe = recipientPos && p.hunter === recipientPos.hunter;
       const row = table.appendTableRow();
-      // "#" column shows the post's full number (e.g., "13"); the map
-      // marker shows the last digit of that number, so the user can
-      // cross-reference the two visually.
       const numCell = row.appendTableCell(squadRosterLabel_(p, postsById, i));
-      numCell.editAsText().setFontFamily("Arial").setFontSize(10).setBold(true).setForegroundColor("#7a5a00");
-      const hunterCell = row.appendTableCell(p.hunter + (i === 0 ? "  (Ansteller)" : ""));
-      const ht = hunterCell.editAsText().setFontFamily("Arial").setFontSize(10);
-      if (isMe) { ht.setBold(true); hunterCell.setBackgroundColor("#fff2c0"); }
+      styleParagraph(numCell.getChild(0).asParagraph(), {
+        size: 10, bold: true, color: ACCENT, line: 1.0,
+      });
+      const hunterCell = row.appendTableCell(p.hunter + (i === 0 ? " (Ansteller)" : ""));
+      styleParagraph(hunterCell.getChild(0).asParagraph(), {
+        size: 10, bold: !!isMe, color: INK, line: 1.0,
+      });
       const standCell = row.appendTableCell(positionLabel_(p, postsById));
-      standCell.editAsText().setFontFamily("Arial").setFontSize(10).setForegroundColor("#3a3a3a");
+      styleParagraph(standCell.getChild(0).asParagraph(), {
+        size: 10, color: SOFT, line: 1.0,
+      });
+      [numCell, hunterCell, standCell].forEach(function (c) {
+        c.setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(8).setPaddingRight(8);
+      });
     }
-    body.appendParagraph(" ");
 
-    // Freigaben — pulled from ev.freigaben if the organizer has made a
-    // selection; otherwise defaults to "all AKs released" (the legacy
-    // behaviour). Tokens are "species.group.ak" — the matrix defines
-    // labels, so an empty selection just omits the line.
-    const freigabenSet = {};
-    const freigabenRaw = (ev.freigaben && Array.isArray(ev.freigaben)) ? ev.freigaben : freigabenAllKeys_();
-    freigabenRaw.forEach(function (k) { freigabenSet[k] = true; });
-
-    const freigabenTitle = body.appendParagraph("Freigaben");
-    freigabenTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
-    let anyFreigaben = false;
-    FREIGABEN_MATRIX.forEach(function (sp) {
-      // Skip the species entirely if nothing in it is released.
-      const speciesHasAny = sp.groups.some(function (g) {
-        return g.aks.some(function (ak) { return freigabenSet[sp.id + "." + g.id + "." + ak.id]; });
-      });
-      if (!speciesHasAny) return;
-      anyFreigaben = true;
-      const speciesP = body.appendParagraph(sp.label);
-      speciesP.editAsText().setFontFamily("Arial").setFontSize(11).setBold(true).setForegroundColor("#1a5f1a");
-      sp.groups.forEach(function (g) {
-        const checkedAks = g.aks.filter(function (ak) {
-          return freigabenSet[sp.id + "." + g.id + "." + ak.id];
-        });
-        if (!checkedAks.length) return;
-        const aksText = formatAkSelection_(g, checkedAks);
-        const p = body.appendListItem(g.label + ": " + aksText)
-          .setGlyphType(DocumentApp.GlyphType.BULLET)
-          .setIndentStart(18)
-          .setIndentFirstLine(6);
-        p.editAsText().setFontFamily("Arial").setFontSize(10);
-      });
+    // === Kontakte ==============================================
+    const kLabel = body.appendParagraph("KONTAKTE AM JAGDTAG");
+    styleParagraph(kLabel, {
+      size: 7.5, bold: true, color: SOFT, before: 14, after: 4, line: 1.0,
     });
-    if (!anyFreigaben) {
-      const noneP = body.appendParagraph("Keine Schalenwild-Freigaben für diese Drückjagd.");
-      noneP.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#5a5a5a");
+    function appendContact(role, name, phone) {
+      const parts = [name, phone].filter(Boolean).join(" · ");
+      if (!parts) return;
+      const p = body.appendParagraph(role + "   " + parts);
+      styleParagraph(p, { size: 10, color: INK, line: 1.35 });
     }
-    const freigabenNote = body.appendParagraph(
-      "Hinweis: kein Raubwild freigegeben. Leitbachen verschonen."
-    );
-    freigabenNote.editAsText().setFontFamily("Arial").setFontSize(10).setItalic(true).setForegroundColor("#5a5a5a");
-    body.appendParagraph(" ");
-
-    // Kontakte.
-    const contactsTitle = body.appendParagraph("Kontakte am Jagdtag");
-    contactsTitle.editAsText().setFontFamily("Arial").setFontSize(13).setBold(true);
-    function appendBullet(text) {
-      const p = body.appendListItem(text)
-        .setGlyphType(DocumentApp.GlyphType.BULLET)
-        .setIndentStart(18)
-        .setIndentFirstLine(6);
-      p.editAsText().setFontFamily("Arial").setFontSize(11);
-    }
-    if (ev.vet_name || ev.vet_phone) {
-      appendBullet("Tierarzt: " + [ev.vet_name, ev.vet_phone].filter(Boolean).join(" — "));
-    }
-    if (ev.coordinator_name || ev.coordinator_phone) {
-      appendBullet("Nachsuchen-Koordinator: " + [ev.coordinator_name, ev.coordinator_phone].filter(Boolean).join(" — "));
-    }
+    if (ev.vet_name || ev.vet_phone) appendContact("Tierarzt", ev.vet_name, ev.vet_phone);
+    if (ev.coordinator_name || ev.coordinator_phone)
+      appendContact("Nachsuchen-Koordinator", ev.coordinator_name, ev.coordinator_phone);
     const nsf = Array.isArray(ev.nachsuchenfuehrer) ? ev.nachsuchenfuehrer : [];
-    for (const p of nsf) {
-      if (!p.name && !p.phone) continue;
-      appendBullet("Nachsuchenführer: " + [p.name, p.phone].filter(Boolean).join(" — "));
-    }
-    body.appendParagraph(" ");
+    nsf.forEach(function (p) {
+      if (!p.name && !p.phone) return;
+      appendContact("Nachsuchenführer", p.name, p.phone);
+    });
+
+    // === Signature =============================================
     const sig = body.appendParagraph("Waidmannsheil! — " + (ev.organizer || "Dein Organisator"));
-    sig.editAsText().setFontFamily("Arial").setFontSize(11).setItalic(true);
+    styleParagraph(sig, {
+      size: 9, italic: true, color: SOFT, before: 14, line: 1.0,
+      align: DocumentApp.HorizontalAlignment.CENTER,
+    });
 
     doc.saveAndClose();
     const pdfBlob = DriveApp.getFileById(docId).getAs("application/pdf").setName(filename + ".pdf");
