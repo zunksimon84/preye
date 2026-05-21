@@ -3568,11 +3568,10 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     });
 
     // --- Right column: map ---
-    // Hide the cell's auto-paragraph and embed the image into it.
-    const mapPara = rightCell.getChild(0).asParagraph();
-    styleParagraph(mapPara, { size: 8, line: 1.0 });
-    mapPara.setText("");
-
+    // We resolve the blob FIRST, then build the cell content based on the
+    // outcome. Styling an empty paragraph upfront triggers "Leeres
+    // Textelement kann nicht eingefügt werden" in some Apps Script
+    // versions, so we only call styleParagraph after content lands.
     let mapBlob = null;
     let mapError = "";
     const mbox = fetchMapboxMap_(positions, postsById);
@@ -3586,17 +3585,22 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       mapError = mbox.error;
     }
 
+    const mapPara = rightCell.getChild(0).asParagraph();
     if (mapBlob) {
       const img = mapPara.appendInlineImage(mapBlob);
       const ratio = img.getHeight() / img.getWidth();
       img.setWidth(MAP_W_PT);
       img.setHeight(MAP_W_PT * ratio);
+      // Centre the image inside the cell; no text styles to apply since
+      // the paragraph contains only the image.
+      mapPara.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
       const cap = rightCell.appendParagraph("Pinzahl = Standnummer");
       styleParagraph(cap, {
         size: 7.5, italic: true, color: SOFT, before: 4, line: 1.0,
         align: DocumentApp.HorizontalAlignment.CENTER,
       });
     } else {
+      // Now that we know we're inserting real text, set it BEFORE styling.
       mapPara.setText("⚠ Karte: " + (mapError || "unbekannter Fehler"));
       styleParagraph(mapPara, { size: 9, italic: true, color: "#a85a00", line: 1.2 });
     }
