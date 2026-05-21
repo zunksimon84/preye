@@ -3453,15 +3453,18 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     return p;
   }
 
-  // Append a paragraph inside a TableCell. The cell starts with one
-  // auto-created empty paragraph; we reuse that for the very first
-  // append and fall through to appendParagraph thereafter.
+  // Appender that reuses the cell's auto-created empty first paragraph
+  // for the first call and appends new paragraphs after that. We track
+  // "first call" with a WeakMap rather than a property on the cell —
+  // Apps Script wraps cells in fresh proxies, so custom JS properties
+  // don't survive across calls.
+  const cellState = new Map();
   function appendInCell(cell, text, opts) {
     let para;
-    if (!cell.__firstUsed) {
+    if (!cellState.get(cell)) {
       para = cell.getChild(0).asParagraph();
       para.setText(text);
-      cell.__firstUsed = true;
+      cellState.set(cell, true);
     } else {
       para = cell.appendParagraph(text);
     }
