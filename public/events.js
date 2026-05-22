@@ -1622,7 +1622,9 @@ const REVIERE = {
 };
 
 const PLAN_MARKER_FREE = "#f5c518";   // yellow — Stand not yet assigned
-const PLAN_MARKER_TAKEN = "#e8650e";  // darker orange — a Schütze is on it
+// Fallback red for an assigned Stand whose Runde can't be placed on the
+// south→north gradient — shouldn't happen in practice (see anstellerRundeColors).
+const PLAN_MARKER_TAKEN = "#e22219";
 
 const planMap = {
   instance: null,
@@ -1710,7 +1712,7 @@ function assignedPostInfo() {
     for (const p of (sq.positions || [])) {
       if (p && p.type === "kanzel" && p.post_id) {
         if (!map.has(p.post_id)) map.set(p.post_id, []);
-        map.get(p.post_id).push({ hunter: p.hunter || "", runde });
+        map.get(p.post_id).push({ hunter: p.hunter || "", runde, squadId: sq.id });
       }
     }
   }
@@ -1728,20 +1730,73 @@ function klettersitzPositions() {
       if (!p || p.type !== "klettersitz") continue;
       const lat = Number(p.lat), lng = Number(p.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng) || p.lat === "" || p.lng === "") continue;
-      out.push({ lat, lng, label: p.label || "", hunter: p.hunter || "", runde });
+      out.push({ lat, lng, label: p.label || "", hunter: p.hunter || "", runde, squadId: sq.id });
     }
   }
   return out;
 }
 
-function planMarkerIcon(taken) {
+// --- Per-Runde red gradient ------------------------------------------------
+// Each Ansteller Runde gets one distinct shade of red. The shades form a
+// gradient by how far north the Runde sits: the southernmost Runde is the
+// darkest red, lightening the further north a Runde lies.
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * c).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+// t: 0 = southernmost (darkest) … 1 = northernmost (lightest).
+function redGradient(t) {
+  return hslToHex(359, 85, 37 + t * 34); // bright red, lightness 37 % … 71 %
+}
+
+// Mean latitude of an Ansteller Runde's placed Schützen (Kanzeln +
+// Klettersitze) — null when nothing is placed on the map yet.
+function rundeLatitude(squad) {
+  const lats = [];
+  for (const p of (squad.positions || [])) {
+    if (!p) continue;
+    if (p.type === "kanzel" && p.post_id) {
+      const post = state.posts.find((x) => x.id === p.post_id);
+      if (post && Number.isFinite(post.lat)) lats.push(post.lat);
+    } else if (p.type === "klettersitz" && p.lat !== "") {
+      const lat = Number(p.lat);
+      if (Number.isFinite(lat)) lats.push(lat);
+    }
+  }
+  return lats.length ? lats.reduce((a, b) => a + b, 0) / lats.length : null;
+}
+
+// squad.id → red hex for every Ansteller Runde with at least one Schütze
+// placed. Ranked south → north; the gradient is spread across the ranking.
+function anstellerRundeColors() {
+  const ranked = getAnstellerRunden()
+    .map((sq) => ({ id: sq.id, lat: rundeLatitude(sq) }))
+    .filter((r) => r.lat != null)
+    .sort((a, b) => a.lat - b.lat); // south (low latitude) first
+  const colors = new Map();
+  ranked.forEach((r, i) => {
+    const t = ranked.length > 1 ? i / (ranked.length - 1) : 0;
+    colors.set(r.id, redGradient(t));
+  });
+  return colors;
+}
+
+function planMarkerIcon(fillColor, prominent) {
   return {
     path: google.maps.SymbolPath.CIRCLE,
-    fillColor: taken ? PLAN_MARKER_TAKEN : PLAN_MARKER_FREE,
+    fillColor,
     fillOpacity: 1,
     strokeColor: "#ffffff",
-    strokeWeight: taken ? 2.2 : 1.4,
-    scale: taken ? 8 : 6,
+    strokeWeight: prominent ? 2.2 : 1.4,
+    scale: prominent ? 8 : 6,
   };
 }
 
@@ -1788,8 +1843,14 @@ function drawPlanMap() {
   for (const [id, m] of planMap.markers) {
     if (!wantIds.has(id)) { m.setMap(null); planMap.markers.delete(id); }
   }
+  // Each Ansteller Runde gets its own shade of red — darkest in the south,
+  // lightening toward the north; a free Stand stays yellow.
+  const rundeColors = anstellerRundeColors();
+  const colorForSquad = (sid) => rundeColors.get(sid) || PLAN_MARKER_TAKEN;
+
   for (const post of posts) {
-    const taken = assigned.has(post.id);
+    const owners = assigned.get(post.id);
+    const color = owners ? colorForSquad(owners[0].squadId) : PLAN_MARKER_FREE;
     let m = planMap.markers.get(post.id);
     if (!m) {
       m = new google.maps.Marker({
@@ -1800,8 +1861,8 @@ function drawPlanMap() {
       m.addListener("click", () => openPlanPostInfo(post.id, m));
       planMap.markers.set(post.id, m);
     }
-    m.setIcon(planMarkerIcon(taken));
-    m.setZIndex(taken ? 1000 : 100);
+    m.setIcon(planMarkerIcon(color, !!owners));
+    m.setZIndex(owners ? 1000 : 100);
   }
 
   // Klettersitz markers are cheap — rebuild them wholesale each draw.
@@ -1812,7 +1873,7 @@ function drawPlanMap() {
       position: { lat: ks.lat, lng: ks.lng },
       map,
       title: ks.label || "Klettersitz",
-      icon: planMarkerIcon(true),
+      icon: planMarkerIcon(colorForSquad(ks.squadId), true),
       zIndex: 1000,
     });
     m.addListener("click", () => openPlanKsInfo(ks, m));
@@ -1821,10 +1882,7 @@ function drawPlanMap() {
 
   const takenCount = posts.filter((p) => assigned.has(p.id)).length
     + planMap.ksMarkers.length;
-  const countEl = $("#plan-map-count");
-  if (countEl) {
-    countEl.textContent = `${takenCount} besetzt · ${posts.length} Stände`;
-  }
+  renderPlanLegend(rundeColors, takenCount, posts.length);
 
   // Frame the cutout once per event — never on a recolor, so assigning a
   // hunter doesn't yank the map back from wherever the user panned it.
@@ -1837,6 +1895,28 @@ function drawPlanMap() {
     if (!bounds.isEmpty()) map.fitBounds(bounds, 36);
     planMap.fittedFor = eid;
   }
+}
+
+// Legend: a "Frei" swatch, then one swatch per Ansteller Runde in its own
+// shade of red (south → north, so the row reads dark → light), then a count.
+function renderPlanLegend(rundeColors, takenCount, totalCount) {
+  const el = $("#plan-map-legend");
+  if (!el) return;
+  const item = (color, label) =>
+    `<span class="plan-legend-item">` +
+    `<span class="plan-dot" style="background:${color}"></span>` +
+    `${escapeHtml(label)}</span>`;
+  const byId = new Map(getAnstellerRunden().map((s) => [s.id, s]));
+  const parts = [item(PLAN_MARKER_FREE, "Frei")];
+  for (const [sid, color] of rundeColors) {
+    const sq = byId.get(sid);
+    if (sq) parts.push(item(color, displayRundeName(sq.name).replace(/^Ansteller\s+/, "")));
+  }
+  parts.push(
+    `<span class="plan-legend-item plan-legend-count">` +
+    `${takenCount} besetzt · ${totalCount} Stände</span>`
+  );
+  el.innerHTML = parts.join("");
 }
 
 function openPlanPostInfo(postId, marker) {
