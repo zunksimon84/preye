@@ -6,6 +6,11 @@
      high-contrast look the poster uses. */
   --green-bright: #b5d33a;
   --green-bright-edge: #97b730;
+  /* Brand gradient — taken from the preye P-mark (lime green → charcoal).
+     Used as the primary design element across the topbars. */
+  --lime: #b5d33a;
+  --charcoal: #2c2f34;
+  --brand-gradient: linear-gradient(100deg, var(--lime) 0%, var(--lime) 42%, var(--charcoal) 100%);
   --steel: #8a8e92; /* metallic grey accent, like the bullet jackets */
   --steel-dark: #4a4d52;
   /* Form surfaces — switched from a warm cream to a cool light grey
@@ -48,13 +53,13 @@ body {
   left: 0;
   right: 0;
   z-index: 10;
-  background: var(--green-bright);
+  background: var(--brand-gradient);
   color: #111;
   padding: calc(8px + var(--safe-top)) 12px 8px;
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid var(--green-bright-edge);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
@@ -81,10 +86,10 @@ body {
 }
 
 .brand-eye {
-  /* Bullet-eye logo PNG (replaces the old inline SVG eye). Sized so it
-     reads at the same visual weight as the wordmark next to it. */
-  width: 30px;
-  height: auto;
+  /* preye P-mark. Portrait aspect ratio, so size by height to sit
+     cleanly inside the topbar next to the wordmark. */
+  height: 30px;
+  width: auto;
   flex-shrink: 0;
   display: inline-block;
   vertical-align: middle;
@@ -113,13 +118,16 @@ body {
     align-items: stretch;
     gap: 6px;
     padding: calc(6px + var(--safe-top)) 10px 6px;
+    /* stacked layout: keep the brand row on lime, the filter row on
+       charcoal — so the gradient runs top-to-bottom here. */
+    background: linear-gradient(180deg, var(--lime) 0%, var(--lime) 48%, var(--charcoal) 100%);
   }
   #topbar h1 {
     font-size: 14px;
     flex: none;
   }
   .brand-pray { font-size: 16px; letter-spacing: 0.5px; }
-  .brand-eye { width: 24px; }
+  .brand-eye { height: 26px; }
   .brand-place { font-size: 13px; }
 
   .filters {
@@ -141,13 +149,15 @@ body {
 }
 
 /* All four topbar chips (the two selects, the date picker, the two buttons)
-   share one pill format: dark fill, lime label, bold, lime outline on hover. */
+   share one pill format: dark fill, lime label, bold, lime outline on hover.
+   The faint light border keeps the pill crisp on the charcoal end of the
+   topbar gradient as well as on the lime end. */
 .filters select,
 #filter-date,
 .filter-btn {
   background: #1a1a1a;
   color: var(--green-bright);
-  border: 1px solid #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   padding: 6px 12px;
   font: inherit;
@@ -884,8 +894,8 @@ body {
 }
 
 .gate-brand .brand-eye {
-  width: 38px;
-  height: auto;
+  height: 44px;
+  width: auto;
 }
 
 .gate-sub {
@@ -3399,6 +3409,10 @@ body.rsvp-page {
   gap: 8px;
   padding: 14px 18px;
   color: #111;
+  /* brand gradient bar — the lime stretch holds the wordmark, the
+     charcoal end carries the gradient across the rest of the bar. */
+  background: linear-gradient(100deg, var(--lime) 0%, var(--lime) 58%, var(--charcoal) 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
 #rsvp-main {
