@@ -208,6 +208,12 @@ function showToast(msg, kind, ms = 3000) {
 
 function route() {
   const hash = location.hash || "#/";
+  // Leaving an event detail page: stop the GPS watch (battery) and forget
+  // the fitted bounds so the next event re-frames its own cutout.
+  if (!hash.startsWith("#/event/")) {
+    stopPlanGeo();
+    planMap.fittedFor = null;
+  }
   $$(".ev-view").forEach((v) => { v.hidden = true; });
   if (hash === "#/" || hash === "") {
     $("#view-list").hidden = false;
@@ -1082,6 +1088,9 @@ function renderSquads() {
     hint.textContent = "";
   }
   renderTreibergruppen();
+  // Recolor the Revierkarte — a post turns orange the moment its
+  // post_id shows up in a squad position.
+  renderPlanMap();
 }
 
 // Treibergruppen — same tile layout but a different tint and the leader
@@ -1596,6 +1605,352 @@ async function addTreibergruppe() {
     btn.disabled = false;
     btn.textContent = oldText;
   }
+}
+
+// ---------- Revierkarte (plan map) ----------
+// A satellite cutout at the top of the hunt overview. Every Stand in the
+// event's Revier is a marker — yellow while free, darker orange once a
+// squad position references it. A Google-Maps-style live blue dot lets the
+// Ansteller orient himself in the field.
+
+// Which Teilgebiete belong to which Revier. An event in any one area of a
+// Revier shows that Revier's full cutout (all four areas) — the "PN Werder
+// cutout" Simon asked for, regardless of which Teilgebiete were ticked.
+const REVIERE = {
+  "Peenwerder": ["Hauptrevier", "Ost", "Nord", "Nordrand"],
+  "NPA-Müritz": ["Babke", "Langenhagen", "Schwarzenhof", "Serrahn"],
+};
+
+const PLAN_MARKER_FREE = "#f5c518";   // yellow — Stand not yet assigned
+const PLAN_MARKER_TAKEN = "#e8650e";  // darker orange — a Schütze is on it
+
+const planMap = {
+  instance: null,
+  markers: new Map(),   // post_id → google.maps.Marker (fixed Stände)
+  ksMarkers: [],         // markers for Klettersitz positions (free coords)
+  infoWindow: null,
+  loadPromise: null,
+  fittedFor: null,       // event id the bounds were last fitted to
+  geoWatchId: null,
+  geoMarker: null,
+  geoCircle: null,
+};
+
+// Load the Google Maps JS API on demand. Mirrors app.js: no loading=async,
+// because we use the synchronous google.maps.Map / Marker globals.
+function loadPlanMapsScript() {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) return resolve();
+    const existing = document.getElementById("plan-gmaps-script");
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Maps")));
+      return;
+    }
+    const s = document.createElement("script");
+    s.id = "plan-gmaps-script";
+    s.src = "https://maps.googleapis.com/maps/api/js?key=" +
+            encodeURIComponent(cfg.GOOGLE_MAPS_API_KEY) + "&v=weekly";
+    s.async = true;
+    s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Google Maps konnte nicht geladen werden"));
+    document.head.appendChild(s);
+  });
+}
+
+// Creates the map once; later calls just hand back the existing instance.
+function ensurePlanMap() {
+  if (planMap.instance) return Promise.resolve(planMap.instance);
+  if (planMap.loadPromise) return planMap.loadPromise;
+  planMap.loadPromise = loadPlanMapsScript().then(() => {
+    planMap.instance = new google.maps.Map($("#plan-map"), {
+      center: { lat: 53.6262, lng: 12.8378 }, // Peenwerder, same as app.js
+      zoom: 13,
+      mapTypeId: "hybrid",
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      gestureHandling: "greedy",
+      zoomControl: true,
+      // Zoom widget up top so it clears the locate button bottom-right.
+      zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
+    });
+    planMap.infoWindow = new google.maps.InfoWindow();
+    return planMap.instance;
+  });
+  return planMap.loadPromise;
+}
+
+// The set of Teilgebiet names whose Stände should appear for this event.
+function eventRevierAreas(event) {
+  const tg = new Set((event.teilgebiet || "").split(/\s*,\s*/).filter(Boolean));
+  const areas = new Set();
+  for (const list of Object.values(REVIERE)) {
+    if (list.some((a) => tg.has(a))) list.forEach((a) => areas.add(a));
+  }
+  return areas;
+}
+
+// Fixed Stände (Kanzeln / DJB / Leitern) shown on the cutout for this event.
+function postsForPlanMap() {
+  if (!state.currentEvent) return [];
+  const areas = eventRevierAreas(state.currentEvent.event);
+  return state.posts.filter((p) =>
+    areas.has(p.area) && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+  );
+}
+
+// post_id → [{ hunter, runde }] for every Stand a squad position sits on.
+function assignedPostInfo() {
+  const map = new Map();
+  for (const sq of (state.currentEvent?.squads || [])) {
+    const runde = sq.type === "treiber"
+      ? displayTreiberName(sq.name) : displayRundeName(sq.name);
+    for (const p of (sq.positions || [])) {
+      if (p && p.type === "kanzel" && p.post_id) {
+        if (!map.has(p.post_id)) map.set(p.post_id, []);
+        map.get(p.post_id).push({ hunter: p.hunter || "", runde });
+      }
+    }
+  }
+  return map;
+}
+
+// Klettersitz positions (hunter assigned to free coordinates) — always
+// "taken", drawn as orange markers so the cutout is complete.
+function klettersitzPositions() {
+  const out = [];
+  for (const sq of (state.currentEvent?.squads || [])) {
+    const runde = sq.type === "treiber"
+      ? displayTreiberName(sq.name) : displayRundeName(sq.name);
+    for (const p of (sq.positions || [])) {
+      if (!p || p.type !== "klettersitz") continue;
+      const lat = Number(p.lat), lng = Number(p.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || p.lat === "" || p.lng === "") continue;
+      out.push({ lat, lng, label: p.label || "", hunter: p.hunter || "", runde });
+    }
+  }
+  return out;
+}
+
+function planMarkerIcon(taken) {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: taken ? PLAN_MARKER_TAKEN : PLAN_MARKER_FREE,
+    fillOpacity: 1,
+    strokeColor: "#ffffff",
+    strokeWeight: taken ? 2.2 : 1.4,
+    scale: taken ? 8 : 6,
+  };
+}
+
+// Decide whether the section is shown and, if so, (re)draw it. Safe to call
+// repeatedly — it's the single entry point hooked into renderSquads().
+function renderPlanMap() {
+  const section = $("#event-map-section");
+  if (!section || !state.currentEvent) return;
+  const placeholder = $("#plan-map-placeholder");
+  const wrap = $("#plan-map-wrap");
+  section.hidden = false;
+
+  const showPlaceholder = (msg) => {
+    wrap.hidden = true;
+    placeholder.hidden = false;
+    placeholder.textContent = msg;
+  };
+
+  if (!cfg.GOOGLE_MAPS_API_KEY || cfg.GOOGLE_MAPS_API_KEY.startsWith("PASTE")) {
+    showPlaceholder("Karte nicht verfügbar — config.js fehlt.");
+    return;
+  }
+  if (!postsForPlanMap().length) {
+    showPlaceholder("Für dieses Revier ist noch kein Kartenausschnitt mit Ständen hinterlegt.");
+    return;
+  }
+  placeholder.hidden = true;
+  wrap.hidden = false;
+  ensurePlanMap()
+    .then(drawPlanMap)
+    .catch(() => showPlaceholder("Karte konnte nicht geladen werden."));
+}
+
+// Reads current state fresh on every call, so an optimistic squad save
+// recolors instantly without re-fetching anything.
+function drawPlanMap() {
+  const map = planMap.instance;
+  if (!map || !state.currentEvent) return;
+  const posts = postsForPlanMap();
+  const assigned = assignedPostInfo();
+  const wantIds = new Set(posts.map((p) => p.id));
+
+  // Drop markers for Stände no longer in the cutout (event switched Revier).
+  for (const [id, m] of planMap.markers) {
+    if (!wantIds.has(id)) { m.setMap(null); planMap.markers.delete(id); }
+  }
+  for (const post of posts) {
+    const taken = assigned.has(post.id);
+    let m = planMap.markers.get(post.id);
+    if (!m) {
+      m = new google.maps.Marker({
+        position: { lat: post.lat, lng: post.lng },
+        map,
+        title: post.name,
+      });
+      m.addListener("click", () => openPlanPostInfo(post.id, m));
+      planMap.markers.set(post.id, m);
+    }
+    m.setIcon(planMarkerIcon(taken));
+    m.setZIndex(taken ? 1000 : 100);
+  }
+
+  // Klettersitz markers are cheap — rebuild them wholesale each draw.
+  planMap.ksMarkers.forEach((m) => m.setMap(null));
+  planMap.ksMarkers = [];
+  for (const ks of klettersitzPositions()) {
+    const m = new google.maps.Marker({
+      position: { lat: ks.lat, lng: ks.lng },
+      map,
+      title: ks.label || "Klettersitz",
+      icon: planMarkerIcon(true),
+      zIndex: 1000,
+    });
+    m.addListener("click", () => openPlanKsInfo(ks, m));
+    planMap.ksMarkers.push(m);
+  }
+
+  const takenCount = posts.filter((p) => assigned.has(p.id)).length
+    + planMap.ksMarkers.length;
+  const countEl = $("#plan-map-count");
+  if (countEl) {
+    countEl.textContent = `${takenCount} besetzt · ${posts.length} Stände`;
+  }
+
+  // Frame the cutout once per event — never on a recolor, so assigning a
+  // hunter doesn't yank the map back from wherever the user panned it.
+  const eid = state.currentEvent.event.id;
+  if (planMap.fittedFor !== eid) {
+    google.maps.event.trigger(map, "resize");
+    const bounds = new google.maps.LatLngBounds();
+    posts.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+    planMap.ksMarkers.forEach((m) => bounds.extend(m.getPosition()));
+    if (!bounds.isEmpty()) map.fitBounds(bounds, 36);
+    planMap.fittedFor = eid;
+  }
+}
+
+function openPlanPostInfo(postId, marker) {
+  const post = state.posts.find((p) => p.id === postId);
+  if (!post) return;
+  const assigned = assignedPostInfo().get(postId) || [];
+  const typeBadge = post.type && post.type !== "Kanzel" ? " · " + post.type : "";
+  let html = `<div class="plan-info"><strong>${escapeHtml(post.name)}</strong>` +
+             `<div class="plan-info-sub">${escapeHtml(post.area)}${escapeHtml(typeBadge)}</div>`;
+  if (assigned.length) {
+    html += assigned.map((a) =>
+      `<div class="plan-info-assign">${escapeHtml(a.hunter || "—")}` +
+      `<span class="muted"> · ${escapeHtml(a.runde)}</span></div>`
+    ).join("");
+  } else {
+    html += `<div class="plan-info-free muted">Frei — noch nicht zugewiesen</div>`;
+  }
+  html += `</div>`;
+  planMap.infoWindow.setContent(html);
+  planMap.infoWindow.open(planMap.instance, marker);
+}
+
+function openPlanKsInfo(ks, marker) {
+  const title = ks.label ? escapeHtml(ks.label) : "Klettersitz";
+  const html = `<div class="plan-info"><strong>${title}</strong>` +
+    `<div class="plan-info-sub">Klettersitz</div>` +
+    `<div class="plan-info-assign">${escapeHtml(ks.hunter || "—")}` +
+    `<span class="muted"> · ${escapeHtml(ks.runde)}</span></div></div>`;
+  planMap.infoWindow.setContent(html);
+  planMap.infoWindow.open(planMap.instance, marker);
+}
+
+// Google-Maps-style live location. First tap starts a watchPosition() that
+// keeps the blue dot + accuracy circle moving with the user; later taps
+// just recenter on the latest fix.
+function startPlanGeo() {
+  if (!navigator.geolocation) {
+    showToast("Standort wird vom Browser nicht unterstützt", "error");
+    return;
+  }
+  if (!planMap.instance) return;
+  const btn = $("#plan-locate-btn");
+
+  if (planMap.geoWatchId != null) {
+    if (planMap.geoMarker) {
+      planMap.instance.panTo(planMap.geoMarker.getPosition());
+      if (planMap.instance.getZoom() < 15) planMap.instance.setZoom(16);
+    }
+    return;
+  }
+
+  btn.classList.add("locating");
+  let firstFix = true;
+  planMap.geoWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const acc = pos.coords.accuracy || 0;
+      if (!planMap.geoMarker) {
+        planMap.geoMarker = new google.maps.Marker({
+          map: planMap.instance,
+          position: ll,
+          zIndex: 99999,
+          title: "Mein Standort",
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: "#1a73e8",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 3,
+            scale: 7,
+          },
+        });
+        planMap.geoCircle = new google.maps.Circle({
+          map: planMap.instance,
+          center: ll,
+          radius: acc,
+          strokeColor: "#1a73e8",
+          strokeOpacity: 0.4,
+          strokeWeight: 1,
+          fillColor: "#1a73e8",
+          fillOpacity: 0.12,
+          clickable: false,
+          zIndex: 99998,
+        });
+      } else {
+        planMap.geoMarker.setPosition(ll);
+        planMap.geoCircle.setCenter(ll);
+        planMap.geoCircle.setRadius(acc);
+      }
+      btn.classList.remove("locating");
+      btn.classList.add("active");
+      if (firstFix) {
+        firstFix = false;
+        planMap.instance.panTo(ll);
+        if (planMap.instance.getZoom() < 15) planMap.instance.setZoom(16);
+      }
+    },
+    (err) => {
+      stopPlanGeo();
+      showToast("Standort: " + (err.message || "nicht verfügbar"), "error", 4000);
+    },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 12000 }
+  );
+}
+
+function stopPlanGeo() {
+  if (planMap.geoWatchId != null) {
+    navigator.geolocation.clearWatch(planMap.geoWatchId);
+    planMap.geoWatchId = null;
+  }
+  if (planMap.geoMarker) { planMap.geoMarker.setMap(null); planMap.geoMarker = null; }
+  if (planMap.geoCircle) { planMap.geoCircle.setMap(null); planMap.geoCircle = null; }
+  const btn = $("#plan-locate-btn");
+  if (btn) btn.classList.remove("active", "locating");
 }
 
 // ---------- Wiring ----------
@@ -2350,6 +2705,9 @@ function wireUi() {
   $("#squad-edit-cancel").addEventListener("click", closeSquadEditor);
   $("#squad-edit-backdrop").addEventListener("click", closeSquadEditor);
   $("#squad-edit-save").addEventListener("click", saveEditingSquad);
+
+  // Revierkarte — live "Mein Standort" dot.
+  $("#plan-locate-btn").addEventListener("click", startPlanGeo);
 
   // Edit existing event
   $("#edit-event-btn").addEventListener("click", openEventEditor);

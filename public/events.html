@@ -125,6 +125,26 @@
           <button id="edit-event-btn" class="ghost-btn" type="button">Bearbeiten</button>
         </div>
         <div id="event-header"></div>
+
+        <section class="ev-section ev-section--map" id="event-map-section" hidden>
+          <h3 class="ev-section-title">Revierkarte</h3>
+          <p id="plan-map-placeholder" class="plan-map-placeholder" hidden></p>
+          <div class="plan-map-wrap" id="plan-map-wrap">
+            <div id="plan-map" role="application" aria-label="Revierkarte mit Ständen"></div>
+            <button type="button" id="plan-locate-btn" class="plan-locate-btn"
+                    aria-label="Mein Standort" title="Mein Standort">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19a7 7 0 110-14 7 7 0 010 14z" />
+              </svg>
+            </button>
+          </div>
+          <div class="plan-map-legend">
+            <span class="plan-legend-item"><span class="plan-dot plan-dot--free"></span> Frei</span>
+            <span class="plan-legend-item"><span class="plan-dot plan-dot--taken"></span> Besetzt</span>
+            <span class="plan-legend-item plan-legend-count" id="plan-map-count"></span>
+          </div>
+        </section>
+
         <div id="event-contacts" class="ev-contacts" hidden></div>
         <div id="event-freigaben" class="ev-freigaben" hidden></div>
         <section class="ev-section">

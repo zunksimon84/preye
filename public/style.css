@@ -2143,6 +2143,82 @@ body.rsvp-page #rsvp-topbar {
 
 .ev-placeholder { color: var(--muted); font-size: 14px; padding: 12px 0; }
 
+/* Revierkarte (plan map) ---------------------------------------------------- */
+
+.ev-section--map .ev-section-title { border-bottom-color: #e8650e; }
+
+.plan-map-wrap {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+#plan-map {
+  width: 100%;
+  height: clamp(260px, 44vh, 380px);
+  background: #1a1a1a;
+}
+.plan-map-placeholder {
+  margin: 0;
+  padding: 22px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  background: #fff;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+/* Round white control, bottom-right — mirrors Google's own map buttons. */
+.plan-locate-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  color: #5f6368;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.plan-locate-btn svg { width: 22px; height: 22px; }
+.plan-locate-btn.active { color: #1a73e8; }
+.plan-locate-btn.locating { animation: plan-locate-pulse 1s ease-in-out infinite; }
+@keyframes plan-locate-pulse { 50% { opacity: 0.45; } }
+
+.plan-map-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #444;
+}
+.plan-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.plan-legend-count { margin-left: auto; color: var(--muted); }
+.plan-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.plan-dot--free { background: #f5c518; }
+.plan-dot--taken { background: #e8650e; }
+
+.plan-info { font-size: 13px; line-height: 1.45; min-width: 150px; }
+.plan-info strong { font-size: 14px; }
+.plan-info-sub { color: #666; margin: 1px 0 5px; }
+.plan-info-free { font-style: italic; }
+
 /* Ansteller Runden ---------------------------------------------------------- */
 
 .squads-toolbar {
