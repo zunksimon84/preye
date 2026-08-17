@@ -512,3 +512,155 @@ img { max-width: 100%; }
   .hero-facts div { display: flex; align-items: baseline; gap: 10px; }
   .hero-facts b { font-size: 1.4rem; }
 }
+
+/* ------------------------------------------------------------- Dashboard */
+
+.dash {
+  width: min(var(--shell), 100%);
+  margin: 0 auto;
+  padding: clamp(52px, 8vw, 96px) var(--gap);
+}
+.dash-head { text-align: center; margin-bottom: clamp(26px, 4vw, 42px); }
+.dash-head h2 {
+  margin: 12px auto 12px;
+  font-size: clamp(1.6rem, 3.6vw, 2.6rem);
+  line-height: 1.12;
+  font-weight: 780;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  max-width: 20ch;
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.card--wide { grid-column: span 1; }
+
+.card {
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: var(--paper);
+  padding: clamp(18px, 2.6vw, 26px);
+  box-shadow: 0 18px 40px -30px rgba(6, 32, 43, 0.45);
+}
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.card-big {
+  margin: 0 0 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: clamp(2.1rem, 4.6vw, 3rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.card-big small { font-size: 14px; font-weight: 600; color: var(--ink-faint); letter-spacing: 0; }
+.card-note { margin: 12px 0 0; font-size: 12.5px; color: var(--ink-faint); }
+
+/* Top stand per area: the number is the point, so it gets the weight. */
+.toplist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.toplist li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+.toplist li:last-child { border-bottom: none; padding-bottom: 0; }
+.toplist .area-name {
+  grid-column: 1 / -1;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sea);
+}
+.toplist .stand { font-size: 15px; font-weight: 650; }
+.toplist .count { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.toplist-empty { color: var(--ink-faint); font-size: 14px; border: none; }
+
+/* Species split, in the shape the app's Strecke panel uses. */
+.species { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+.species li { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; align-items: baseline; }
+.species .sp-name { font-size: 15px; font-weight: 650; }
+.species .sp-count { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.species .sp-bar {
+  grid-column: 1 / -1;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--paper-deep);
+  overflow: hidden;
+}
+.species .sp-bar i { display: block; height: 100%; border-radius: 999px; background: var(--ramp); }
+.species .sp-split {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-cta { display: flex; justify-content: center; margin-top: clamp(26px, 4vw, 40px); }
+
+.cta--dark {
+  background: var(--ink);
+  color: #fff;
+  border: 1.5px solid var(--ink);
+  padding: 14px 30px;
+  font-size: 15px;
+}
+.cta--dark:hover { background: #0b3240; border-color: #0b3240; }
+
+/* ------------------------------------------------------- Zwei Einstiege */
+
+.actions {
+  width: min(var(--shell), 100%);
+  margin: 0 auto;
+  padding: 0 var(--gap) clamp(52px, 8vw, 96px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.action {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: var(--paper);
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.action:hover {
+  border-color: var(--sea);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -28px rgba(6, 32, 43, 0.55);
+}
+.action-tag {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--sea);
+}
+.action b { font-size: clamp(1.15rem, 2.2vw, 1.5rem); font-weight: 760; letter-spacing: -0.015em; }
+.action b::after { content: " →"; color: var(--pool); }
+.action-sub { font-size: 15px; color: var(--ink-soft); }
+
+@media (max-width: 900px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .actions { grid-template-columns: 1fr; }
+}

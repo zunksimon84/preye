@@ -1534,7 +1534,7 @@ a.filter-btn {
 @media print {
   /* Map page: print the Anschuss-Protokoll only. standkarte.html brings its
      own print rules further down. */
-  body:not(.stk-page) > *:not(#protocol-modal) { display: none !important; }
+  body:not(.stk-page):not(.nachsuche-page) > *:not(#protocol-modal) { display: none !important; }
   #protocol-modal {
     position: static;
     inset: auto;
@@ -4205,4 +4205,81 @@ body.stk-page {
   .stk-grid { grid-template-columns: 1fr 1fr; }
   .stk-block--freigaben { grid-column: 1 / -1; }
   @page { size: A4 portrait; margin: 12mm; }
+}
+
+/* ===========================================================================
+   Standalone Anschussprotokoll (nachsuche.html).
+   Same form as the modal in the map app, but flowing down a normal page: no
+   Revier, no hunt, no login. Only the container changes — every .proto-* rule
+   above still applies.
+   =========================================================================== */
+
+body.nachsuche-page {
+  overflow: auto;
+  background: var(--bg);
+}
+body.nachsuche-page #stk-topbar { position: static; }
+
+#ns-main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 16px 14px 48px;
+}
+
+.ns-intro {
+  margin: 4px 0 18px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--steel-dark);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--pool-blue);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+/* Undo the modal positioning — here it is just a sheet on the page. */
+body.nachsuche-page #protocol-modal.ns-sheet {
+  position: static;
+  inset: auto;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  transform: none;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px -22px rgba(6, 32, 43, 0.5);
+  background: var(--card);
+  display: block;
+  overflow: visible;
+  z-index: auto;
+}
+body.nachsuche-page .protocol-body { overflow: visible; height: auto; max-height: none; }
+body.nachsuche-page .proto-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 14px 16px;
+}
+body.nachsuche-page .proto-actions .cancel-btn { width: auto; margin-top: 0; }
+
+/* The free stand line replaces the Kanzel dropdown. */
+#proto-free-stand {
+  width: 100%;
+  font: inherit;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+@media print {
+  body.nachsuche-page #stk-topbar,
+  body.nachsuche-page .ns-intro,
+  body.nachsuche-page .proto-actions,
+  body.nachsuche-page #toast { display: none !important; }
+  body.nachsuche-page #ns-main { padding: 0; max-width: none; }
+  body.nachsuche-page #protocol-modal.ns-sheet { border: none; box-shadow: none; }
+  @page { size: A4 portrait; margin: 10mm; }
 }

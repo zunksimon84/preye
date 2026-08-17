@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b7c95" />
+    <title>PREYE — Anschussprotokoll</title>
+    <link rel="icon" type="image/png" href="favicon-preye.png" />
+    <link rel="apple-touch-icon" href="favicon-preye.png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="nachsuche-page">
+    <header id="stk-topbar">
+      <h1>
+        <a href="landing.html" class="brand-link" aria-label="Zur Startseite">
+          <span class="brand-pray">PREYE</span>
+          <img class="brand-eye" src="preye-mark.png" alt="" />
+        </a>
+        <span class="brand-place">Anschussprotokoll</span>
+      </h1>
+      <nav class="filters">
+        <a href="landing.html" class="filter-btn">← Start</a>
+      </nav>
+    </header>
+
+    <main id="ns-main">
+      <p class="ns-intro">
+        Frei ausfüllbar, an kein Revier gebunden. Trag ein, was Du weißt, lade das
+        PDF herunter und schick es dem Nachsuchenführer — per WhatsApp, Mail oder
+        wie es gerade schnell geht. Es wird nichts gespeichert und nichts
+        übertragen; das Protokoll entsteht auf Deinem Gerät.
+      </p>
+
+      <section id="protocol-modal" class="ns-sheet">
+        <div class="protocol-body" id="protocol-sheet">
+        <div class="proto-banner">
+          <span class="proto-banner-title">ANSCHUSS-PROTOKOLL</span>
+        </div>
+
+        <div class="proto-loc">
+          <label class="proto-loc-row visible">
+            Ort / Stand
+            <input type="text" id="proto-free-stand" maxlength="80" autocomplete="off"
+                   placeholder="z.B. Kanzel Eichwerder Ost, Revier Musterhausen" />
+          </label>
+          <div class="proto-loc-row proto-loc-coords">
+            <label>Breitengrad <span class="muted">(optional)</span><input type="number" id="proto-loc-lat" step="0.000001" inputmode="decimal" /></label>
+            <label>Längengrad <span class="muted">(optional)</span><input type="number" id="proto-loc-lng" step="0.000001" inputmode="decimal" /></label>
+          </div>
+          <button type="button" id="proto-loc-here" class="ghost">Aktuelle Position</button>
+        </div>
+
+        <div class="proto-line">
+          <label class="grow">Name:<input type="text" data-proto="name" /></label>
+          <label class="grow">Telefon:<input type="text" data-proto="tel" /></label>
+        </div>
+        <div class="proto-line">
+          <label class="grow">Kaliber / Geschoss:
+            <select data-proto="kaliber" aria-label="Kaliber">
+              <option value="">— Kaliber wählen —</option>
+              <option>6,5x55</option>
+              <option>6,5x57 (R)</option>
+              <option>6,5x65 (R)</option>
+              <option>6,5x68</option>
+              <option>.270 Winchester</option>
+              <option>7x57 (R)</option>
+              <option>7x64</option>
+              <option>7x65 R</option>
+              <option>7 mm Remington Magnum</option>
+              <option>.308 Winchester</option>
+              <option>.30-06 Springfield</option>
+              <option>.30 R Blaser</option>
+              <option>.300 Winchester Magnum</option>
+              <option>8x57 I(R)S</option>
+              <option>8x68 S</option>
+              <option>.338 Winchester Magnum</option>
+              <option>.338 Lapua Magnum</option>
+              <option>9,3x62</option>
+              <option>9,3x64</option>
+              <option>9,3x74 R</option>
+              <option>.375 H&amp;H Magnum</option>
+              <option>Sonstige</option>
+            </select>
+          </label>
+          <label class="proto-chk"><input type="checkbox" data-proto="bleifrei" /> Bleifrei</label>
+          <label class="proto-chk"><input type="checkbox" data-proto="bleihaltig" /> Bleihaltig</label>
+        </div>
+
+        <table class="proto-table">
+          <thead>
+            <tr>
+              <th></th><th>Uhrzeit</th><th>Anzahl Schüsse</th><th>Wildart / gesch. kg</th>
+              <th>Anzahl Stücke</th><th>Beobachtungen (gezeichnet, krank …)</th><th>von Hund(en) verfolgt</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="proto-row-head">Stück I</td>
+              <td data-label="Uhrzeit"><input type="time" data-proto="s1_uhrzeit" /></td>
+              <td data-label="Anzahl Schüsse"><select data-proto="s1_schuesse" data-range="1-10"></select></td>
+              <td data-label="Wildart / gesch. kg" class="proto-cell-stack">
+                <select data-proto="s1_wildart" aria-label="Wildart">
+                  <option value="">—</option>
+                  <option>Rotwild</option>
+                  <option>Damwild</option>
+                  <option>Schwarzwild</option>
+                  <option>Mufflon</option>
+                  <option>Rehwild</option>
+                </select>
+                <select data-proto="s1_kg" data-range="1-100" aria-label="geschätzte kg"></select>
+              </td>
+              <td data-label="Anzahl Stücke"><select data-proto="s1_stuecke" data-range="1-15"></select></td>
+              <td data-label="Beobachtungen"><input data-proto="s1_beob" /></td>
+              <td data-label="von Hund(en) verfolgt">
+                <select data-proto="s1_hund" aria-label="von Hunden verfolgt">
+                  <option value="">—</option><option>Ja</option><option>Nein</option><option>Weiß nicht</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td class="proto-row-head">Stück II</td>
+              <td data-label="Uhrzeit"><input type="time" data-proto="s2_uhrzeit" /></td>
+              <td data-label="Anzahl Schüsse"><select data-proto="s2_schuesse" data-range="1-10"></select></td>
+              <td data-label="Wildart / gesch. kg" class="proto-cell-stack">
+                <select data-proto="s2_wildart" aria-label="Wildart">
+                  <option value="">—</option>
+                  <option>Rotwild</option>
+                  <option>Damwild</option>
+                  <option>Schwarzwild</option>
+                  <option>Mufflon</option>
+                  <option>Rehwild</option>
+                </select>
+                <select data-proto="s2_kg" data-range="1-100" aria-label="geschätzte kg"></select>
+              </td>
+              <td data-label="Anzahl Stücke"><select data-proto="s2_stuecke" data-range="1-15"></select></td>
+              <td data-label="Beobachtungen"><input data-proto="s2_beob" /></td>
+              <td data-label="von Hund(en) verfolgt">
+                <select data-proto="s2_hund" aria-label="von Hunden verfolgt">
+                  <option value="">—</option><option>Ja</option><option>Nein</option><option>Weiß nicht</option>
+                </select>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="proto-label">Stellung des Stückes beim Schuss — links die Reihe einem Stück (I / II) zuordnen, dann den vermutlichen Sitz der Kugel antippen (nochmal antippen entfernt den Punkt).</p>
+        <div class="proto-figure proto-figure--rows" data-fig="animals">
+          <img src="protocol-animals.png" alt="Wildposen" />
+          <canvas></canvas>
+          <select class="proto-fig-row proto-fig-row1" data-proto="animals_row1" aria-label="Obere Reihe — Stück-Nr.">
+            <option value="">—</option><option>I</option><option>II</option>
+          </select>
+          <select class="proto-fig-row proto-fig-row2" data-proto="animals_row2" aria-label="Untere Reihe — Stück-Nr.">
+            <option value="">—</option><option>I</option><option>II</option>
+          </select>
+        </div>
+
+        <p class="proto-label">Anschuss antippen — 1. Punkt = Stück I, 2. Punkt = Stück II; Blickrichtung beachten</p>
+        <div class="proto-bottom">
+          <div class="proto-pirsch">
+            <div class="proto-pirsch-head">Gefundene Pirschzeichen zu Stück-Nr.</div>
+            <div class="proto-pirsch-block">
+              <strong>Stück I</strong>
+              <div class="proto-pirsch-grid">
+                <label><input type="checkbox" data-proto="s1_schweiss" /> Schweiß</label>
+                <label><input type="checkbox" data-proto="s1_knochen" /> Knochen</label>
+                <label><input type="checkbox" data-proto="s1_schnitthaar" /> Schnitthaar</label>
+                <label><input type="checkbox" data-proto="s1_kugelriss" /> Kugelriss</label>
+                <label><input type="checkbox" data-proto="s1_gewebe" /> Gewebe</label>
+                <label><input type="checkbox" data-proto="s1_sonstiges" /> Sonstiges</label>
+              </div>
+              <label class="proto-bem">Bemerkung:<input data-proto="s1_bem" /></label>
+            </div>
+            <div class="proto-pirsch-block">
+              <strong>Stück II</strong>
+              <div class="proto-pirsch-grid">
+                <label><input type="checkbox" data-proto="s2_schweiss" /> Schweiß</label>
+                <label><input type="checkbox" data-proto="s2_knochen" /> Knochen</label>
+                <label><input type="checkbox" data-proto="s2_schnitthaar" /> Schnitthaar</label>
+                <label><input type="checkbox" data-proto="s2_kugelriss" /> Kugelriss</label>
+                <label><input type="checkbox" data-proto="s2_gewebe" /> Gewebe</label>
+                <label><input type="checkbox" data-proto="s2_sonstiges" /> Sonstiges</label>
+              </div>
+              <label class="proto-bem">Bemerkung:<input data-proto="s2_bem" /></label>
+            </div>
+          </div>
+          <div class="proto-figure proto-range" data-fig="range">
+            <svg viewBox="0 0 300 300" aria-hidden="true">
+              <line x1="150" y1="14" x2="150" y2="286" stroke="#cfcfcf" stroke-width="0.6" />
+              <line x1="14" y1="150" x2="286" y2="150" stroke="#cfcfcf" stroke-width="0.6" />
+              <circle cx="150" cy="150" r="42" fill="none" stroke="#9a9a9a" stroke-width="1" />
+              <circle cx="150" cy="150" r="86" fill="none" stroke="#9a9a9a" stroke-width="1" />
+              <circle cx="150" cy="150" r="130" fill="none" stroke="#9a9a9a" stroke-width="1" />
+              <line x1="150" y1="36" x2="150" y2="14" stroke="#5a5a5a" stroke-width="1.6" />
+              <path d="M150 8 L146 18 L154 18 Z" fill="#5a5a5a" />
+              <text x="150" y="32" text-anchor="middle" font-size="11" fill="#5a5a5a">Blickrichtung</text>
+              <text x="106" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">30 m</text>
+              <text x="62" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">60 m</text>
+              <text x="18" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">100 m</text>
+              <g stroke="#444" stroke-width="1.3" fill="none">
+                <path d="M141 150 L159 150 L156 158 L144 158 Z" fill="#444" />
+                <path d="M139 150 L150 142 L161 150" />
+                <line x1="146" y1="158" x2="142" y2="167" />
+                <line x1="154" y1="158" x2="158" y2="167" />
+                <line x1="147" y1="161" x2="153" y2="161" />
+              </g>
+            </svg>
+            <canvas></canvas>
+          </div>
+        </div>
+
+        <div class="proto-meldung">
+          <label><span>Meldung Nachsuchen an:</span><input data-proto="meldung" /></label>
+          <label><span>Nachsuchenführer:</span><input data-proto="nsf_name" /></label>
+          <label><span>Bemerkungen NSF:</span><input data-proto="nsf_bem" /></label>
+        </div>
+      </div>
+        <div class="proto-actions">
+          <button type="button" id="proto-pdf" class="primary-btn">PDF herunterladen</button>
+          <button type="button" id="proto-print" class="cancel-btn">Drucken</button>
+          <button type="button" id="proto-reset" class="cancel-btn">Zurücksetzen</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" hidden></div>
+    <script type="module" src="nachsuche.js"></script>
+  </body>
+</html>

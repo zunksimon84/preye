@@ -24,7 +24,6 @@
 
       <nav class="nav" id="nav" aria-label="Hauptmenü">
         <a href="#revier">Revier</a>
-        <a href="#strecke">Strecke</a>
         <a href="#drueckjagd">Drückjagd</a>
         <a href="#standkarte">Standkarte</a>
         <a href="#nachsuche">Nachsuche</a>
@@ -49,7 +48,7 @@
         <div class="hero-copy">
           <p class="eyebrow eyebrow--light">Peenwerder Jagd</p>
           <h1>Wo das Wild wirklich steht</h1>
-          <p class="hero-sub">Strecken, Stände und Drückjagden für ein Revier — an einem Ort, auf jedem Handy, auch ohne Empfang.</p>
+          <p class="hero-sub">Jeder Stand, jede Strecke, jedes Revier an einem Ort.</p>
           <div class="hero-actions">
             <a class="cta cta--solid" href="index.html">Karte öffnen</a>
             <a class="cta cta--ghost" href="standkarte.html">Zur Standkarte</a>
@@ -70,57 +69,46 @@
         <p class="statement-sub">Jede Strecke, jeder Stand, jede Drückjagd an einem Ort — statt auf Zetteln, in WhatsApp-Gruppen und in vier verschiedenen Excel-Tabellen.</p>
       </section>
 
-      <!-- ------------------------------------------------------- Revier -->
-      <section class="feature" id="revier">
-        <div class="feature-inner">
-          <div class="feature-copy">
-            <p class="eyebrow">Revier</p>
-            <h3>Alle Stände auf einer Karte</h3>
-            <p>99 Kanzeln, Klettersitze und Pirschwege, aufgeteilt auf Hauptrevier, Nord, Nordrand und Ost. Gepflegt wird an einer einzigen Stelle: Du zeichnest einen neuen Stand in Google My Maps ein, der Rest zieht stündlich automatisch nach.</p>
-            <ul class="ticks">
-              <li>Satellitenkarte mit allen Ständen und Gebieten</li>
-              <li>Klettersitze mit eigener Position, direkt vom Handy erfasst</li>
-              <li>Eine Quelle für alles — keine zweite Liste, die veraltet</li>
-            </ul>
-            <a class="link-arrow" href="index.html">Karte öffnen</a>
-          </div>
-          <div class="feature-visual">
-            <div class="viz viz--areas">
+      <!-- ---------------------------------------------------- Dashboard -->
+      <section class="dash" id="revier">
+        <div class="dash-head">
+          <p class="eyebrow">Revier</p>
+          <h2>Dein Revier auf einen Blick</h2>
+          <p class="statement-sub">Live aus derselben Quelle wie die Karte — keine gepflegte Zweitliste.</p>
+        </div>
+
+        <div class="dash-grid">
+          <article class="card card--wide">
+            <h3>Stände im Revier</h3>
+            <p class="card-big"><span id="d-posts">99</span><small>Stände</small></p>
+            <div class="viz--areas" id="d-areas">
               <div class="area" style="--w: 72"><span>Hauptrevier</span><b>72</b></div>
               <div class="area" style="--w: 12"><span>Nord</span><b>12</b></div>
               <div class="area" style="--w: 10"><span>Nordrand</span><b>10</b></div>
               <div class="area" style="--w: 2"><span>Ost</span><b>2</b></div>
-              <div class="area" style="--w: 3"><span>Klettersitz &amp; Pirsch</span><b>3</b></div>
             </div>
-          </div>
-        </div>
-      </section>
+          </article>
 
-      <!-- ------------------------------------------------------ Strecke -->
-      <section class="feature feature--alt" id="strecke">
-        <div class="feature-inner">
-          <div class="feature-copy">
-            <p class="eyebrow">Strecke</p>
-            <h3>Die Heatmap zeigt, wo es sich lohnt</h3>
-            <p>Eintragen dauert zwanzig Sekunden: Kanzel, Wildart, Geschlecht, Anzahl. Aus den Einträgen einer Saison wächst eine Wärmekarte, die zeigt, welche Stände tragen und welche nur schön gelegen sind.</p>
-            <ul class="ticks">
-              <li>Filter nach Wildart und Zeitraum, bis auf den Tag</li>
-              <li>Strecken-Übersicht mit Saison-Verlauf und Top-Ständen</li>
-              <li>Rollt zum 1. April automatisch in die neue Saison</li>
+          <article class="card" id="d-top-card">
+            <h3>Bester Stand je Gebiet</h3>
+            <ol class="toplist" id="d-top">
+              <li class="toplist-empty">wird geladen …</li>
+            </ol>
+            <p class="card-note">Erlegungen dieser Saison</p>
+          </article>
+
+          <article class="card">
+            <h3>Strecke dieser Saison</h3>
+            <p class="card-big"><span id="d-total">47</span><small>Stück</small></p>
+            <ul class="species" id="d-species">
+              <li class="toplist-empty">wird geladen …</li>
             </ul>
-            <a class="link-arrow" href="index.html">Heatmap ansehen</a>
-          </div>
-          <div class="feature-visual">
-            <div class="viz viz--heat" aria-hidden="true">
-              <span style="--x: 18%; --y: 62%; --s: 1.4"></span>
-              <span style="--x: 34%; --y: 38%; --s: 0.8"></span>
-              <span style="--x: 52%; --y: 55%; --s: 1.9"></span>
-              <span style="--x: 68%; --y: 30%; --s: 1.1"></span>
-              <span style="--x: 76%; --y: 66%; --s: 0.7"></span>
-              <span style="--x: 44%; --y: 74%; --s: 1.0"></span>
-            </div>
-            <p class="viz-caption">47 Stück auf 22 Ständen in dieser Saison</p>
-          </div>
+            <p class="card-note" id="d-season">1. April – 31. März</p>
+          </article>
+        </div>
+
+        <div class="dash-cta">
+          <a class="cta cta--dark" href="index.html">Dein Revier</a>
         </div>
       </section>
 
@@ -136,7 +124,7 @@
               <li>Revierkarte färbt jede Runde in einem eigenen Ton</li>
               <li>Freigaben je Wildart und Altersklasse, direkt in der Infomail</li>
             </ul>
-            <a class="link-arrow" href="events.html">Jagdplanungstool</a>
+            <a class="cta cta--dark" href="events.html">Zur Drückjagdplanung</a>
           </div>
           <div class="feature-visual">
             <div class="viz viz--rounds">
@@ -146,6 +134,20 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- ----------------------------------------------- Zwei Einstiege -->
+      <section class="actions">
+        <a class="action" href="nachsuche.html">
+          <span class="action-tag">Ohne Revier, sofort</span>
+          <b>Nachsuche melden</b>
+          <span class="action-sub">Anschussprotokoll frei ausfüllen, PDF herunterladen und dem Nachsuchenführer schicken. Kein Login, nichts wird gespeichert.</span>
+        </a>
+        <a class="action" href="standkarte.html">
+          <span class="action-tag">Für den Jagdtag</span>
+          <b>Standkarte ausfüllen</b>
+          <span class="action-sub">Zeiten, Freigaben, Kontakte und Dein Stand — dazu die Liste für Gesehenes und Beschossenes. Läuft auch ohne Empfang.</span>
+        </a>
       </section>
 
       <!-- -------------------------------------------------- Standkarte -->
@@ -192,7 +194,7 @@
               <li>Sitz der Kugel auf der Wildpose markieren</li>
               <li>Als PDF an den Nachsuchenführer, offene Nachsuchen auf der Karte</li>
             </ul>
-            <a class="link-arrow" href="index.html#protokoll">Protokoll ansehen</a>
+            <a class="cta cta--dark" href="nachsuche.html">Nachsuche melden</a>
           </div>
           <div class="feature-visual">
             <div class="viz viz--rings" aria-hidden="true">
@@ -239,18 +241,18 @@
           <a href="index.html">Karte &amp; Heatmap</a>
           <a href="events.html">Jagdplanungstool</a>
           <a href="standkarte.html">Standkarte</a>
-          <a href="index.html#protokoll">Anschussprotokoll</a>
+          <a href="nachsuche.html">Anschussprotokoll</a>
         </nav>
         <nav aria-label="Revier">
           <p class="foot-head">Revier</p>
           <a href="#revier">Stände</a>
-          <a href="#strecke">Strecke</a>
           <a href="#drueckjagd">Drückjagd</a>
         </nav>
       </div>
       <p class="foot-legal">Privater Zugang · Peenwerder &amp; NPA Müritz</p>
     </footer>
 
+    <script src="config.js"></script>
     <script src="landing.js"></script>
   </body>
 </html>
