@@ -17,10 +17,18 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 const ROWS = 10; // same ten lines as the printed card
 
+// Wildarten come from the backend (same list the Strecke form uses); this is
+// only what we show until the bootstrap call lands.
+const SPECIES_FALLBACK = [
+  "Rehwild", "Schwarzwild", "Rotwild", "Damwild",
+  "Fuchs", "Dachs", "Waschbär", "Hase", "Sonstiges",
+];
+
 const state = {
   events: [],
   detail: null,   // { event, hunters, squads, freigaben_matrix }
   posts: [],      // Kanzeln from the bootstrap endpoint (for coordinates)
+  species: SPECIES_FALLBACK.slice(),
   me: "",
 };
 
@@ -281,7 +289,9 @@ function readList() {
 function saveList() {
   const rows = $$("#stk-tbody tr").map((tr) => ({
     time: $(".stk-in-time", tr).value,
-    wild: $(".stk-in-wild", tr).value,
+    art: $(".stk-in-art", tr).value,
+    sex: (($(".gender-btn.active", tr) || {}).dataset || {}).gender || "",
+    count: $(".stk-in-count", tr).value,
     gesehen: $(".stk-cb-gesehen", tr).checked,
     beschossen: $(".stk-cb-beschossen", tr).checked,
     liegt: $(".stk-cb-liegt", tr).checked,
@@ -290,23 +300,57 @@ function saveList() {
   try { localStorage.setItem(listKey(), JSON.stringify(rows)); } catch {}
 }
 
+// 1–20 and a "20+" bucket for the rare Rotte that nobody counted exactly.
+function countOptions(selected) {
+  let out = `<option value="">Anzahl</option>`;
+  for (let n = 1; n <= 20; n++) {
+    out += `<option${String(selected) === String(n) ? " selected" : ""}>${n}</option>`;
+  }
+  out += `<option${selected === "20+" ? " selected" : ""}>20+</option>`;
+  return out;
+}
+
+function speciesOptions(selected) {
+  return `<option value="">Wildart</option>` + state.species.map((s) =>
+    `<option${s === selected ? " selected" : ""}>${escapeHtml(s)}</option>`).join("");
+}
+
 function renderList() {
   const saved = readList();
   const tbody = $("#stk-tbody");
   let html = "";
   for (let i = 0; i < ROWS; i++) {
     const r = saved[i] || {};
+    const n = i + 1;
     html += `<tr>
-      <td class="stk-col-nr" data-label="Nr.">${i + 1}</td>
-      <td class="stk-col-time" data-label="Uhrzeit"><input type="time" class="stk-in-time" value="${escapeHtml(r.time || "")}" aria-label="Uhrzeit Zeile ${i + 1}" /></td>
-      <td class="stk-col-wild" data-label="Wildart / Geschlecht / Anzahl"><input type="text" class="stk-in-wild" value="${escapeHtml(r.wild || "")}" placeholder="Wildart / Geschlecht / Anzahl" aria-label="Wildart Zeile ${i + 1}" /></td>
-      <td data-label="gesehen"><input type="checkbox" class="stk-cb-gesehen"${r.gesehen ? " checked" : ""} aria-label="gesehen Zeile ${i + 1}" /></td>
-      <td data-label="beschossen"><input type="checkbox" class="stk-cb-beschossen"${r.beschossen ? " checked" : ""} aria-label="beschossen Zeile ${i + 1}" /></td>
-      <td data-label="Stück liegt"><input type="checkbox" class="stk-cb-liegt"${r.liegt ? " checked" : ""} aria-label="Stück liegt Zeile ${i + 1}" /></td>
-      <td data-label="Nachsuche"><input type="checkbox" class="stk-cb-nachsuche"${r.nachsuche ? " checked" : ""} aria-label="Nachsuche Zeile ${i + 1}" /></td>
+      <td class="stk-col-nr" data-label="Nr.">${n}</td>
+      <td class="stk-col-time" data-label="Uhrzeit"><input type="time" class="stk-in-time" value="${escapeHtml(r.time || "")}" aria-label="Uhrzeit Zeile ${n}" /></td>
+      <td class="stk-col-art" data-label="Wildart"><select class="stk-in-art" aria-label="Wildart Zeile ${n}">${speciesOptions(r.art || "")}</select></td>
+      <td class="stk-col-sex" data-label="Geschlecht">
+        <div class="gender-buttons" role="group" aria-label="Geschlecht Zeile ${n}">
+          <button type="button" class="gender-btn${r.sex === "m" ? " active" : ""}" data-gender="m" aria-label="Männlich" aria-pressed="${r.sex === "m"}">♂</button>
+          <button type="button" class="gender-btn${r.sex === "w" ? " active" : ""}" data-gender="w" aria-label="Weiblich" aria-pressed="${r.sex === "w"}">♀</button>
+        </div>
+      </td>
+      <td class="stk-col-count" data-label="Anzahl"><select class="stk-in-count" aria-label="Anzahl Zeile ${n}">${countOptions(r.count || "")}</select></td>
+      <td data-label="gesehen"><input type="checkbox" class="stk-cb-gesehen"${r.gesehen ? " checked" : ""} aria-label="gesehen Zeile ${n}" /></td>
+      <td data-label="beschossen"><input type="checkbox" class="stk-cb-beschossen"${r.beschossen ? " checked" : ""} aria-label="beschossen Zeile ${n}" /></td>
+      <td data-label="Stück liegt"><input type="checkbox" class="stk-cb-liegt"${r.liegt ? " checked" : ""} aria-label="Stück liegt Zeile ${n}" /></td>
+      <td data-label="Nachsuche"><input type="checkbox" class="stk-cb-nachsuche"${r.nachsuche ? " checked" : ""} aria-label="Nachsuche Zeile ${n}" /></td>
     </tr>`;
   }
   tbody.innerHTML = html;
+}
+
+// The species list only arrives with the bootstrap call, which can land after
+// the card is already on screen. Swap the options in without touching what
+// the hunter has picked in the meantime.
+function refreshSpeciesOptions() {
+  $$("#stk-tbody .stk-in-art").forEach((sel) => {
+    const current = sel.value;
+    sel.innerHTML = speciesOptions(current);
+    sel.value = current;
+  });
 }
 
 // Plain-text version of the filled list, for WhatsApp / mail / share sheet.
@@ -321,18 +365,24 @@ function buildReport() {
     "Schütze: " + (state.me || "—") + (stand ? " · Stand: " + stand : ""),
     "",
   ];
-  const rows = readList().filter((r) => r && (r.time || r.wild || r.gesehen || r.beschossen || r.liegt || r.nachsuche));
+  const rows = readList().filter((r) => r &&
+    (r.time || r.art || r.sex || r.count || r.gesehen || r.beschossen || r.liegt || r.nachsuche));
   if (!rows.length) {
     lines.push("Keine Beobachtungen eingetragen.");
   } else {
     rows.forEach((r, i) => {
+      const wild = [
+        r.art || "",
+        r.sex === "m" ? "♂" : r.sex === "w" ? "♀" : "",
+        r.count ? r.count + "×" : "",
+      ].filter(Boolean).join(" ");
       const flags = [
         r.gesehen ? "gesehen" : "",
         r.beschossen ? "beschossen" : "",
         r.liegt ? "Stück liegt" : "",
         r.nachsuche ? "NACHSUCHE" : "",
       ].filter(Boolean).join(", ");
-      lines.push(`${i + 1}. ${r.time || "--:--"} ${r.wild || ""}${flags ? " — " + flags : ""}`.trim());
+      lines.push(`${i + 1}. ${r.time || "--:--"} ${wild}${flags ? " — " + flags : ""}`.trim());
     });
   }
   return lines.join("\n");
@@ -483,7 +533,7 @@ async function selectEvent(id) {
   }
   localStorage.setItem("preye.stk.event", id);
   setParams(id, state.me);
-  loadPosts(); // background, only needed for the navigation link
+  loadBootstrap(); // background: Kanzel coordinates + the Wildart list
   if (state.me) renderCard(); else renderHunterPicker();
 }
 
@@ -496,15 +546,22 @@ function selectHunter(name) {
   renderCard();
 }
 
-async function loadPosts() {
+// Kanzel coordinates (for the route link) and the Wildart list, both off the
+// same bootstrap call the map page uses.
+async function loadBootstrap() {
   try {
     const data = await fetchJson("bootstrap");
     state.posts = data.posts || [];
-    if (!$("#stk-card").hidden) renderMine();
+    if (Array.isArray(data.species) && data.species.length) state.species = data.species;
+    if (!$("#stk-card").hidden) {
+      renderMine();
+      refreshSpeciesOptions();
+    }
   } catch {
     try {
       const res = await fetch("posts.json");
       state.posts = await res.json();
+      if (!$("#stk-card").hidden) renderMine();
     } catch {}
   }
 }
@@ -536,6 +593,22 @@ function wireUi() {
   const tbody = $("#stk-tbody");
   tbody.addEventListener("input", saveList);
   tbody.addEventListener("change", saveList);
+  // Geschlecht: one or none per row — tapping the active symbol clears it.
+  // Same behaviour as the gender toggle on the Strecke form.
+  tbody.addEventListener("click", (e) => {
+    const btn = e.target.closest(".gender-btn");
+    if (!btn) return;
+    const wasActive = btn.classList.contains("active");
+    $$(".gender-btn", btn.closest("tr")).forEach((o) => {
+      o.classList.remove("active");
+      o.setAttribute("aria-pressed", "false");
+    });
+    if (!wasActive) {
+      btn.classList.add("active");
+      btn.setAttribute("aria-pressed", "true");
+    }
+    saveList();
+  });
   $("#stk-hunter-back").addEventListener("click", resetToEventPicker);
   $("#stk-hunter-free-go").addEventListener("click", () => {
     const v = $("#stk-hunter-free").value.trim();

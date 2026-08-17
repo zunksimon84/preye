@@ -3984,8 +3984,11 @@ body.stk-page {
 }
 .stk-table .stk-col-nr { width: 26px; font-weight: 700; background: var(--bg); }
 .stk-table .stk-col-time { width: 82px; }
+.stk-table .stk-col-art { width: 116px; }
+.stk-table .stk-col-sex { width: 74px; }
+.stk-table .stk-col-count { width: 86px; }
 .stk-table input[type="time"],
-.stk-table input[type="text"] {
+.stk-table select {
   width: 100%;
   font: inherit;
   font-size: 12px;
@@ -3994,11 +3997,21 @@ body.stk-page {
   border-radius: 4px;
   background: #fff;
   min-width: 0;
+  -webkit-appearance: auto;
+  appearance: auto;
 }
 .stk-table input[type="checkbox"] { width: 20px; height: 20px; }
-/* The Wildart placeholder only earns its place on the phone, where the
-   header row is gone. */
-.stk-table input::placeholder { color: transparent; }
+
+/* Reuse the ♂ / ♀ toggle from the Strecke form, shrunk to table size. */
+.stk-table .gender-buttons { justify-content: center; align-self: center; gap: 3px; }
+.stk-table .gender-btn {
+  width: 32px;
+  height: 28px;
+  font-size: 15px;
+  border-radius: 5px;
+  line-height: 1;
+  padding: 0;
+}
 
 .stk-actions {
   display: flex;
@@ -4067,13 +4080,19 @@ body.stk-page {
     color: var(--muted);
   }
   .stk-table td.stk-col-time { flex: 0 0 116px; }
-  /* Wildart gets its own line, the four flags share the one below it. */
-  .stk-table td.stk-col-wild { flex: 1 1 100%; }
+  /* Wildart / Geschlecht / Anzahl share the second line, the four flags the
+     third. */
+  .stk-table td.stk-col-art { flex: 1 1 130px; }
+  .stk-table td.stk-col-sex { flex: 0 0 auto; }
+  /* Anzahl eats the rest of its line so the four flags always start a fresh
+     one and land as a tidy 2×2. */
+  .stk-table td.stk-col-count { flex: 1 1 86px; }
+  .stk-table .gender-btn { width: 38px; height: 34px; font-size: 17px; }
   .stk-table td[data-label="gesehen"],
   .stk-table td[data-label="beschossen"],
   .stk-table td[data-label="Stück liegt"],
   .stk-table td[data-label="Nachsuche"] {
-    flex: 0 0 auto;
+    flex: 0 0 calc(50% - 4px);
     display: flex;
     align-items: center;
     gap: 4px;
@@ -4087,7 +4106,8 @@ body.stk-page {
     content: attr(data-label);
   }
   .stk-table input[type="checkbox"] { width: 22px; height: 22px; }
-  .stk-table input::placeholder { color: var(--muted); opacity: 0.7; }
+  .stk-table input[type="time"],
+  .stk-table select { font-size: 13px; padding: 6px 4px; }
   .stk-mine-row,
   .stk-dl-row { grid-template-columns: 96px 1fr; }
 }
@@ -4105,6 +4125,7 @@ body.stk-page {
      backgrounds — the card is recognisable by them. */
   .stk-banner,
   .stk-table th,
+  .stk-table .gender-btn.active,
   .stk-mine {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
