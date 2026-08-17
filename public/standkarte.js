@@ -20,8 +20,8 @@ const ROWS = 10; // same ten lines as the printed card
 // Wildarten come from the backend (same list the Strecke form uses); this is
 // only what we show until the bootstrap call lands.
 const SPECIES_FALLBACK = [
-  "Rehwild", "Schwarzwild", "Rotwild", "Damwild",
-  "Fuchs", "Dachs", "Waschbär", "Hase", "Sonstiges",
+  "Rotwild", "Damwild", "Schwarzwild", "Mufflon", "Rehwild",
+  "Fuchs", "Dachs", "Waschbär", "Hase", "Wolf", "Sonstiges",
 ];
 
 const state = {

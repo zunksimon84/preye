@@ -245,7 +245,8 @@ async function bootstrap() {
   const res = await fetch("posts.json");
   state.posts = await res.json();
   state.hunters = [];
-  state.species = ["Rehwild", "Schwarzwild", "Rotwild", "Damwild", "Fuchs", "Dachs", "Hase", "Sonstiges"];
+  state.species = ["Rotwild", "Damwild", "Schwarzwild", "Mufflon", "Rehwild",
+                   "Fuchs", "Dachs", "Waschbär", "Hase", "Wolf", "Sonstiges"];
   showToast("Backend nicht konfiguriert — nur Anzeige", "error", 5000);
 }
 

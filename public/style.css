@@ -18,13 +18,11 @@
   --lime: #b5d33a;
   --lime-bright: #c6e03c;
   --charcoal: #2c2f34;
-  --brand-gradient: linear-gradient(100deg, var(--pool-blue) 0%, var(--brand-green) 52%, var(--lime) 100%);
-  /* Phone bars are only a few centimetres long, so the desktop ramp arrives
-     washed out — the pure colours never get any room. These push the ends
-     further apart and give each stop real estate: deeper blue behind the
-     wordmark (white stays legible on it), a more saturated green, and the
-     lime reached well before the edge. */
-  --brand-gradient-strong: linear-gradient(100deg,
+  /* Five stops rather than three: a deeper blue behind the wordmark (white
+     stays legible on it), a saturated sea green so the blue→green handoff
+     doesn't go dull, and the lime reached before the edge so the warm end
+     actually shows. */
+  --brand-gradient: linear-gradient(100deg,
     var(--pool-blue-deep) 0%,
     var(--pool-blue) 20%,
     var(--sea-green) 40%,
@@ -4207,15 +4205,4 @@ body.stk-page {
   .stk-grid { grid-template-columns: 1fr 1fr; }
   .stk-block--freigaben { grid-column: 1 / -1; }
   @page { size: A4 portrait; margin: 12mm; }
-}
-
-/* The Standkarte and RSVP bars stay a single horizontal row on the phone, so
-   they take the stronger horizontal ramp instead of the stacked one. Lives at
-   the end of the file because both bars are defined further up and an id
-   selector in a media query carries no extra specificity. */
-@media (max-width: 600px) {
-  #stk-topbar,
-  #rsvp-topbar {
-    background: var(--brand-gradient-strong);
-  }
 }

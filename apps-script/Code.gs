@@ -4,15 +4,20 @@
 //   Execute as: Me      Who has access: Anyone
 // Then paste the deployment URL into public/config.js as APPS_SCRIPT_URL.
 
+// Order matters — every species dropdown in the app renders this list as it
+// stands: the big game first in the order it gets called on a Drückjagd, then
+// the rest, with Wolf and Sonstiges at the foot.
 const SPECIES = [
-  "Rehwild",
-  "Schwarzwild",
   "Rotwild",
   "Damwild",
+  "Schwarzwild",
+  "Mufflon",
+  "Rehwild",
   "Fuchs",
   "Dachs",
   "Waschbär",
   "Hase",
+  "Wolf",
   "Sonstiges",
 ];
 
