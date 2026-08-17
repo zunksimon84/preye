@@ -11,13 +11,34 @@
      existing brand lime, so every lime button on the site still ties back
      into the bar. Used as the primary design element across the topbars. */
   --pool-blue: #0b7c95;
-  --pool-blue-deep: #075c70; /* darker step for the mobile bar + theme-color */
+  --pool-blue-deep: #045d75; /* darker step for the phone bars + theme-color */
   --brand-green: #3b9e6b;
+  --sea-green: #0f9a78;      /* keeps the blue→green handoff from going dull */
+  --brand-green-vivid: #2fa35f;
   --lime: #b5d33a;
+  --lime-bright: #c6e03c;
   --charcoal: #2c2f34;
   --brand-gradient: linear-gradient(100deg, var(--pool-blue) 0%, var(--brand-green) 52%, var(--lime) 100%);
+  /* Phone bars are only a few centimetres long, so the desktop ramp arrives
+     washed out — the pure colours never get any room. These push the ends
+     further apart and give each stop real estate: deeper blue behind the
+     wordmark (white stays legible on it), a more saturated green, and the
+     lime reached well before the edge. */
+  --brand-gradient-strong: linear-gradient(100deg,
+    var(--pool-blue-deep) 0%,
+    var(--pool-blue) 20%,
+    var(--sea-green) 40%,
+    var(--brand-green-vivid) 62%,
+    var(--lime) 86%,
+    var(--lime-bright) 100%);
   /* Same ramp turned top-to-bottom, for the stacked phone topbar. */
-  --brand-gradient-v: linear-gradient(180deg, var(--pool-blue) 0%, var(--brand-green) 55%, var(--lime) 100%);
+  --brand-gradient-v: linear-gradient(180deg,
+    var(--pool-blue-deep) 0%,
+    var(--pool-blue) 22%,
+    var(--sea-green) 42%,
+    var(--brand-green-vivid) 64%,
+    var(--lime) 88%,
+    var(--lime-bright) 100%);
   --steel: #8a8e92; /* metallic grey accent, like the bullet jackets */
   --steel-dark: #4a4d52;
   /* Form surfaces — switched from a warm cream to a cool light grey
@@ -4186,4 +4207,15 @@ body.stk-page {
   .stk-grid { grid-template-columns: 1fr 1fr; }
   .stk-block--freigaben { grid-column: 1 / -1; }
   @page { size: A4 portrait; margin: 12mm; }
+}
+
+/* The Standkarte and RSVP bars stay a single horizontal row on the phone, so
+   they take the stronger horizontal ramp instead of the stacked one. Lives at
+   the end of the file because both bars are defined further up and an id
+   selector in a media query carries no extra specificity. */
+@media (max-width: 600px) {
+  #stk-topbar,
+  #rsvp-topbar {
+    background: var(--brand-gradient-strong);
+  }
 }
