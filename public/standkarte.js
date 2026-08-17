@@ -328,8 +328,9 @@ function renderList() {
       <td class="stk-col-art" data-label="Wildart"><select class="stk-in-art" aria-label="Wildart Zeile ${n}">${speciesOptions(r.art || "")}</select></td>
       <td class="stk-col-sex" data-label="Geschlecht">
         <div class="gender-buttons" role="group" aria-label="Geschlecht Zeile ${n}">
-          <button type="button" class="gender-btn${r.sex === "m" ? " active" : ""}" data-gender="m" aria-label="Männlich" aria-pressed="${r.sex === "m"}">♂</button>
-          <button type="button" class="gender-btn${r.sex === "w" ? " active" : ""}" data-gender="w" aria-label="Weiblich" aria-pressed="${r.sex === "w"}">♀</button>
+          <button type="button" class="gender-btn${r.sex === "m" ? " active" : ""}" data-gender="m" title="Männlich" aria-label="Männlich" aria-pressed="${r.sex === "m"}">♂</button>
+          <button type="button" class="gender-btn${r.sex === "w" ? " active" : ""}" data-gender="w" title="Weiblich" aria-label="Weiblich" aria-pressed="${r.sex === "w"}">♀</button>
+          <button type="button" class="gender-btn${r.sex === "x" ? " active" : ""}" data-gender="x" title="Gemischt — Rotte/Rudel aus männlichen und weiblichen Stücken" aria-label="Gemischt" aria-pressed="${r.sex === "x"}">♂♀</button>
         </div>
       </td>
       <td class="stk-col-count" data-label="Anzahl"><select class="stk-in-count" aria-label="Anzahl Zeile ${n}">${countOptions(r.count || "")}</select></td>
@@ -373,7 +374,7 @@ function buildReport() {
     rows.forEach((r, i) => {
       const wild = [
         r.art || "",
-        r.sex === "m" ? "♂" : r.sex === "w" ? "♀" : "",
+        r.sex === "m" ? "♂" : r.sex === "w" ? "♀" : r.sex === "x" ? "⚥ gemischt" : "",
         r.count ? r.count + "×" : "",
       ].filter(Boolean).join(" ");
       const flags = [

@@ -472,6 +472,14 @@ a.filter-btn {
   border-color: #c2185b;
 }
 
+/* "Gemischt" — a Rotte with both sexes in it. Only the Standkarte's
+   Beobachtungsliste offers it; the Strecke form logs single pieces. */
+.gender-btn[data-gender="x"].active {
+  background: #6a3fb5;
+  color: #fff;
+  border-color: #6a3fb5;
+}
+
 .ak-select {
   flex: 1;
 }
@@ -3985,7 +3993,7 @@ body.stk-page {
 .stk-table .stk-col-nr { width: 26px; font-weight: 700; background: var(--bg); }
 .stk-table .stk-col-time { width: 82px; }
 .stk-table .stk-col-art { width: 116px; }
-.stk-table .stk-col-sex { width: 74px; }
+.stk-table .stk-col-sex { width: 100px; }
 .stk-table .stk-col-count { width: 86px; }
 .stk-table input[type="time"],
 .stk-table select {
@@ -4005,13 +4013,15 @@ body.stk-page {
 /* Reuse the ♂ / ♀ toggle from the Strecke form, shrunk to table size. */
 .stk-table .gender-buttons { justify-content: center; align-self: center; gap: 3px; }
 .stk-table .gender-btn {
-  width: 32px;
+  width: 29px;
   height: 28px;
   font-size: 15px;
   border-radius: 5px;
   line-height: 1;
   padding: 0;
 }
+/* "Gemischt" carries both symbols, so it needs a wider box. */
+.stk-table .gender-btn[data-gender="x"] { width: 38px; font-size: 13px; letter-spacing: -1px; }
 
 .stk-actions {
   display: flex;
@@ -4088,6 +4098,7 @@ body.stk-page {
      one and land as a tidy 2×2. */
   .stk-table td.stk-col-count { flex: 1 1 86px; }
   .stk-table .gender-btn { width: 38px; height: 34px; font-size: 17px; }
+  .stk-table .gender-btn[data-gender="x"] { width: 46px; font-size: 14px; }
   .stk-table td[data-label="gesehen"],
   .stk-table td[data-label="beschossen"],
   .stk-table td[data-label="Stück liegt"],
