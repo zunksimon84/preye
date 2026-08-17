@@ -4,3 +4,6 @@ node_modules/
 public/config.js
 .DS_Store
 *.log
+
+# Browser-Automatisierung legt hier Snapshots und Logs ab.
+.playwright-cli/
