@@ -4,51 +4,210 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b7c95" />
-    <title>PREYE — Anschussprotokoll</title>
+    <title>PREYE 👁 Peenwerder Jagd</title>
     <link rel="icon" type="image/png" href="favicon-preye.png" />
     <link rel="apple-touch-icon" href="favicon-preye.png" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body class="nachsuche-page">
-    <header id="stk-topbar">
+  <body>
+    <div id="gate" hidden>
+      <div class="gate-card">
+        <div class="gate-brand">
+          <span class="brand-pray">PREYE</span>
+          <img class="brand-eye" src="preye-mark.png" alt="" />
+        </div>
+        <p class="gate-sub">Privater Zugang</p>
+        <form id="gate-form" autocomplete="on">
+          <input id="gate-pw" type="password" autocomplete="current-password"
+                 placeholder="Passwort" required />
+          <button type="submit">Öffnen</button>
+        </form>
+        <p id="gate-error" class="gate-error" hidden></p>
+      </div>
+    </div>
+
+    <header id="topbar">
       <h1>
         <a href="index.html" class="brand-link" aria-label="Zur Startseite">
           <span class="brand-pray">PREYE</span>
           <img class="brand-eye" src="preye-mark.png" alt="" />
         </a>
-        <span class="brand-place">Anschussprotokoll</span>
+        <span class="brand-place">Peenwerder Jagd</span>
       </h1>
-      <nav class="filters">
-        <a href="index.html" class="filter-btn">← Start</a>
-      </nav>
+      <div class="filters">
+        <select id="filter-species" aria-label="Wildart filtern">
+          <option value="">Alle Wildarten</option>
+        </select>
+        <select id="filter-range" aria-label="Zeitraum">
+          <option value="all">Gesamt</option>
+          <option value="season" selected>Diese Saison</option>
+          <option value="30d">30 Tage</option>
+          <option value="7d">7 Tage</option>
+          <option value="today">Heute</option>
+          <option value="custom">Datum…</option>
+        </select>
+        <input id="filter-date" type="date" hidden aria-label="Datum auswählen" />
+        <button id="strecke-btn" class="filter-btn" type="button">Strecke</button>
+        <a href="standkarte.html" class="filter-btn" id="standkarte-link"
+           title="Digitale Standkarte für die nächste Drückjagd">Standkarte</a>
+        <button id="protocol-btn" class="filter-btn filter-btn--alert" type="button"
+                aria-label="Nachsuche melden — Anschuss-Protokoll"
+                title="Nachsuche melden — Anschuss-Protokoll ausfüllen">Nachsuche melden</button>
+      </div>
     </header>
 
-    <main id="ns-main">
-      <p class="ns-intro">
-        Frei ausfüllbar, an kein Revier gebunden. Trag ein, was Du weißt, lade das
-        PDF herunter und schick es dem Nachsuchenführer — per WhatsApp, Mail oder
-        wie es gerade schnell geht. Es wird nichts gespeichert und nichts
-        übertragen; das Protokoll entsteht auf Deinem Gerät.
-      </p>
+    <div id="map" role="application" aria-label="Karte mit Hochsitzen und Heatmap"></div>
 
-      <section id="protocol-modal" class="ns-sheet">
-        <div class="protocol-body" id="protocol-sheet">
+    <button id="fab" aria-label="Strecke eintragen">+</button>
+
+    <aside id="leaderboard" hidden>
+      <strong>Top 5</strong>
+      <ol id="leaderboard-list"></ol>
+    </aside>
+
+    <div id="sheet-backdrop" hidden></div>
+    <section id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheet-title">
+      <header>
+        <h2 id="sheet-title">Strecke eintragen</h2>
+        <button id="sheet-close" aria-label="Schließen">×</button>
+      </header>
+      <form id="harvest-form">
+        <div class="mode-toggle" role="tablist" aria-label="Standortart">
+          <button type="button" class="mode-btn active" data-mode="post" role="tab" aria-selected="true">Kanzel</button>
+          <button type="button" class="mode-btn" data-mode="klettersitz" role="tab" aria-selected="false">Klettersitz</button>
+          <button type="button" class="mode-btn" data-mode="pirsch" role="tab" aria-selected="false">Pirsch</button>
+        </div>
+        <label data-mode-show="post">
+          Kanzel
+          <select id="f-post"></select>
+        </label>
+        <label data-mode-show="coords">
+          Bezeichnung <span class="muted">(optional)</span>
+          <input id="f-free-label" type="text" maxlength="40" autocomplete="off"
+                 placeholder="z.B. Eichenwiese-Süd" />
+        </label>
+        <div class="row" data-mode-show="coords">
+          <label>
+            Breitengrad
+            <input id="f-free-lat" type="number" step="0.000001" inputmode="decimal" />
+          </label>
+          <label>
+            Längengrad
+            <input id="f-free-lng" type="number" step="0.000001" inputmode="decimal" />
+          </label>
+        </div>
+        <button type="button" id="f-free-here" class="ghost" data-mode-show="coords">
+          Aktuelle Position
+        </button>
+        <label>
+          Jäger
+          <select id="f-hunter" required></select>
+        </label>
+        <label>
+          Wildart
+          <select id="f-species" required></select>
+        </label>
+        <div class="species-extras">
+          <div class="gender-buttons" role="group" aria-label="Geschlecht">
+            <button type="button" class="gender-btn" data-gender="m" aria-label="Männlich">♂</button>
+            <button type="button" class="gender-btn" data-gender="w" aria-label="Weiblich">♀</button>
+          </div>
+          <label class="ak-select">
+            Altersklasse <span class="muted">(optional)</span>
+            <select id="f-age">
+              <option value="">— keine Angabe</option>
+              <option value="0">AK 0</option>
+              <option value="1">AK 1</option>
+              <option value="2">AK 2</option>
+              <option value="3">AK 3</option>
+              <option value="4">AK 4</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Anzahl
+          <div class="counter">
+            <button type="button" data-step="-1" aria-label="Weniger">−</button>
+            <input id="f-count" type="number" min="1" max="20" value="1" inputmode="numeric" required />
+            <button type="button" data-step="1" aria-label="Mehr">+</button>
+          </div>
+        </label>
+        <label>
+          Datum & Uhrzeit
+          <input id="f-time" type="datetime-local" step="60" />
+        </label>
+        <label>
+          Notiz <span class="muted">(optional)</span>
+          <textarea id="f-notes" rows="2" maxlength="200"></textarea>
+        </label>
+        <button type="submit" id="f-submit">Eintragen</button>
+        <button type="button" id="f-cancel" class="cancel-btn">Abbrechen</button>
+      </form>
+      <aside id="history" hidden>
+        <h3>Bisherige Strecke</h3>
+        <ul id="history-list"></ul>
+      </aside>
+    </section>
+
+    <div id="strecke-backdrop" hidden></div>
+    <section id="strecke-modal" hidden aria-modal="true" role="dialog" aria-labelledby="strecke-title">
+      <header>
+        <h2 id="strecke-title">Strecke</h2>
+        <button id="strecke-close" aria-label="Schließen">×</button>
+      </header>
+      <div class="strecke-range muted" id="strecke-range"></div>
+      <div class="strecke-total">
+        <div class="big-number" id="strecke-total">—</div>
+        <div class="muted">Stück gesamt</div>
+      </div>
+      <ul id="strecke-list"></ul>
+      <div class="timeline" id="strecke-timeline" hidden>
+        <h3>Saison-Verlauf</h3>
+        <svg id="timeline-svg" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="timeline-axis">
+          <span>1. Apr</span>
+          <span id="timeline-today" class="muted"></span>
+          <span>31. Mär</span>
+        </div>
+      </div>
+      <button type="button" id="strecke-close-bottom" class="cancel-btn">Schließen</button>
+    </section>
+
+    <div id="protocol-backdrop" hidden></div>
+    <section id="protocol-modal" hidden aria-modal="true" role="dialog" aria-labelledby="protocol-title">
+      <header>
+        <h2 id="protocol-title">Anschuss-Protokoll</h2>
+        <button id="protocol-close" aria-label="Schließen">×</button>
+      </header>
+      <div class="protocol-body" id="protocol-sheet">
         <div class="proto-banner">
           <span class="proto-banner-title">ANSCHUSS-PROTOKOLL</span>
         </div>
 
         <div class="proto-loc">
-          <label class="proto-loc-row visible">
-            Ort / Stand
-            <input type="text" id="proto-free-stand" maxlength="80" autocomplete="off"
-                   placeholder="z.B. Kanzel Eichwerder Ost, Revier Musterhausen" />
-          </label>
-          <div class="proto-loc-row proto-loc-coords">
-            <label>Breitengrad <span class="muted">(optional)</span><input type="number" id="proto-loc-lat" step="0.000001" inputmode="decimal" /></label>
-            <label>Längengrad <span class="muted">(optional)</span><input type="number" id="proto-loc-lng" step="0.000001" inputmode="decimal" /></label>
+          <div class="proto-mode-toggle" role="tablist" aria-label="Standort">
+            <button type="button" class="proto-mode-btn active" data-pmode="post">Kanzel</button>
+            <button type="button" class="proto-mode-btn" data-pmode="klettersitz">Klettersitz</button>
+            <button type="button" class="proto-mode-btn" data-pmode="pirsch">Pirsch</button>
           </div>
-          <button type="button" id="proto-loc-here" class="ghost">Aktuelle Position</button>
+          <label class="proto-loc-row visible" data-pmode-show="post">
+            Stand / Kanzel
+            <select id="proto-post"></select>
+          </label>
+          <label class="proto-loc-row" data-pmode-show="coords">
+            Bezeichnung <span class="muted">(optional)</span>
+            <input type="text" id="proto-loc-label" maxlength="40" autocomplete="off"
+                   placeholder="z.B. Eichenwiese-Süd" />
+          </label>
+          <div class="proto-loc-row proto-loc-coords" data-pmode-show="coords">
+            <label>Breitengrad<input type="number" id="proto-loc-lat" step="0.000001" inputmode="decimal" /></label>
+            <label>Längengrad<input type="number" id="proto-loc-lng" step="0.000001" inputmode="decimal" /></label>
+          </div>
+          <button type="button" id="proto-loc-here" class="ghost" data-pmode-show="coords">Aktuelle Position</button>
         </div>
 
         <div class="proto-line">
@@ -215,16 +374,23 @@
           <label><span>Nachsuchenführer:</span><input data-proto="nsf_name" /></label>
           <label><span>Bemerkungen NSF:</span><input data-proto="nsf_bem" /></label>
         </div>
+        <label class="proto-email">
+          E-Mail (Protokoll als PDF senden — optional):
+          <input type="email" data-proto="recipient" inputmode="email" autocomplete="email"
+                 placeholder="empfaenger@beispiel.de" />
+        </label>
       </div>
-        <div class="proto-actions">
-          <button type="button" id="proto-pdf" class="primary-btn">PDF herunterladen</button>
-          <button type="button" id="proto-print" class="cancel-btn">Drucken</button>
-          <button type="button" id="proto-reset" class="cancel-btn">Zurücksetzen</button>
-        </div>
-      </section>
-    </main>
+      <div class="proto-actions">
+        <button type="button" id="proto-submit">Nachsuche melden</button>
+        <button type="button" id="proto-print" class="cancel-btn">Drucken</button>
+        <button type="button" id="proto-reset" class="cancel-btn">Zurücksetzen</button>
+        <button type="button" id="proto-close-bottom" class="cancel-btn">Schließen</button>
+      </div>
+    </section>
 
     <div id="toast" hidden></div>
-    <script type="module" src="nachsuche.js"></script>
+
+    <script src="config.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

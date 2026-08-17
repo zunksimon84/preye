@@ -3,394 +3,256 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b7c95" />
-    <title>PREYE 👁 Peenwerder Jagd</title>
+    <meta name="theme-color" content="#04141c" />
+    <title>PREYE — Revier, Strecke, Drückjagd</title>
+    <meta name="description" content="Strecken, Stände und Drückjagden für ein Revier, an einem Ort. Heatmap, Jagdplanungstool und digitale Standkarte für die Peenwerder Jagd." />
     <link rel="icon" type="image/png" href="favicon-preye.png" />
     <link rel="apple-touch-icon" href="favicon-preye.png" />
-    <link rel="manifest" href="manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="landing.css" />
   </head>
   <body>
-    <div id="gate" hidden>
-      <div class="gate-card">
-        <div class="gate-brand">
-          <span class="brand-pray">PREYE</span>
-          <img class="brand-eye" src="preye-mark.png" alt="" />
-        </div>
-        <p class="gate-sub">Privater Zugang</p>
-        <form id="gate-form" autocomplete="on">
-          <input id="gate-pw" type="password" autocomplete="current-password"
-                 placeholder="Passwort" required />
-          <button type="submit">Öffnen</button>
-        </form>
-        <p id="gate-error" class="gate-error" hidden></p>
-      </div>
-    </div>
+    <a class="skip" href="#main">Zum Inhalt springen</a>
 
-    <header id="topbar">
-      <h1>
-        <a href="landing.html" class="brand-link" aria-label="Zur Startseite">
-          <span class="brand-pray">PREYE</span>
-          <img class="brand-eye" src="preye-mark.png" alt="" />
-        </a>
-        <span class="brand-place">Peenwerder Jagd</span>
-      </h1>
-      <div class="filters">
-        <select id="filter-species" aria-label="Wildart filtern">
-          <option value="">Alle Wildarten</option>
-        </select>
-        <select id="filter-range" aria-label="Zeitraum">
-          <option value="all">Gesamt</option>
-          <option value="season" selected>Diese Saison</option>
-          <option value="30d">30 Tage</option>
-          <option value="7d">7 Tage</option>
-          <option value="today">Heute</option>
-          <option value="custom">Datum…</option>
-        </select>
-        <input id="filter-date" type="date" hidden aria-label="Datum auswählen" />
-        <button id="strecke-btn" class="filter-btn" type="button">Strecke</button>
-        <a href="standkarte.html" class="filter-btn" id="standkarte-link"
-           title="Digitale Standkarte für die nächste Drückjagd">Standkarte</a>
-        <button id="protocol-btn" class="filter-btn filter-btn--alert" type="button"
-                aria-label="Nachsuche melden — Anschuss-Protokoll"
-                title="Nachsuche melden — Anschuss-Protokoll ausfüllen">Nachsuche melden</button>
-      </div>
+    <header class="topbar" id="topbar">
+      <a class="brand" href="index.html" aria-label="PREYE — Startseite">
+        <span class="brand-word">PREYE</span>
+        <img class="brand-mark" src="preye-mark.png" alt="" />
+      </a>
+
+      <nav class="nav" id="nav" aria-label="Hauptmenü">
+        <a href="#revier">Revier</a>
+        <a href="events.html">Drückjagd</a>
+        <a href="standkarte.html">Standkarte</a>
+        <a href="nachsuche.html">Nachsuche</a>
+      </nav>
+
+      <a class="cta cta--bar" href="karte.html">Karte öffnen</a>
+
+      <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menü">
+        <span></span><span></span><span></span>
+      </button>
     </header>
 
-    <div id="map" role="application" aria-label="Karte mit Hochsitzen und Heatmap"></div>
+    <main id="main">
+      <!-- ---------------------------------------------------------- Hero -->
+      <section class="hero">
+        <video class="hero-loop" autoplay muted loop playsinline preload="metadata" poster="hero.jpg">
+          <source src="hero.webm" type="video/webm" />
+          <source src="hero.mp4" type="video/mp4" />
+        </video>
+        <div class="hero-scrim" aria-hidden="true"></div>
 
-    <button id="fab" aria-label="Strecke eintragen">+</button>
-
-    <aside id="leaderboard" hidden>
-      <strong>Top 5</strong>
-      <ol id="leaderboard-list"></ol>
-    </aside>
-
-    <div id="sheet-backdrop" hidden></div>
-    <section id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheet-title">
-      <header>
-        <h2 id="sheet-title">Strecke eintragen</h2>
-        <button id="sheet-close" aria-label="Schließen">×</button>
-      </header>
-      <form id="harvest-form">
-        <div class="mode-toggle" role="tablist" aria-label="Standortart">
-          <button type="button" class="mode-btn active" data-mode="post" role="tab" aria-selected="true">Kanzel</button>
-          <button type="button" class="mode-btn" data-mode="klettersitz" role="tab" aria-selected="false">Klettersitz</button>
-          <button type="button" class="mode-btn" data-mode="pirsch" role="tab" aria-selected="false">Pirsch</button>
-        </div>
-        <label data-mode-show="post">
-          Kanzel
-          <select id="f-post"></select>
-        </label>
-        <label data-mode-show="coords">
-          Bezeichnung <span class="muted">(optional)</span>
-          <input id="f-free-label" type="text" maxlength="40" autocomplete="off"
-                 placeholder="z.B. Eichenwiese-Süd" />
-        </label>
-        <div class="row" data-mode-show="coords">
-          <label>
-            Breitengrad
-            <input id="f-free-lat" type="number" step="0.000001" inputmode="decimal" />
-          </label>
-          <label>
-            Längengrad
-            <input id="f-free-lng" type="number" step="0.000001" inputmode="decimal" />
-          </label>
-        </div>
-        <button type="button" id="f-free-here" class="ghost" data-mode-show="coords">
-          Aktuelle Position
-        </button>
-        <label>
-          Jäger
-          <select id="f-hunter" required></select>
-        </label>
-        <label>
-          Wildart
-          <select id="f-species" required></select>
-        </label>
-        <div class="species-extras">
-          <div class="gender-buttons" role="group" aria-label="Geschlecht">
-            <button type="button" class="gender-btn" data-gender="m" aria-label="Männlich">♂</button>
-            <button type="button" class="gender-btn" data-gender="w" aria-label="Weiblich">♀</button>
+        <div class="hero-copy">
+          <p class="eyebrow eyebrow--light">Peenwerder Jagd</p>
+          <h1>Wo das Wild wirklich steht</h1>
+          <p class="hero-sub">Jeder Stand, jede Strecke, jedes Revier an einem Ort.</p>
+          <div class="hero-actions">
+            <a class="cta cta--solid" href="karte.html">Karte öffnen</a>
+            <a class="cta cta--ghost" href="standkarte.html">Zur Standkarte</a>
           </div>
-          <label class="ak-select">
-            Altersklasse <span class="muted">(optional)</span>
-            <select id="f-age">
-              <option value="">— keine Angabe</option>
-              <option value="0">AK 0</option>
-              <option value="1">AK 1</option>
-              <option value="2">AK 2</option>
-              <option value="3">AK 3</option>
-              <option value="4">AK 4</option>
-            </select>
-          </label>
-        </div>
-        <label>
-          Anzahl
-          <div class="counter">
-            <button type="button" data-step="-1" aria-label="Weniger">−</button>
-            <input id="f-count" type="number" min="1" max="20" value="1" inputmode="numeric" required />
-            <button type="button" data-step="1" aria-label="Mehr">+</button>
-          </div>
-        </label>
-        <label>
-          Datum & Uhrzeit
-          <input id="f-time" type="datetime-local" step="60" />
-        </label>
-        <label>
-          Notiz <span class="muted">(optional)</span>
-          <textarea id="f-notes" rows="2" maxlength="200"></textarea>
-        </label>
-        <button type="submit" id="f-submit">Eintragen</button>
-        <button type="button" id="f-cancel" class="cancel-btn">Abbrechen</button>
-      </form>
-      <aside id="history" hidden>
-        <h3>Bisherige Strecke</h3>
-        <ul id="history-list"></ul>
-      </aside>
-    </section>
-
-    <div id="strecke-backdrop" hidden></div>
-    <section id="strecke-modal" hidden aria-modal="true" role="dialog" aria-labelledby="strecke-title">
-      <header>
-        <h2 id="strecke-title">Strecke</h2>
-        <button id="strecke-close" aria-label="Schließen">×</button>
-      </header>
-      <div class="strecke-range muted" id="strecke-range"></div>
-      <div class="strecke-total">
-        <div class="big-number" id="strecke-total">—</div>
-        <div class="muted">Stück gesamt</div>
-      </div>
-      <ul id="strecke-list"></ul>
-      <div class="timeline" id="strecke-timeline" hidden>
-        <h3>Saison-Verlauf</h3>
-        <svg id="timeline-svg" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true"></svg>
-        <div class="timeline-axis">
-          <span>1. Apr</span>
-          <span id="timeline-today" class="muted"></span>
-          <span>31. Mär</span>
-        </div>
-      </div>
-      <button type="button" id="strecke-close-bottom" class="cancel-btn">Schließen</button>
-    </section>
-
-    <div id="protocol-backdrop" hidden></div>
-    <section id="protocol-modal" hidden aria-modal="true" role="dialog" aria-labelledby="protocol-title">
-      <header>
-        <h2 id="protocol-title">Anschuss-Protokoll</h2>
-        <button id="protocol-close" aria-label="Schließen">×</button>
-      </header>
-      <div class="protocol-body" id="protocol-sheet">
-        <div class="proto-banner">
-          <span class="proto-banner-title">ANSCHUSS-PROTOKOLL</span>
         </div>
 
-        <div class="proto-loc">
-          <div class="proto-mode-toggle" role="tablist" aria-label="Standort">
-            <button type="button" class="proto-mode-btn active" data-pmode="post">Kanzel</button>
-            <button type="button" class="proto-mode-btn" data-pmode="klettersitz">Klettersitz</button>
-            <button type="button" class="proto-mode-btn" data-pmode="pirsch">Pirsch</button>
-          </div>
-          <label class="proto-loc-row visible" data-pmode-show="post">
-            Stand / Kanzel
-            <select id="proto-post"></select>
-          </label>
-          <label class="proto-loc-row" data-pmode-show="coords">
-            Bezeichnung <span class="muted">(optional)</span>
-            <input type="text" id="proto-loc-label" maxlength="40" autocomplete="off"
-                   placeholder="z.B. Eichenwiese-Süd" />
-          </label>
-          <div class="proto-loc-row proto-loc-coords" data-pmode-show="coords">
-            <label>Breitengrad<input type="number" id="proto-loc-lat" step="0.000001" inputmode="decimal" /></label>
-            <label>Längengrad<input type="number" id="proto-loc-lng" step="0.000001" inputmode="decimal" /></label>
-          </div>
-          <button type="button" id="proto-loc-here" class="ghost" data-pmode-show="coords">Aktuelle Position</button>
+        <div class="hero-facts">
+          <div><b>99</b><span>Stände im Revier</span></div>
+          <div><b>22</b><span>Jäger</span></div>
+          <div><b>9</b><span>geplante Jagden</span></div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------- Thesis -->
+      <section class="statement">
+        <p class="eyebrow">preye</p>
+        <h2>Ein Revier weiß mehr, als ein Kopf sich merken kann.</h2>
+        <p class="statement-sub">Jede Strecke, jeder Stand, jede Drückjagd an einem Ort — statt auf Zetteln, in WhatsApp-Gruppen und in vier verschiedenen Excel-Tabellen.</p>
+      </section>
+
+      <!-- ---------------------------------------------------- Dashboard -->
+      <section class="dash" id="revier">
+        <div class="dash-head">
+          <p class="eyebrow">Revier</p>
+          <h2>Dein Revier auf einen Blick</h2>
+          <p class="statement-sub">Live aus derselben Quelle wie die Karte — keine gepflegte Zweitliste.</p>
         </div>
 
-        <div class="proto-line">
-          <label class="grow">Name:<input type="text" data-proto="name" /></label>
-          <label class="grow">Telefon:<input type="text" data-proto="tel" /></label>
-        </div>
-        <div class="proto-line">
-          <label class="grow">Kaliber / Geschoss:
-            <select data-proto="kaliber" aria-label="Kaliber">
-              <option value="">— Kaliber wählen —</option>
-              <option>6,5x55</option>
-              <option>6,5x57 (R)</option>
-              <option>6,5x65 (R)</option>
-              <option>6,5x68</option>
-              <option>.270 Winchester</option>
-              <option>7x57 (R)</option>
-              <option>7x64</option>
-              <option>7x65 R</option>
-              <option>7 mm Remington Magnum</option>
-              <option>.308 Winchester</option>
-              <option>.30-06 Springfield</option>
-              <option>.30 R Blaser</option>
-              <option>.300 Winchester Magnum</option>
-              <option>8x57 I(R)S</option>
-              <option>8x68 S</option>
-              <option>.338 Winchester Magnum</option>
-              <option>.338 Lapua Magnum</option>
-              <option>9,3x62</option>
-              <option>9,3x64</option>
-              <option>9,3x74 R</option>
-              <option>.375 H&amp;H Magnum</option>
-              <option>Sonstige</option>
-            </select>
-          </label>
-          <label class="proto-chk"><input type="checkbox" data-proto="bleifrei" /> Bleifrei</label>
-          <label class="proto-chk"><input type="checkbox" data-proto="bleihaltig" /> Bleihaltig</label>
-        </div>
-
-        <table class="proto-table">
-          <thead>
-            <tr>
-              <th></th><th>Uhrzeit</th><th>Anzahl Schüsse</th><th>Wildart / gesch. kg</th>
-              <th>Anzahl Stücke</th><th>Beobachtungen (gezeichnet, krank …)</th><th>von Hund(en) verfolgt</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="proto-row-head">Stück I</td>
-              <td data-label="Uhrzeit"><input type="time" data-proto="s1_uhrzeit" /></td>
-              <td data-label="Anzahl Schüsse"><select data-proto="s1_schuesse" data-range="1-10"></select></td>
-              <td data-label="Wildart / gesch. kg" class="proto-cell-stack">
-                <select data-proto="s1_wildart" aria-label="Wildart">
-                  <option value="">—</option>
-                  <option>Rotwild</option>
-                  <option>Damwild</option>
-                  <option>Schwarzwild</option>
-                  <option>Mufflon</option>
-                  <option>Rehwild</option>
-                </select>
-                <select data-proto="s1_kg" data-range="1-100" aria-label="geschätzte kg"></select>
-              </td>
-              <td data-label="Anzahl Stücke"><select data-proto="s1_stuecke" data-range="1-15"></select></td>
-              <td data-label="Beobachtungen"><input data-proto="s1_beob" /></td>
-              <td data-label="von Hund(en) verfolgt">
-                <select data-proto="s1_hund" aria-label="von Hunden verfolgt">
-                  <option value="">—</option><option>Ja</option><option>Nein</option><option>Weiß nicht</option>
-                </select>
-              </td>
-            </tr>
-            <tr>
-              <td class="proto-row-head">Stück II</td>
-              <td data-label="Uhrzeit"><input type="time" data-proto="s2_uhrzeit" /></td>
-              <td data-label="Anzahl Schüsse"><select data-proto="s2_schuesse" data-range="1-10"></select></td>
-              <td data-label="Wildart / gesch. kg" class="proto-cell-stack">
-                <select data-proto="s2_wildart" aria-label="Wildart">
-                  <option value="">—</option>
-                  <option>Rotwild</option>
-                  <option>Damwild</option>
-                  <option>Schwarzwild</option>
-                  <option>Mufflon</option>
-                  <option>Rehwild</option>
-                </select>
-                <select data-proto="s2_kg" data-range="1-100" aria-label="geschätzte kg"></select>
-              </td>
-              <td data-label="Anzahl Stücke"><select data-proto="s2_stuecke" data-range="1-15"></select></td>
-              <td data-label="Beobachtungen"><input data-proto="s2_beob" /></td>
-              <td data-label="von Hund(en) verfolgt">
-                <select data-proto="s2_hund" aria-label="von Hunden verfolgt">
-                  <option value="">—</option><option>Ja</option><option>Nein</option><option>Weiß nicht</option>
-                </select>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <p class="proto-label">Stellung des Stückes beim Schuss — links die Reihe einem Stück (I / II) zuordnen, dann den vermutlichen Sitz der Kugel antippen (nochmal antippen entfernt den Punkt).</p>
-        <div class="proto-figure proto-figure--rows" data-fig="animals">
-          <img src="protocol-animals.png" alt="Wildposen" />
-          <canvas></canvas>
-          <select class="proto-fig-row proto-fig-row1" data-proto="animals_row1" aria-label="Obere Reihe — Stück-Nr.">
-            <option value="">—</option><option>I</option><option>II</option>
-          </select>
-          <select class="proto-fig-row proto-fig-row2" data-proto="animals_row2" aria-label="Untere Reihe — Stück-Nr.">
-            <option value="">—</option><option>I</option><option>II</option>
-          </select>
-        </div>
-
-        <p class="proto-label">Anschuss antippen — 1. Punkt = Stück I, 2. Punkt = Stück II; Blickrichtung beachten</p>
-        <div class="proto-bottom">
-          <div class="proto-pirsch">
-            <div class="proto-pirsch-head">Gefundene Pirschzeichen zu Stück-Nr.</div>
-            <div class="proto-pirsch-block">
-              <strong>Stück I</strong>
-              <div class="proto-pirsch-grid">
-                <label><input type="checkbox" data-proto="s1_schweiss" /> Schweiß</label>
-                <label><input type="checkbox" data-proto="s1_knochen" /> Knochen</label>
-                <label><input type="checkbox" data-proto="s1_schnitthaar" /> Schnitthaar</label>
-                <label><input type="checkbox" data-proto="s1_kugelriss" /> Kugelriss</label>
-                <label><input type="checkbox" data-proto="s1_gewebe" /> Gewebe</label>
-                <label><input type="checkbox" data-proto="s1_sonstiges" /> Sonstiges</label>
-              </div>
-              <label class="proto-bem">Bemerkung:<input data-proto="s1_bem" /></label>
+        <div class="dash-grid">
+          <article class="card card--wide">
+            <h3>Stände im Revier</h3>
+            <p class="card-big"><span id="d-posts">99</span><small>Stände</small></p>
+            <div class="viz--areas" id="d-areas">
+              <div class="area" style="--w: 72"><span>Hauptrevier</span><b>72</b></div>
+              <div class="area" style="--w: 12"><span>Nord</span><b>12</b></div>
+              <div class="area" style="--w: 10"><span>Nordrand</span><b>10</b></div>
+              <div class="area" style="--w: 2"><span>Ost</span><b>2</b></div>
             </div>
-            <div class="proto-pirsch-block">
-              <strong>Stück II</strong>
-              <div class="proto-pirsch-grid">
-                <label><input type="checkbox" data-proto="s2_schweiss" /> Schweiß</label>
-                <label><input type="checkbox" data-proto="s2_knochen" /> Knochen</label>
-                <label><input type="checkbox" data-proto="s2_schnitthaar" /> Schnitthaar</label>
-                <label><input type="checkbox" data-proto="s2_kugelriss" /> Kugelriss</label>
-                <label><input type="checkbox" data-proto="s2_gewebe" /> Gewebe</label>
-                <label><input type="checkbox" data-proto="s2_sonstiges" /> Sonstiges</label>
-              </div>
-              <label class="proto-bem">Bemerkung:<input data-proto="s2_bem" /></label>
+          </article>
+
+          <article class="card" id="d-top-card">
+            <h3>Bester Stand je Gebiet</h3>
+            <ol class="toplist" id="d-top">
+              <li class="toplist-empty">wird geladen …</li>
+            </ol>
+            <p class="card-note">Erlegungen dieser Saison</p>
+          </article>
+
+          <article class="card">
+            <h3>Strecke dieser Saison</h3>
+            <p class="card-big"><span id="d-total">47</span><small>Stück</small></p>
+            <ul class="species" id="d-species">
+              <li class="toplist-empty">wird geladen …</li>
+            </ul>
+            <p class="card-note" id="d-season">1. April – 31. März</p>
+          </article>
+        </div>
+
+        <div class="dash-cta">
+          <a class="cta cta--dark" href="karte.html">Dein Revier</a>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------- Drückjagd -->
+      <section class="feature" id="drueckjagd">
+        <div class="feature-inner">
+          <div class="feature-copy">
+            <p class="eyebrow">Drückjagd</p>
+            <h3>Vom Termin bis zum letzten Stand</h3>
+            <p>Jagd anlegen, Jäger per Link einladen, Zu- und Absagen einsammeln, Ansteller Runden und Treibergruppen bauen, Infomails mit Karte und Standnummer verschicken. Jeder Schütze bekommt seinen Stand, jeder Ansteller seine Runde.</p>
+            <ul class="ticks">
+              <li>Einladung als Magic-Link — kein Konto, kein Passwort für die Jäger</li>
+              <li>Revierkarte färbt jede Runde in einem eigenen Ton</li>
+              <li>Freigaben je Wildart und Altersklasse, direkt in der Infomail</li>
+            </ul>
+            <a class="cta cta--dark" href="events.html">Zur Drückjagdplanung</a>
+          </div>
+          <div class="feature-visual">
+            <div class="viz viz--rounds">
+              <div class="round"><b>Ansteller Runde I</b><span>Nr. 19 · Nr. 17 · Nr. 11</span></div>
+              <div class="round"><b>Ansteller Runde II</b><span>Nr. 42 · Nr. 38 · Nr. 35 · Nr. 31</span></div>
+              <div class="round"><b>Treibergruppe I</b><span>6 Treiber · 3 Hunde</span></div>
             </div>
           </div>
-          <div class="proto-figure proto-range" data-fig="range">
-            <svg viewBox="0 0 300 300" aria-hidden="true">
-              <line x1="150" y1="14" x2="150" y2="286" stroke="#cfcfcf" stroke-width="0.6" />
-              <line x1="14" y1="150" x2="286" y2="150" stroke="#cfcfcf" stroke-width="0.6" />
-              <circle cx="150" cy="150" r="42" fill="none" stroke="#9a9a9a" stroke-width="1" />
-              <circle cx="150" cy="150" r="86" fill="none" stroke="#9a9a9a" stroke-width="1" />
-              <circle cx="150" cy="150" r="130" fill="none" stroke="#9a9a9a" stroke-width="1" />
-              <line x1="150" y1="36" x2="150" y2="14" stroke="#5a5a5a" stroke-width="1.6" />
-              <path d="M150 8 L146 18 L154 18 Z" fill="#5a5a5a" />
-              <text x="150" y="32" text-anchor="middle" font-size="11" fill="#5a5a5a">Blickrichtung</text>
-              <text x="106" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">30 m</text>
-              <text x="62" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">60 m</text>
-              <text x="18" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">100 m</text>
-              <g stroke="#444" stroke-width="1.3" fill="none">
-                <path d="M141 150 L159 150 L156 158 L144 158 Z" fill="#444" />
-                <path d="M139 150 L150 142 L161 150" />
-                <line x1="146" y1="158" x2="142" y2="167" />
-                <line x1="154" y1="158" x2="158" y2="167" />
-                <line x1="147" y1="161" x2="153" y2="161" />
-              </g>
-            </svg>
-            <canvas></canvas>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------- Zwei Einstiege -->
+      <section class="actions">
+        <a class="action" href="nachsuche.html">
+          <span class="action-tag">Ohne Revier, sofort</span>
+          <b>Nachsuche melden</b>
+          <span class="action-sub">Anschussprotokoll frei ausfüllen, PDF herunterladen und dem Nachsuchenführer schicken. Kein Login, nichts wird gespeichert.</span>
+        </a>
+        <a class="action" href="standkarte.html">
+          <span class="action-tag">Für den Jagdtag</span>
+          <b>Standkarte ausfüllen</b>
+          <span class="action-sub">Zeiten, Freigaben, Kontakte und Dein Stand — dazu die Liste für Gesehenes und Beschossenes. Läuft auch ohne Empfang.</span>
+        </a>
+      </section>
+
+      <!-- -------------------------------------------------- Standkarte -->
+      <section class="feature feature--alt" id="standkarte">
+        <div class="feature-inner">
+          <div class="feature-copy">
+            <p class="eyebrow">Standkarte</p>
+            <h3>Die Karte für den Jagdtag, auf dem Handy</h3>
+            <p>Zeiten, Treffpunkt, Freigaben, Kontakte und Dein eigener Stand mit Route — dazu die Liste zum Eintragen, was Du gesehen und beschossen hast. Was Du tippst, bleibt auf dem Gerät.</p>
+            <ul class="ticks">
+              <li>Funktioniert auf dem Stand ohne Empfang, wenn Du sie einmal geöffnet hast</li>
+              <li>Kommt per QR-Code aus der Infomail aufs Handy</li>
+              <li>Meldung mit einem Tipp an den Jagdkoordinator</li>
+            </ul>
+            <a class="link-arrow" href="standkarte.html">Standkarte öffnen</a>
+          </div>
+          <div class="feature-visual">
+            <div class="viz viz--card">
+              <div class="mini-card">
+                <div class="mini-band">STANDKARTE</div>
+                <div class="mini-row"><span>Stand</span><b>Nr. 11 — Wildapfel</b></div>
+                <div class="mini-row"><span>Runde</span><b>Ansteller Runde I</b></div>
+                <div class="mini-row"><span>Jagdende</span><b>12:30</b></div>
+                <div class="mini-list">
+                  <div><i>1</i>09:42 · Schwarzwild ♀ · beschossen</div>
+                  <div><i>2</i>10:15 · Rehwild ♂ · gesehen</div>
+                  <div class="empty"><i>3</i></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div class="proto-meldung">
-          <label><span>Meldung Nachsuchen an:</span><input data-proto="meldung" /></label>
-          <label><span>Nachsuchenführer:</span><input data-proto="nsf_name" /></label>
-          <label><span>Bemerkungen NSF:</span><input data-proto="nsf_bem" /></label>
+      <!-- --------------------------------------------------- Nachsuche -->
+      <section class="feature" id="nachsuche">
+        <div class="feature-inner">
+          <div class="feature-copy">
+            <p class="eyebrow">Nachsuche</p>
+            <h3>Anschussprotokoll, solange es frisch ist</h3>
+            <p>Stand, Uhrzeit, Kaliber, Stellung des Stückes beim Schuss, gefundene Pirschzeichen und der Anschuss im Entfernungskreis — direkt am Stand ausgefüllt und beim Nachsuchenführer, bevor die Erinnerung verblasst.</p>
+            <ul class="ticks">
+              <li>Anschuss und Fluchtrichtung in den Kreis tippen</li>
+              <li>Sitz der Kugel auf der Wildpose markieren</li>
+              <li>Als PDF an den Nachsuchenführer, offene Nachsuchen auf der Karte</li>
+            </ul>
+            <a class="cta cta--dark" href="nachsuche.html">Nachsuche melden</a>
+          </div>
+          <div class="feature-visual">
+            <div class="viz viz--rings" aria-hidden="true">
+              <svg viewBox="0 0 240 240" role="img">
+                <circle cx="120" cy="120" r="34" />
+                <circle cx="120" cy="120" r="70" />
+                <circle cx="120" cy="120" r="106" />
+                <line x1="120" y1="14" x2="120" y2="226" />
+                <line x1="14" y1="120" x2="226" y2="120" />
+                <line x1="45" y1="45" x2="195" y2="195" />
+                <line x1="195" y1="45" x2="45" y2="195" />
+                <text x="120" y="30" text-anchor="middle">12 Uhr</text>
+                <g class="mark">
+                  <line x1="150" y1="88" x2="166" y2="72" />
+                  <line x1="166" y1="88" x2="150" y2="72" />
+                </g>
+              </svg>
+            </div>
+            <p class="viz-caption">30 m · 60 m · 100 m um den Sitz</p>
+          </div>
         </div>
-        <label class="proto-email">
-          E-Mail (Protokoll als PDF senden — optional):
-          <input type="email" data-proto="recipient" inputmode="email" autocomplete="email"
-                 placeholder="empfaenger@beispiel.de" />
-        </label>
-      </div>
-      <div class="proto-actions">
-        <button type="button" id="proto-submit">Nachsuche melden</button>
-        <button type="button" id="proto-print" class="cancel-btn">Drucken</button>
-        <button type="button" id="proto-reset" class="cancel-btn">Zurücksetzen</button>
-        <button type="button" id="proto-close-bottom" class="cancel-btn">Schließen</button>
-      </div>
-    </section>
+      </section>
 
-    <div id="toast" hidden></div>
+      <!-- --------------------------------------------------------- CTA -->
+      <section class="closing">
+        <p class="eyebrow eyebrow--light">Waidmannsheil</p>
+        <h2>Das Revier passt in eine Hosentasche.</h2>
+        <div class="hero-actions">
+          <a class="cta cta--solid" href="karte.html">Karte öffnen</a>
+          <a class="cta cta--ghost" href="events.html">Jagd planen</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-inner">
+        <div class="foot-brand">
+          <span class="brand-word">PREYE</span>
+          <img class="brand-mark" src="preye-mark.png" alt="" />
+          <p>Revierverwaltung für die Peenwerder Jagd.</p>
+        </div>
+        <nav aria-label="Werkzeuge">
+          <p class="foot-head">Werkzeuge</p>
+          <a href="karte.html">Karte &amp; Heatmap</a>
+          <a href="events.html">Jagdplanungstool</a>
+          <a href="standkarte.html">Standkarte</a>
+          <a href="nachsuche.html">Anschussprotokoll</a>
+        </nav>
+        <nav aria-label="Revier">
+          <p class="foot-head">Revier</p>
+          <a href="#revier">Stände</a>
+          <a href="#drueckjagd">Drückjagd</a>
+        </nav>
+      </div>
+      <p class="foot-legal">Privater Zugang · Peenwerder &amp; NPA Müritz</p>
+    </footer>
 
     <script src="config.js"></script>
-    <script type="module" src="app.js"></script>
+    <script src="landing.js"></script>
   </body>
 </html>

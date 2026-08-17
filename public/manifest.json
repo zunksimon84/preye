@@ -1,7 +1,7 @@
 {
   "name": "PREYE 👁 Peenwerder Jagd",
   "short_name": "PREYE",
-  "start_url": ".",
+  "start_url": "karte.html",
   "display": "standalone",
   "background_color": "#0e0e0e",
   "theme_color": "#0b7c95",
@@ -12,5 +12,6 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ]
+  ],
+  "scope": "/"
 }
