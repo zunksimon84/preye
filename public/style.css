@@ -6,11 +6,18 @@
      high-contrast look the poster uses. */
   --green-bright: #b5d33a;
   --green-bright-edge: #97b730;
-  /* Brand gradient — taken from the preye P-mark (lime green → charcoal).
-     Used as the primary design element across the topbars. */
+  /* Brand gradient — the Lunge Evo Run colourway: pool blue at the heel,
+     through green, into the yellow-green at the toe. The warm end is the
+     existing brand lime, so every lime button on the site still ties back
+     into the bar. Used as the primary design element across the topbars. */
+  --pool-blue: #0b7c95;
+  --pool-blue-deep: #075c70; /* darker step for the mobile bar + theme-color */
+  --brand-green: #3b9e6b;
   --lime: #b5d33a;
   --charcoal: #2c2f34;
-  --brand-gradient: linear-gradient(100deg, var(--lime) 0%, var(--lime) 42%, var(--charcoal) 100%);
+  --brand-gradient: linear-gradient(100deg, var(--pool-blue) 0%, var(--brand-green) 52%, var(--lime) 100%);
+  /* Same ramp turned top-to-bottom, for the stacked phone topbar. */
+  --brand-gradient-v: linear-gradient(180deg, var(--pool-blue) 0%, var(--brand-green) 55%, var(--lime) 100%);
   --steel: #8a8e92; /* metallic grey accent, like the bullet jackets */
   --steel-dark: #4a4d52;
   /* Form surfaces — switched from a warm cream to a cool light grey
@@ -54,7 +61,7 @@ body {
   right: 0;
   z-index: 10;
   background: var(--brand-gradient);
-  color: #111;
+  color: #fff;
   padding: calc(8px + var(--safe-top)) 12px 8px;
   display: flex;
   align-items: center;
@@ -104,6 +111,17 @@ body {
   text-overflow: ellipsis;
 }
 
+/* On the topbars the wordmark sits over the pool-blue end of the gradient,
+   so it goes light. On the white gate card it keeps the near-black above. */
+#topbar .brand-pray,
+#topbar .brand-place,
+#stk-topbar .brand-pray,
+#stk-topbar .brand-place,
+#rsvp-topbar .brand-pray,
+#rsvp-topbar .brand-place {
+  color: #fff;
+}
+
 @media (max-width: 380px) {
   .brand-place {
     font-size: 13px;
@@ -118,9 +136,9 @@ body {
     align-items: stretch;
     gap: 6px;
     padding: calc(6px + var(--safe-top)) 10px 6px;
-    /* stacked layout: keep the brand row on lime, the filter row on
-       charcoal — so the gradient runs top-to-bottom here. */
-    background: linear-gradient(180deg, var(--lime) 0%, var(--lime) 48%, var(--charcoal) 100%);
+    /* stacked layout: brand row on the blue end, filter row on the lime end,
+       so the same ramp runs top-to-bottom here. */
+    background: var(--brand-gradient-v);
   }
   #topbar h1 {
     font-size: 14px;
@@ -3416,7 +3434,7 @@ body.events-page #toast.toast-error { background: #c0392b; color: #fff; }
 /* RSVP page (rsvp.html) ---------------------------------------------------- */
 
 body.rsvp-page {
-  background: linear-gradient(180deg, var(--green-bright) 0%, var(--bg) 200px);
+  background: linear-gradient(180deg, var(--pool-blue) 0%, var(--bg) 200px);
   min-height: 100vh;
 }
 
@@ -3425,10 +3443,10 @@ body.rsvp-page {
   align-items: center;
   gap: 8px;
   padding: 14px 18px;
-  color: #111;
-  /* brand gradient bar — the lime stretch holds the wordmark, the
-     charcoal end carries the gradient across the rest of the bar. */
-  background: linear-gradient(100deg, var(--lime) 0%, var(--lime) 58%, var(--charcoal) 100%);
+  color: #fff;
+  /* brand gradient bar — pool blue behind the wordmark, running out into
+     the lime at the far end. */
+  background: var(--brand-gradient);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
@@ -3734,7 +3752,7 @@ body.stk-page {
 #stk-topbar {
   position: static;
   background: var(--brand-gradient);
-  color: #111;
+  color: #fff;
   padding: calc(8px + var(--safe-top)) 12px 8px;
   display: flex;
   align-items: center;
@@ -3845,7 +3863,28 @@ body.stk-page {
 .stk-banner-sub { font-size: 12px; opacity: 0.85; }
 
 .stk-title { margin: 0; font-size: 21px; line-height: 1.2; }
-.stk-subtitle { margin: 3px 0 14px; font-size: 13px; color: var(--muted); }
+.stk-subtitle { margin: 3px 0 10px; font-size: 13px; color: var(--muted); }
+
+/* Offline note. Calm blue while there is signal, amber once the phone
+   actually drops off the network. */
+.stk-offline {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(11, 124, 149, 0.35);
+  background: rgba(11, 124, 149, 0.08);
+  color: var(--pool-blue-deep);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.stk-offline::before { content: "📶 "; }
+.stk-offline--off {
+  border-color: #d9a441;
+  background: #fdf5e3;
+  color: #7a5310;
+  font-weight: 600;
+}
+.stk-offline--off::before { content: "📴 "; }
 
 /* Mein Stand — the one thing a hunter opens the card for on the way out. */
 .stk-mine {
@@ -4129,6 +4168,7 @@ body.stk-page {
   body.stk-page .stk-actions,
   body.stk-page .stk-pick,
   body.stk-page .stk-state,
+  body.stk-page .stk-offline,
   body.stk-page #toast { display: none !important; }
   body.stk-page #stk-main { padding: 0; max-width: none; }
   .stk-card { border: none; border-radius: 0; padding: 0; }

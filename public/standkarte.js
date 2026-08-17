@@ -443,6 +443,22 @@ function renderContacts() {
   $("#stk-contacts").innerHTML = html;
 }
 
+// Says plainly that the card keeps working without a signal, and switches to
+// the actual state the moment the phone loses the network in the Kanzel.
+function renderOfflineNote() {
+  const el = $("#stk-offline");
+  if (!el) return;
+  if (navigator.onLine === false) {
+    el.className = "stk-offline stk-offline--off";
+    el.textContent = "Kein Empfang — die Karte kommt aus dem Speicher dieses Geräts. "
+      + "Eintragen funktioniert ganz normal weiter; „Meldung senden“ geht, sobald Du wieder Netz hast.";
+  } else {
+    el.className = "stk-offline";
+    el.textContent = "Offline nutzbar: Karte und Liste liegen auf diesem Gerät. "
+      + "Einmal mit Empfang geöffnet, kannst Du sie auf dem Stand ohne Netz weiter ausfüllen.";
+  }
+}
+
 function renderCard() {
   const ev = state.detail.event;
   document.title = "PREYE 👁 Standkarte — " + (ev.name || "");
@@ -455,6 +471,7 @@ function renderCard() {
   renderContacts();
   renderFreigaben();
   renderList();
+  renderOfflineNote();
 
   $("#stk-foot").textContent = "Waidmannsheil!";
   $("#stk-card").hidden = false;
@@ -662,6 +679,13 @@ function wireUi() {
 
 async function main() {
   wireUi();
+  window.addEventListener("online", renderOfflineNote);
+  window.addEventListener("offline", renderOfflineNote);
+  // Keeps a copy of this page's own files so a reload in the Kanzel doesn't
+  // land on the browser's error screen. See sw.js — it touches nothing else.
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
   const params = new URLSearchParams(location.search);
   const wantEvent = params.get("event") || localStorage.getItem("preye.stk.event") || "";
   state.me = (params.get("h") || localStorage.getItem("preye.stk.hunter") || "").trim();
