@@ -4244,8 +4244,8 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     const qRow = qTable.appendTableRow();
     const qLeft = qRow.appendTableCell();
     const qRight = qRow.appendTableCell();
-    qTable.setColumnWidth(0, 104);
-    qTable.setColumnWidth(1, 444);
+    qTable.setColumnWidth(0, 142);
+    qTable.setColumnWidth(1, 406);
     [qLeft, qRight].forEach(function (c) {
       c.setPaddingTop(0).setPaddingBottom(0);
     });
@@ -4254,8 +4254,12 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
 
     const qPara = qLeft.getChild(0).asParagraph();
     if (stkBlob) {
+      // Docs renders inline images at 96 dpi against the PDF's 72 pt, so what
+      // you ask for comes out at three quarters the size. 128 pt here lands at
+      // ~96 pt on the page — about 34 mm printed, which keeps the modules
+      // coarse enough for a phone to read at arm's length.
       const qImg = qPara.appendInlineImage(stkBlob);
-      qImg.setWidth(92).setHeight(92);
+      qImg.setWidth(128).setHeight(128);
     } else {
       qPara.setText("QR nicht verfügbar");
       styleParagraph(qPara, { size: 8, italic: true, color: SOFT, line: 1.2 });
