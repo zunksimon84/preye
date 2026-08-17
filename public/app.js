@@ -36,6 +36,7 @@ async function main() {
     await refreshAggregates();
     loadNachsuchen(); // fire-and-forget — flashing skull markers for open Nachsuchen
     wireUi();
+    applyProtocolDeepLink();
   } catch (err) {
     console.error(err);
     showToast("Fehler beim Laden: " + err.message, "error", 6000);
@@ -1120,6 +1121,25 @@ function openProtocol() {
   $("#protocol-modal").hidden = false;
   requestAnimationFrame(() => protoFigures.forEach((f) => f.resize()));
 }
+// The Standkarte (standkarte.html) hands over here with
+// `index.html?stand=HR-11&name=Max%20Mustermann#protokoll` so the hunter
+// doesn't retype what we already know about him.
+function applyProtocolDeepLink() {
+  if (location.hash !== "#protokoll") return;
+  const params = new URLSearchParams(location.search);
+  openProtocol();
+  const stand = params.get("stand");
+  if (stand) {
+    const sel = $("#proto-post");
+    const hit = Array.from(sel.options).some((o) => o.value === stand);
+    if (hit) sel.value = stand;
+  }
+  const name = params.get("name");
+  if (name) $('[data-proto="name"]').value = name;
+  // Drop the params so a reload doesn't reopen the modal over fresh input.
+  history.replaceState(null, "", location.pathname);
+}
+
 function closeProtocol() {
   $("#protocol-modal").hidden = true;
   $("#protocol-backdrop").hidden = true;

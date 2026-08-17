@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#b5d33a" />
+    <title>PREYE 👁 Standkarte</title>
+    <link rel="icon" type="image/png" href="favicon-preye.png" />
+    <link rel="apple-touch-icon" href="favicon-preye.png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="stk-page">
+    <header id="stk-topbar">
+      <h1>
+        <a href="index.html" class="brand-link" aria-label="Zurück zur Karte">
+          <span class="brand-pray">PREYE</span>
+          <img class="brand-eye" src="preye-mark.png" alt="" />
+        </a>
+        <span class="brand-place">Standkarte</span>
+      </h1>
+      <nav class="filters">
+        <a href="index.html" class="filter-btn">← Karte</a>
+        <button type="button" class="filter-btn" id="stk-switch" hidden>Jagd wechseln</button>
+      </nav>
+    </header>
+
+    <main id="stk-main">
+      <div id="stk-state" class="stk-state">
+        <div class="boar-loader boar-loader--center">Lade Jagden …</div>
+      </div>
+
+      <!-- Step 1: which hunt? -->
+      <section id="stk-pick-event" class="stk-pick" hidden>
+        <h2 class="stk-pick-title">Für welche Jagd brauchst Du die Standkarte?</h2>
+        <div id="stk-event-list" class="stk-event-list"></div>
+      </section>
+
+      <!-- Step 2: who are you? -->
+      <section id="stk-pick-hunter" class="stk-pick" hidden>
+        <h2 class="stk-pick-title">Wer bist Du?</h2>
+        <p class="stk-pick-sub" id="stk-pick-hunter-sub"></p>
+        <div id="stk-hunter-list" class="stk-hunter-list"></div>
+        <label class="stk-hunter-free">
+          Nicht dabei? Namen eintragen:
+          <input type="text" id="stk-hunter-free" maxlength="60" autocomplete="name" placeholder="Vor- und Nachname" />
+        </label>
+        <button type="button" class="primary-btn" id="stk-hunter-free-go">Weiter</button>
+        <button type="button" class="cancel-btn" id="stk-hunter-back">← andere Jagd</button>
+      </section>
+
+      <!-- The card itself -->
+      <article id="stk-card" class="stk-card" hidden>
+        <div class="stk-banner">
+          <span class="stk-banner-title">STANDKARTE</span>
+          <span class="stk-banner-sub" id="stk-banner-sub"></span>
+        </div>
+
+        <h2 class="stk-title" id="stk-title"></h2>
+        <p class="stk-subtitle" id="stk-subtitle"></p>
+
+        <!-- Mein Stand -->
+        <section class="stk-mine" id="stk-mine" hidden>
+          <div class="stk-mine-head">
+            <span class="stk-mine-label">Mein Stand</span>
+            <span class="stk-mine-hunter" id="stk-mine-hunter"></span>
+          </div>
+          <div class="stk-mine-body" id="stk-mine-body"></div>
+        </section>
+
+        <div class="stk-grid">
+          <!-- Zeiten / Ablauf -->
+          <section class="stk-block">
+            <h3>Zeiten &amp; Ablauf</h3>
+            <dl class="stk-dl" id="stk-times"></dl>
+            <ul class="stk-rules">
+              <li>Jagdbeginn: mit Einnahme des Standes, sobald die Sicherheit hergestellt ist.</li>
+              <li>Nach zwei ungeklärten Anschüssen ist Hahn in Ruh.</li>
+              <li>Es gilt die
+                <a href="https://cdn.svlfg.de/fiona8-blobs/public/svlfgonpremiseproduction/4602f00372a5a47d/3ae5d95e332a/vsg4_4-jagd.pdf"
+                   target="_blank" rel="noopener noreferrer">VSG 4.4 Jagd</a>.</li>
+            </ul>
+            <p class="stk-briefing" id="stk-briefing" hidden></p>
+          </section>
+
+          <!-- Kontakte -->
+          <section class="stk-block stk-block--contacts">
+            <h3>Im Notfall / Kontakte</h3>
+            <div id="stk-contacts"></div>
+          </section>
+
+          <!-- Freigaben -->
+          <section class="stk-block stk-block--freigaben">
+            <h3>Freigaben</h3>
+            <div id="stk-freigaben"></div>
+            <p class="stk-freigaben-foot">Raubwild ist generell nicht freigegeben · Leitbachen verschonen.</p>
+          </section>
+        </div>
+
+        <!-- Beobachtungsliste -->
+        <section class="stk-block stk-block--list">
+          <h3>Beobachtungen &amp; beschossenes Wild</h3>
+          <p class="stk-hint">Wird automatisch auf diesem Gerät gespeichert — funktioniert auch ohne Empfang auf dem Stand.</p>
+          <table class="stk-table">
+            <thead>
+              <tr>
+                <th class="stk-col-nr">Nr.</th>
+                <th class="stk-col-time">Uhrzeit</th>
+                <th class="stk-col-wild">Wildart / Geschlecht / Anzahl</th>
+                <th>gesehen</th>
+                <th>beschossen</th>
+                <th>Stück liegt</th>
+                <th>Nachsuche</th>
+              </tr>
+            </thead>
+            <tbody id="stk-tbody"></tbody>
+          </table>
+        </section>
+
+        <div class="stk-actions">
+          <button type="button" id="stk-anschuss" class="primary-btn stk-alert">Anschuss melden</button>
+          <button type="button" id="stk-send" class="primary-btn">Meldung senden</button>
+          <button type="button" id="stk-print" class="cancel-btn">Drucken</button>
+          <button type="button" id="stk-reset" class="cancel-btn">Liste leeren</button>
+        </div>
+        <p class="stk-foot" id="stk-foot"></p>
+      </article>
+    </main>
+
+    <div id="toast" hidden></div>
+
+    <script src="config.js"></script>
+    <script src="standkarte.js"></script>
+  </body>
+</html>

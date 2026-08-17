@@ -170,6 +170,13 @@ body {
   transition: background-color 0.12s, border-color 0.12s, transform 0.08s;
 }
 
+/* Some nav entries are links (← Karte, Standkarte) rather than buttons. */
+a.filter-btn {
+  display: inline-block;
+  text-decoration: none;
+  line-height: 1.35;
+}
+
 .filters select:hover,
 #filter-date:hover,
 .filter-btn:hover {
@@ -1480,7 +1487,9 @@ body {
 }
 
 @media print {
-  body > *:not(#protocol-modal) { display: none !important; }
+  /* Map page: print the Anschuss-Protokoll only. standkarte.html brings its
+     own print rules further down. */
+  body:not(.stk-page) > *:not(#protocol-modal) { display: none !important; }
   #protocol-modal {
     position: static;
     inset: auto;
@@ -3701,4 +3710,408 @@ body.rsvp-page {
   .add-hunter-form button { align-self: stretch; }
   .rsvp-event-name { font-size: 20px; }
   .rsvp-meta-row { grid-template-columns: 90px 1fr; }
+}
+
+/* ===========================================================================
+   Standkarte (standkarte.html) — the paper card each Schütze gets handed at
+   the Drückjagd, rendered from the hunt in the Jagdplanungstool. Scrolls like
+   a document on the phone, prints as a clean A4 sheet.
+   =========================================================================== */
+
+body.stk-page {
+  overflow: auto;
+  background: var(--bg);
+}
+
+#stk-topbar {
+  position: static;
+  background: var(--brand-gradient);
+  color: #111;
+  padding: calc(8px + var(--safe-top)) 12px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#stk-topbar h1 {
+  margin: 0;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#stk-topbar .filters { display: flex; gap: 8px; align-items: center; }
+#stk-topbar .filter-btn { text-decoration: none; }
+
+#stk-main {
+  padding: 16px 14px 40px;
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.stk-state { margin: 24px 0; color: var(--muted); font-size: 14px; }
+.stk-state-error { color: var(--accent); }
+
+.stk-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 4px 0 8px;
+}
+
+/* ---- Pickers ---- */
+
+.stk-pick { margin: 8px 0 24px; }
+.stk-pick-title { font-size: 18px; margin: 4px 0 4px; }
+.stk-pick-sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+
+.stk-event-list { display: grid; gap: 8px; }
+.stk-event-btn {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+.stk-event-btn:hover { border-color: var(--green-bright-edge); }
+.stk-event-date { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.stk-event-name { font-size: 16px; font-weight: 700; }
+.stk-event-area { font-size: 12px; color: var(--steel-dark); align-self: center; }
+
+.stk-hunter-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.stk-hunter-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 9px 15px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.stk-hunter-btn:hover { border-color: var(--green-bright-edge); }
+.stk-hunter-free {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.stk-hunter-free input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 10px;
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+#stk-pick-hunter .cancel-btn { margin-left: 8px; }
+
+/* ---- The card ---- */
+
+.stk-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 16px 18px;
+  overflow: hidden;
+}
+
+.stk-banner {
+  margin: 0 -16px 12px;
+  padding: 9px 16px;
+  background: var(--green-dark);
+  color: #fff;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.stk-banner-title { font-weight: 800; letter-spacing: 2px; font-size: 14px; }
+.stk-banner-sub { font-size: 12px; opacity: 0.85; }
+
+.stk-title { margin: 0; font-size: 21px; line-height: 1.2; }
+.stk-subtitle { margin: 3px 0 14px; font-size: 13px; color: var(--muted); }
+
+/* Mein Stand — the one thing a hunter opens the card for on the way out. */
+.stk-mine {
+  border: 2px solid var(--green-bright-edge);
+  border-radius: 10px;
+  background: #f7fbe9;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+.stk-mine-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.stk-mine-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+.stk-mine-hunter { font-size: 13px; font-weight: 700; }
+.stk-mine-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 14px;
+  border-top: 1px solid rgba(31, 58, 31, 0.12);
+}
+.stk-mine-row:first-child { border-top: none; }
+.stk-mine-row span { color: var(--muted); font-size: 12px; align-self: center; }
+.stk-mine-nav a { font-weight: 700; }
+
+.stk-grid { display: grid; gap: 14px; }
+
+.stk-block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.stk-block h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+
+.stk-dl { margin: 0; }
+.stk-dl-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 14px;
+}
+.stk-dl dt { color: var(--muted); font-size: 12px; align-self: center; }
+.stk-dl dd { margin: 0; }
+
+.stk-rules {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--steel-dark);
+}
+.stk-rules li { margin-bottom: 3px; }
+
+.stk-briefing {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.stk-contact {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.stk-contact:first-child { border-top: none; }
+.stk-contact-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stk-contact-name { margin-right: 8px; }
+.stk-contact-phone { font-weight: 700; white-space: nowrap; }
+.stk-contact-phone a { text-decoration: none; }
+
+.stk-fg-species {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 4px 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--border);
+}
+.stk-fg-species:first-child { border-top: none; }
+.stk-fg-name { font-weight: 700; font-size: 13.5px; }
+.stk-fg-list { list-style: none; margin: 0; padding: 0; }
+.stk-fg-list li { display: flex; gap: 8px; font-size: 13px; padding: 1px 0; }
+.stk-fg-group { color: var(--muted); min-width: 90px; }
+.stk-fg-ak { font-weight: 600; }
+.stk-fg-closed { font-size: 13px; color: var(--accent); }
+.stk-freigaben-foot {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ---- Beobachtungsliste ---- */
+
+.stk-block--list { margin-top: 14px; }
+
+.stk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.stk-table th,
+.stk-table td {
+  border: 1px solid var(--border);
+  padding: 3px 4px;
+  text-align: center;
+  vertical-align: middle;
+}
+.stk-table th {
+  background: var(--green-bright);
+  color: #111;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.stk-table .stk-col-nr { width: 26px; font-weight: 700; background: var(--bg); }
+.stk-table .stk-col-time { width: 82px; }
+.stk-table input[type="time"],
+.stk-table input[type="text"] {
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 3px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  min-width: 0;
+}
+.stk-table input[type="checkbox"] { width: 20px; height: 20px; }
+/* The Wildart placeholder only earns its place on the phone, where the
+   header row is gone. */
+.stk-table input::placeholder { color: transparent; }
+
+.stk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.stk-actions .primary-btn.stk-alert {
+  background: var(--accent);
+  border-color: #8f3a22;
+  color: #fff;
+}
+/* The shared .cancel-btn is a full-width sheet button; inside the action row
+   it has to sit next to the primary buttons. */
+.stk-actions .cancel-btn,
+#stk-pick-hunter .cancel-btn {
+  width: auto;
+  margin-top: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--steel-dark);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stk-foot {
+  margin: 14px 0 0;
+  text-align: right;
+  font-style: italic;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (min-width: 700px) {
+  .stk-grid { grid-template-columns: 1fr 1fr; }
+  .stk-block--freigaben { grid-column: 1 / -1; }
+  .stk-fg-species { grid-template-columns: 130px 1fr; }
+}
+
+/* Phone: the seven-column list turns into one stacked block per line. */
+@media (max-width: 620px) {
+  .stk-table thead { display: none; }
+  .stk-table,
+  .stk-table tbody,
+  .stk-table tr,
+  .stk-table td { display: block; width: auto; }
+  .stk-table tr {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 7px 9px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+  }
+  .stk-table td { border: none; padding: 0; text-align: left; }
+  .stk-table td.stk-col-nr {
+    flex: 0 0 20px;
+    background: transparent;
+    font-size: 15px;
+    color: var(--muted);
+  }
+  .stk-table td.stk-col-time { flex: 0 0 116px; }
+  /* Wildart gets its own line, the four flags share the one below it. */
+  .stk-table td.stk-col-wild { flex: 1 1 100%; }
+  .stk-table td[data-label="gesehen"],
+  .stk-table td[data-label="beschossen"],
+  .stk-table td[data-label="Stück liegt"],
+  .stk-table td[data-label="Nachsuche"] {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    color: var(--steel-dark);
+  }
+  .stk-table td[data-label="gesehen"]::after,
+  .stk-table td[data-label="beschossen"]::after,
+  .stk-table td[data-label="Stück liegt"]::after,
+  .stk-table td[data-label="Nachsuche"]::after {
+    content: attr(data-label);
+  }
+  .stk-table input[type="checkbox"] { width: 22px; height: 22px; }
+  .stk-table input::placeholder { color: var(--muted); opacity: 0.7; }
+  .stk-mine-row,
+  .stk-dl-row { grid-template-columns: 96px 1fr; }
+}
+
+@media print {
+  body.stk-page { background: #fff; }
+  body.stk-page #stk-topbar,
+  body.stk-page .stk-actions,
+  body.stk-page .stk-pick,
+  body.stk-page .stk-state,
+  body.stk-page #toast { display: none !important; }
+  body.stk-page #stk-main { padding: 0; max-width: none; }
+  .stk-card { border: none; border-radius: 0; padding: 0; }
+  /* Keep the green banner / table header when the browser is set to print
+     backgrounds — the card is recognisable by them. */
+  .stk-banner,
+  .stk-table th,
+  .stk-mine {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .stk-banner { margin: 0 0 10px; }
+  .stk-block, .stk-mine { break-inside: avoid; }
+  .stk-grid { grid-template-columns: 1fr 1fr; }
+  .stk-block--freigaben { grid-column: 1 / -1; }
+  @page { size: A4 portrait; margin: 12mm; }
 }
