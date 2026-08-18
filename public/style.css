@@ -18,6 +18,7 @@
   --lime: #b5d33a;
   --lime-bright: #c6e03c;
   --charcoal: #2c2f34;
+  --night: #04141c;   /* ground of every topbar, same as the overview */
   /* Five stops rather than three: a deeper blue behind the wordmark (white
      stays legible on it), a saturated sea green so the blue→green handoff
      doesn't go dull, and the lime reached before the edge so the warm end
@@ -79,14 +80,14 @@ body {
   left: 0;
   right: 0;
   z-index: 10;
-  background: var(--brand-gradient);
+  background: var(--night);
   color: #fff;
-  padding: calc(8px + var(--safe-top)) 12px 8px;
+  padding: calc(8px + var(--safe-top)) 14px 8px;
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  border-bottom: 3px solid transparent;
+  border-image: var(--brand-gradient) 1;
 }
 
 #topbar h1 {
@@ -155,9 +156,8 @@ body {
     align-items: stretch;
     gap: 6px;
     padding: calc(6px + var(--safe-top)) 10px 6px;
-    /* stacked layout: brand row on the blue end, filter row on the lime end,
-       so the same ramp runs top-to-bottom here. */
-    background: var(--brand-gradient-v);
+    /* Same night ground stacked; the ramp stays as the edge below. */
+    background: var(--night);
   }
   #topbar h1 {
     font-size: 14px;
@@ -192,19 +192,19 @@ body {
 .filters select,
 #filter-date,
 .filter-btn {
-  background: #1a1a1a;
-  color: var(--green-bright);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  padding: 6px 12px;
+  background: transparent;
+  color: #dbe9e6;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  padding: 7px 13px;
   font: inherit;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  transition: background-color 0.12s, border-color 0.12s, transform 0.08s;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s, transform 0.08s;
 }
 
 /* Some nav entries are links (← Karte, Standkarte) rather than buttons. */
@@ -217,7 +217,9 @@ a.filter-btn {
 .filters select:hover,
 #filter-date:hover,
 .filter-btn:hover {
-  border-color: var(--green-bright);
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 .filters select:active,
@@ -241,13 +243,15 @@ a.filter-btn {
 /* The Anschuss-Protokoll / Nachsuche trigger — same chip format but a cold
    red so it reads as the "report a wounded animal" action, not a filter. */
 .filter-btn--alert {
-  background: #d11f3c;
-  border-color: #d11f3c;
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 
 .filter-btn--alert:hover {
-  border-color: #fff;
+  background: #cc5231;
+  border-color: #cc5231;
+  color: #fff;
 }
 
 #map {
@@ -3463,10 +3467,10 @@ body.rsvp-page {
   gap: 8px;
   padding: 14px 18px;
   color: #fff;
-  /* brand gradient bar — pool blue behind the wordmark, running out into
-     the lime at the far end. */
-  background: var(--brand-gradient);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  /* Night ground with the ramp as a hairline edge — same bar as everywhere. */
+  background: var(--night);
+  border-bottom: 3px solid transparent;
+  border-image: var(--brand-gradient) 1;
 }
 
 #rsvp-main {
@@ -3770,8 +3774,10 @@ body.stk-page {
 
 #stk-topbar {
   position: static;
-  background: var(--brand-gradient);
+  background: var(--night);
   color: #fff;
+  border-bottom: 3px solid transparent;
+  border-image: var(--brand-gradient) 1;
   padding: calc(8px + var(--safe-top)) 12px 8px;
   display: flex;
   align-items: center;

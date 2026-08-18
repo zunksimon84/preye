@@ -681,11 +681,7 @@ async function main() {
   wireUi();
   window.addEventListener("online", renderOfflineNote);
   window.addEventListener("offline", renderOfflineNote);
-  // Keeps a copy of this page's own files so a reload in the Kanzel doesn't
-  // land on the browser's error screen. See sw.js — it touches nothing else.
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
+  // The service worker is registered by pwa.js on every page now.
   const params = new URLSearchParams(location.search);
   const wantEvent = params.get("event") || localStorage.getItem("preye.stk.event") || "";
   state.me = (params.get("h") || localStorage.getItem("preye.stk.hunter") || "").trim();
