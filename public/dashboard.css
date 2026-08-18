@@ -10,6 +10,15 @@
    =========================================================================== */
 
 :root {
+  /* Die Seite läuft mit viewport-fit=cover, reicht also bis unter Status- und
+     Browserleiste. Ohne diese vier Werte klebt die Leiste am Rand des
+     Layout-Fensters — und damit in Safari hinter der URL-Leiste. --vv-* setzt
+     viewport-insets.js. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --vv-top: 0px;
+  --vv-bottom: 0px;
+
   --pool-deep: #045d75;
   --pool: #0b7c95;
   --sea: #0f9a78;
@@ -66,7 +75,11 @@ body {
   display: flex;
   align-items: center;
   gap: clamp(12px, 2vw, 26px);
-  padding: 9px var(--gap);
+  /* Oben kommt der Rand dazu, den Statusleiste und Safari-Leiste belegen. Als
+     Innenabstand, nicht als top-Versatz: so schiebt sich der Inhalt nach unten
+     ins Sichtbare, während der Farbverlauf den Streifen darüber weiter
+     ausfüllt. */
+  padding: calc(9px + var(--safe-top) + var(--vv-top)) var(--gap) 9px;
   /* The ramp under a dark veil — full strength it would swallow the links at
      the lime end; veiled it keeps the colour and stays readable. */
   background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--ramp);

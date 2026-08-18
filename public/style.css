@@ -94,7 +94,7 @@ body {
    below, so the bright colours are still on the page. */
   background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient);
   color: #fff;
-  padding: calc(8px + var(--safe-top)) 14px 8px;
+  padding: calc(8px + var(--safe-top) + var(--vv-top)) 14px 8px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1185,8 +1185,14 @@ a.filter-btn {
 }
 .proto-figure[data-fig="animals"] canvas {
   left: 58px;
-  right: 0;
-  width: auto;
+  /* Ausdrücklich rechnen statt width:auto. Ein Canvas ist ein ersetztes
+     Element: bei width:auto nimmt der Browser seine Eigenbreite — also das
+     width-Attribut — und ignoriert right:0. resize() schreibt aber genau
+     dieses Attribut aus der gemessenen CSS-Breite zurück. Beides zusammen
+     rastet auf dem ersten Messwert ein: der Canvas blieb 170px breit über
+     einem 312px breiten Bild, und rechts davon nahm die Grafik keine
+     Anschusspunkte mehr an. */
+  width: calc(100% - 58px);
 }
 
 /* Per-row Stück selector overlaid on the left edge of the animal-pose chart
@@ -3398,7 +3404,9 @@ body.rsvp-page {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 18px;
+  /* Scrollt mit, steht aber beim Öffnen ganz oben — also den Streifen unter
+     der Statusleiste mitnehmen. */
+  padding: calc(14px + var(--safe-top)) 18px 14px;
   color: #fff;
   /* Same veiled ramp as every other bar. */
   background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient);
