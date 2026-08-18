@@ -80,7 +80,12 @@ body {
   left: 0;
   right: 0;
   z-index: 10;
-  background: var(--night);
+/* The ramp across the whole bar, laid under a dark veil. At full
+   strength the lime end only gives white text 1.5:1 — that is why the
+   buttons used to need black plates. At 52 % it is 5.1:1 and the
+   controls can be plain outlines. The undimmed ramp stays as the edge
+   below, so the bright colours are still on the page. */
+  background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient);
   color: #fff;
   padding: calc(8px + var(--safe-top)) 14px 8px;
   display: flex;
@@ -156,8 +161,8 @@ body {
     align-items: stretch;
     gap: 6px;
     padding: calc(6px + var(--safe-top)) 10px 6px;
-    /* Same night ground stacked; the ramp stays as the edge below. */
-    background: var(--night);
+    /* Stacked: the ramp runs top-to-bottom, same veil over it. */
+    background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient-v);
   }
   #topbar h1 {
     font-size: 14px;
@@ -193,8 +198,8 @@ body {
 #filter-date,
 .filter-btn {
   background: transparent;
-  color: #dbe9e6;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 8px;
   padding: 7px 13px;
   font: inherit;
@@ -3467,8 +3472,8 @@ body.rsvp-page {
   gap: 8px;
   padding: 14px 18px;
   color: #fff;
-  /* Night ground with the ramp as a hairline edge — same bar as everywhere. */
-  background: var(--night);
+  /* Same veiled ramp as every other bar. */
+  background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient);
   border-bottom: 3px solid transparent;
   border-image: var(--brand-gradient) 1;
 }
@@ -3774,7 +3779,7 @@ body.stk-page {
 
 #stk-topbar {
   position: static;
-  background: var(--night);
+  background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient);
   color: #fff;
   border-bottom: 3px solid transparent;
   border-image: var(--brand-gradient) 1;

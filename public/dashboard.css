@@ -65,7 +65,9 @@ body {
   align-items: center;
   gap: clamp(12px, 2vw, 26px);
   padding: 9px var(--gap);
-  background: var(--night);
+  /* The ramp under a dark veil — full strength it would swallow the links at
+     the lime end; veiled it keeps the colour and stays readable. */
+  background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--ramp);
   color: #fff;
   border-bottom: 3px solid transparent;
   border-image: var(--ramp) 1;
@@ -76,7 +78,7 @@ body {
 
 .bar-nav { display: flex; gap: clamp(10px, 1.6vw, 22px); margin-left: auto; }
 .bar-nav a {
-  color: #cfe1de;
+  color: #e4efec;
   text-decoration: none;
   font-size: 13px;
   font-weight: 650;
@@ -89,7 +91,7 @@ body {
 
 .bar-season {
   font-size: 12px;
-  color: #8fa9ad;
+  color: #edf5f2;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
