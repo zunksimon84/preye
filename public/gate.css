@@ -1,0 +1,139 @@
+/* Zugangssperre — gehört zu gate.js und liegt deshalb in einer eigenen Datei.
+   Vorher stand das nur in style.css; der Control Room und die Reviere laden
+   aber dashboard.css, und dort hätte die Maske ohne jeden Stil dagestanden.
+
+   Alle Werte tragen hier ein --gate-Präfix und stehen ausgeschrieben da. Das
+   ist Absicht: die Datei liegt mal neben style.css, mal neben dashboard.css,
+   und ein gemeinsam benutzter Tokenname (--card, --text, --brand-gradient)
+   würde je nach Ladereihenfolge das eine oder das andere Stylesheet
+   überschreiben. Ändert sich die Marke, muss dieser Block mitwandern. */
+
+:root {
+  --gate-night: #04141c;
+  --gate-card-bg: #ffffff;
+  --gate-text: #1a1a1a;
+  --gate-muted: #6b6b6b;
+  --gate-border: #d0d5db;
+  --gate-sea-green: #0f9a78;
+  --gate-error: #b83f18;
+  --gate-gradient: linear-gradient(100deg,
+    #045d75 0%,
+    #0b7c95 20%,
+    #0f9a78 40%,
+    #2fa35f 62%,
+    #b5d33a 86%,
+    #c6e03c 100%);
+}
+
+/* ---------------- Privater Zugang ----------------
+   Die Karte stammte noch aus der Zeit vor dem Verlauf: weißer Kasten mit
+   Lime-Rahmen und Lime-Knopf auf schwarzem Grund. Jetzt der veilte Verlauf
+   als Hintergrund, die Rampe als Kante oben auf der Karte, und ein dunkler
+   Knopf statt des grünen — dieselbe Sprache wie Übersicht und Leisten. */
+
+#gate {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    linear-gradient(rgba(4, 20, 28, 0.62), rgba(4, 20, 28, 0.62)),
+    var(--gate-gradient);
+}
+
+/* Höhere Spezifität als #gate allein, damit das hidden-Attribut die Sperre
+   wirklich verbirgt — ohne diese Regel schlägt #gate { display: flex } die
+   Browserregel [hidden] { display: none }, und die Maske steht auch im
+   öffentlichen Betrieb immer im Bild. Beim Neubau der Karte am 18.8. habe ich
+   genau das übersehen; die Sperre erschien danach auf jeder Seite. */
+#gate[hidden] {
+  display: none;
+}
+
+.gate-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--gate-card-bg);
+  padding: 34px 28px 28px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 372px;
+  text-align: center;
+  border: 1px solid var(--gate-border);
+  box-shadow: 0 24px 60px -28px rgba(2, 16, 22, 0.75);
+}
+/* Die Rampe als Kante — dasselbe Zeichen wie unter jeder Leiste. */
+.gate-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 5px;
+  background: var(--gate-gradient);
+}
+
+.gate-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  color: var(--gate-text);
+  font-size: 23px;
+}
+
+.gate-brand .brand-eye {
+  height: 46px;
+  width: auto;
+}
+
+.gate-sub {
+  color: var(--gate-muted);
+  margin: 8px 0 22px;
+  font-size: 13.5px;
+}
+
+#gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#gate-pw {
+  font: inherit;
+  font-size: 16px;
+  padding: 13px 14px;
+  border: 1px solid var(--gate-border);
+  border-radius: 10px;
+  text-align: center;
+  background: #fff;
+  transition: border-color 0.14s, box-shadow 0.14s;
+}
+#gate-pw:focus {
+  outline: none;
+  border-color: var(--gate-sea-green);
+  box-shadow: 0 0 0 3px rgba(15, 154, 120, 0.18);
+}
+
+#gate-form button {
+  padding: 13px;
+  background: var(--gate-night);
+  color: #fff;
+  border: 1px solid var(--gate-night);
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.14s, transform 0.08s;
+}
+#gate-form button:hover { background: #0b3240; border-color: #0b3240; }
+#gate-form button:active { transform: scale(0.985); }
+#gate-form button:disabled { opacity: 0.6; cursor: default; }
+
+.gate-error {
+  margin: 12px 0 0;
+  color: var(--gate-error);
+  font-size: 13px;
+}

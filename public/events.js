@@ -113,84 +113,9 @@ async function postJson(body) {
 // detail, etc.) eats two Apps Script cold-start round-trips (~2–4 s)
 // before anything renders. Mutations still go through the live token,
 // so a revoked token only stays valid for the rest of the TTL window.
-const GATE_OK_KEY = "preye.gate.verified_at";
-const GATE_OK_TTL_MS = 15 * 60 * 1000;
 
-async function passGate() {
-  if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) return true;
-  const verifiedAt = parseInt(localStorage.getItem(GATE_OK_KEY) || "0", 10);
-  if (verifiedAt && Date.now() - verifiedAt < GATE_OK_TTL_MS) return true;
-  let isPublic = true;
-  try {
-    const res = await fetch(cfg.APPS_SCRIPT_URL + "?action=site-status");
-    const data = await res.json();
-    isPublic = !!data.is_public;
-  } catch (err) {
-    return true;
-  }
-  if (isPublic) {
-    localStorage.setItem(GATE_OK_KEY, String(Date.now()));
-    return true;
-  }
-  const cached = localStorage.getItem("preye.token");
-  if (cached) {
-    try {
-      const v = await fetch(cfg.APPS_SCRIPT_URL + "?action=verify-access&token=" + encodeURIComponent(cached));
-      const vr = await v.json();
-      if (vr.ok) {
-        localStorage.setItem(GATE_OK_KEY, String(Date.now()));
-        return true;
-      }
-    } catch (err) {}
-    localStorage.removeItem("preye.token");
-    localStorage.removeItem(GATE_OK_KEY);
-  }
-  const ok = await showGate();
-  if (ok) localStorage.setItem(GATE_OK_KEY, String(Date.now()));
-  return ok;
-}
-
-function showGate() {
-  return new Promise((resolve) => {
-    const gate = $("#gate");
-    const form = $("#gate-form");
-    const input = $("#gate-pw");
-    const errorEl = $("#gate-error");
-    const submitBtn = form.querySelector("button");
-    gate.hidden = false;
-    setTimeout(() => input.focus(), 50);
-    let inflight = false;
-    async function attempt() {
-      if (inflight) return;
-      const password = input.value;
-      if (!password) return;
-      inflight = true;
-      errorEl.hidden = true;
-      submitBtn.disabled = true;
-      try {
-        const url = cfg.APPS_SCRIPT_URL + "?action=verify-access&password=" + encodeURIComponent(password);
-        const res = await fetch(url, { redirect: "follow" });
-        const data = await res.json();
-        if (data && data.ok && data.token) {
-          localStorage.setItem("preye.token", data.token);
-          gate.hidden = true;
-          resolve(true);
-          return;
-        }
-        errorEl.textContent = "Falsches Passwort.";
-        errorEl.hidden = false;
-        input.select();
-      } catch (err) {
-        errorEl.textContent = "Fehler: " + (err.message || err);
-        errorEl.hidden = false;
-      } finally {
-        inflight = false;
-        submitBtn.disabled = false;
-      }
-    }
-    form.addEventListener("submit", (e) => { e.preventDefault(); attempt(); });
-  });
-}
+// Die Zugangssperre steht in gate.js — eine Fassung für alle Seiten, statt
+// wie früher je eine Kopie hier und in events.js.
 
 // ---------- Toast ----------
 
@@ -2838,7 +2763,7 @@ async function main() {
     document.body.innerHTML = "<p style='padding:24px'>config.js fehlt — Pages-Deployment prüfen.</p>";
     return;
   }
-  if (!(await passGate())) return;
+  if (!(await window.PreyeGate.pass())) return;
   wireUi();
   await loadAddressBook();
   route();

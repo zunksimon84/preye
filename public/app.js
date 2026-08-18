@@ -32,7 +32,7 @@ async function main() {
     return;
   }
   try {
-    if (!(await passGate())) return; // private + wrong/missing password
+    if (!(await window.PreyeGate.pass())) return; // private + wrong/missing password
     await loadMapsScript(cfg.GOOGLE_MAPS_API_KEY);
     initMap();
     await bootstrap();
@@ -61,93 +61,8 @@ function backendUrl(action, params = {}) {
   return u.toString();
 }
 
-async function passGate() {
-  if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) return true;
-  let isPublic = true;
-  try {
-    const res = await fetch(cfg.APPS_SCRIPT_URL + "?action=site-status");
-    const data = await res.json();
-    isPublic = !!data.is_public;
-  } catch (err) {
-    console.warn("site-status check failed, allowing through:", err);
-    return true;
-  }
-  if (isPublic) return true;
-  const cached = localStorage.getItem("preye.token");
-  if (cached) {
-    try {
-      const v = await fetch(cfg.APPS_SCRIPT_URL + "?action=verify-access&token=" + encodeURIComponent(cached));
-      const vr = await v.json();
-      if (vr.ok) return true;
-    } catch (err) {
-      // fall through to prompt
-    }
-    localStorage.removeItem("preye.token");
-  }
-  return showGate();
-}
-
-function showGate() {
-  return new Promise((resolve) => {
-    const gate = $("#gate");
-    const form = $("#gate-form");
-    const input = $("#gate-pw");
-    const errorEl = $("#gate-error");
-    const submitBtn = form.querySelector("button");
-    gate.hidden = false;
-    setTimeout(() => input.focus(), 50);
-
-    let inflight = false;
-    async function attempt() {
-      if (inflight) return;
-      const password = input.value;
-      if (!password) return;
-      inflight = true;
-      errorEl.hidden = true;
-      const oldText = submitBtn.textContent;
-      submitBtn.disabled = true;
-      submitBtn.textContent = "…";
-      try {
-        const url = cfg.APPS_SCRIPT_URL + "?action=verify-access&password=" + encodeURIComponent(password);
-        const res = await fetch(url, { redirect: "follow" });
-        const text = await res.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (parseErr) {
-          throw new Error("Antwort vom Server konnte nicht gelesen werden");
-        }
-        if (data && data.ok && data.token) {
-          localStorage.setItem("preye.token", data.token);
-          gate.hidden = true;
-          resolve(true);
-          return;
-        }
-        if (data && data.error) {
-          errorEl.textContent = "Fehler: " + data.error;
-        } else {
-          errorEl.textContent = "Falsches Passwort.";
-        }
-        errorEl.hidden = false;
-        input.select();
-      } catch (err) {
-        console.error("gate verify failed", err);
-        errorEl.textContent = "Fehler: " + (err.message || err);
-        errorEl.hidden = false;
-      } finally {
-        inflight = false;
-        submitBtn.disabled = false;
-        submitBtn.textContent = oldText;
-      }
-    }
-
-    form.addEventListener("submit", (e) => { e.preventDefault(); attempt(); });
-    submitBtn.addEventListener("click", (e) => { e.preventDefault(); attempt(); });
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); attempt(); }
-    });
-  });
-}
+// Die Zugangssperre steht in gate.js — eine Fassung für alle Seiten, statt
+// wie früher je eine Kopie hier und in events.js.
 
 // Track iOS Chrome / Safari URL-bar position so position:fixed modals
 // can sit above (not behind) the browser chrome. CSS env() doesn't expose

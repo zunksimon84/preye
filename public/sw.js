@@ -18,6 +18,8 @@ const SHELL = [
   "standkarte.js",
   "style.css",
   "config.js",
+  "gate.js",
+  "gate.css",
   "preye-mark.png",
   "favicon-preye.png",
 ];

@@ -16,6 +16,8 @@
   const get = (action) => {
     const u = new URL(cfg.APPS_SCRIPT_URL);
     u.searchParams.set("action", action);
+    const token = localStorage.getItem("preye.token");
+    if (token) u.searchParams.set("token", token);
     return fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
   };
 
