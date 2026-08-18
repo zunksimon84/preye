@@ -4,255 +4,136 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#04141c" />
-    <title>PREYE — Revier, Strecke, Drückjagd</title>
-    <meta name="description" content="Strecken, Stände und Drückjagden für ein Revier, an einem Ort. Heatmap, Jagdplanungstool und digitale Standkarte für die Peenwerder Jagd." />
+    <title>PREYE — Übersicht</title>
+    <meta name="robots" content="noindex" />
     <link rel="icon" type="image/png" href="favicon-preye.png" />
     <link rel="apple-touch-icon" href="favicon-preye.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
-    <link rel="stylesheet" href="landing.css" />
+    <link rel="stylesheet" href="dashboard.css" />
   </head>
   <body>
-    <a class="skip" href="#main">Zum Inhalt springen</a>
+    <a class="skip" href="#board">Zum Inhalt springen</a>
 
-    <header class="topbar" id="topbar">
-      <a class="brand" href="index.html" aria-label="PREYE — Startseite">
+    <header class="bar" id="bar">
+      <a class="brand" href="index.html" aria-label="PREYE — Übersicht">
         <span class="brand-word">PREYE</span>
         <img class="brand-mark" src="preye-mark.png" alt="" />
       </a>
-
-      <nav class="nav" id="nav" aria-label="Hauptmenü">
-        <a href="#revier">Revier</a>
+      <nav class="bar-nav" id="nav" aria-label="Werkzeuge">
+        <a href="karte.html">Karte</a>
         <a href="events.html">Drückjagd</a>
         <a href="standkarte.html">Standkarte</a>
         <a href="nachsuche.html">Nachsuche</a>
       </nav>
-
-      <a class="cta cta--bar" href="karte.html">Karte öffnen</a>
-
+      <span class="bar-season" id="bar-season">Saison —</span>
       <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menü">
         <span></span><span></span><span></span>
       </button>
     </header>
 
-    <main id="main">
-      <!-- ---------------------------------------------------------- Hero -->
-      <section class="hero">
-        <video class="hero-loop" autoplay muted loop playsinline preload="metadata" poster="hero.jpg">
+    <main id="board" class="board">
+      <!-- A thin band, not a hero: enough to know whose tool this is. -->
+      <section class="band">
+        <video class="band-loop" autoplay muted loop playsinline preload="metadata" poster="hero.jpg">
           <source src="hero.webm" type="video/webm" />
           <source src="hero.mp4" type="video/mp4" />
         </video>
-        <div class="hero-scrim" aria-hidden="true"></div>
-
-        <div class="hero-copy">
-          <p class="eyebrow eyebrow--light">Peenwerder Jagd</p>
-          <h1>Wo das Wild wirklich steht</h1>
-          <p class="hero-sub">Jeder Stand, jede Strecke, jedes Revier an einem Ort.</p>
-          <div class="hero-actions">
-            <a class="cta cta--solid" href="karte.html">Karte öffnen</a>
-            <a class="cta cta--ghost" href="standkarte.html">Zur Standkarte</a>
-          </div>
-        </div>
-
-        <div class="hero-facts">
-          <div><b>99</b><span>Stände im Revier</span></div>
-          <div><b>22</b><span>Jäger</span></div>
-          <div><b>9</b><span>geplante Jagden</span></div>
+        <div class="band-copy">
+          <h1>Peenwerder Jagd</h1>
+          <p id="band-sub">Revier, Strecke und Drückjagden</p>
         </div>
       </section>
 
-      <!-- ------------------------------------------------------- Thesis -->
-      <section class="statement">
-        <p class="eyebrow">preye</p>
-        <h2>Ein Revier weiß mehr, als ein Kopf sich merken kann.</h2>
-        <p class="statement-sub">Jede Strecke, jeder Stand, jede Drückjagd an einem Ort — statt auf Zetteln, in WhatsApp-Gruppen und in vier verschiedenen Excel-Tabellen.</p>
-      </section>
-
-      <!-- ---------------------------------------------------- Dashboard -->
-      <section class="dash" id="revier">
-        <div class="dash-head">
-          <p class="eyebrow">Revier</p>
-          <h2>Dein Revier auf einen Blick</h2>
-          <p class="statement-sub">Live aus derselben Quelle wie die Karte — keine gepflegte Zweitliste.</p>
-        </div>
-
-        <div class="dash-grid">
-          <article class="card card--wide">
-            <h3>Stände im Revier</h3>
-            <p class="card-big"><span id="d-posts">99</span><small>Stände</small></p>
-            <div class="viz--areas" id="d-areas">
-              <div class="area" style="--w: 72"><span>Hauptrevier</span><b>72</b></div>
-              <div class="area" style="--w: 12"><span>Nord</span><b>12</b></div>
-              <div class="area" style="--w: 10"><span>Nordrand</span><b>10</b></div>
-              <div class="area" style="--w: 2"><span>Ost</span><b>2</b></div>
-            </div>
-          </article>
-
-          <article class="card" id="d-top-card">
-            <h3>Bester Stand je Gebiet</h3>
-            <ol class="toplist" id="d-top">
-              <li class="toplist-empty">wird geladen …</li>
-            </ol>
-            <p class="card-note">Erlegungen dieser Saison</p>
-          </article>
-
-          <article class="card">
-            <h3>Strecke dieser Saison</h3>
-            <p class="card-big"><span id="d-total">47</span><small>Stück</small></p>
-            <ul class="species" id="d-species">
-              <li class="toplist-empty">wird geladen …</li>
-            </ul>
-            <p class="card-note" id="d-season">1. April – 31. März</p>
-          </article>
-        </div>
-
-        <div class="dash-cta">
-          <a class="cta cta--dark" href="karte.html">Dein Revier</a>
-        </div>
-      </section>
-
-      <!-- --------------------------------------------------- Drückjagd -->
-      <section class="feature" id="drueckjagd">
-        <div class="feature-inner">
-          <div class="feature-copy">
-            <p class="eyebrow">Drückjagd</p>
-            <h3>Vom Termin bis zum letzten Stand</h3>
-            <p>Jagd anlegen, Jäger per Link einladen, Zu- und Absagen einsammeln, Ansteller Runden und Treibergruppen bauen, Infomails mit Karte und Standnummer verschicken. Jeder Schütze bekommt seinen Stand, jeder Ansteller seine Runde.</p>
-            <ul class="ticks">
-              <li>Einladung als Magic-Link — kein Konto, kein Passwort für die Jäger</li>
-              <li>Revierkarte färbt jede Runde in einem eigenen Ton</li>
-              <li>Freigaben je Wildart und Altersklasse, direkt in der Infomail</li>
-            </ul>
-            <a class="cta cta--dark" href="events.html">Zur Drückjagdplanung</a>
-          </div>
-          <div class="feature-visual">
-            <div class="viz viz--rounds">
-              <div class="round"><b>Ansteller Runde I</b><span>Nr. 19 · Nr. 17 · Nr. 11</span></div>
-              <div class="round"><b>Ansteller Runde II</b><span>Nr. 42 · Nr. 38 · Nr. 35 · Nr. 31</span></div>
-              <div class="round"><b>Treibergruppe I</b><span>6 Treiber · 3 Hunde</span></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ----------------------------------------------- Zwei Einstiege -->
-      <section class="actions">
-        <a class="action" href="nachsuche.html">
-          <span class="action-tag">Ohne Revier, sofort</span>
+      <!-- Everything the tool does, one tap away. -->
+      <nav class="tiles" aria-label="Funktionen">
+        <a class="tile" href="karte.html">
+          <span class="tile-icon" aria-hidden="true">◉</span>
+          <b>Karte &amp; Strecke</b>
+          <span>Heatmap, Stände, Strecke eintragen</span>
+        </a>
+        <a class="tile" href="events.html">
+          <span class="tile-icon" aria-hidden="true">▤</span>
+          <b>Drückjagdplanung</b>
+          <span>Jagden, Einladungen, Runden, Infomails</span>
+        </a>
+        <a class="tile" href="standkarte.html">
+          <span class="tile-icon" aria-hidden="true">▣</span>
+          <b>Standkarte</b>
+          <span>Karte für den Jagdtag, offline nutzbar</span>
+        </a>
+        <a class="tile tile--alert" href="nachsuche.html">
+          <span class="tile-icon" aria-hidden="true">✕</span>
           <b>Nachsuche melden</b>
-          <span class="action-sub">Anschussprotokoll frei ausfüllen, PDF herunterladen und dem Nachsuchenführer schicken. Kein Login, nichts wird gespeichert.</span>
+          <span>Anschussprotokoll als PDF, ohne Revier</span>
         </a>
-        <a class="action" href="standkarte.html">
-          <span class="action-tag">Für den Jagdtag</span>
-          <b>Standkarte ausfüllen</b>
-          <span class="action-sub">Zeiten, Freigaben, Kontakte und Dein Stand — dazu die Liste für Gesehenes und Beschossenes. Läuft auch ohne Empfang.</span>
-        </a>
-      </section>
+      </nav>
 
-      <!-- -------------------------------------------------- Standkarte -->
-      <section class="feature feature--alt" id="standkarte">
-        <div class="feature-inner">
-          <div class="feature-copy">
-            <p class="eyebrow">Standkarte</p>
-            <h3>Die Karte für den Jagdtag, auf dem Handy</h3>
-            <p>Zeiten, Treffpunkt, Freigaben, Kontakte und Dein eigener Stand mit Route — dazu die Liste zum Eintragen, was Du gesehen und beschossen hast. Was Du tippst, bleibt auf dem Gerät.</p>
-            <ul class="ticks">
-              <li>Funktioniert auf dem Stand ohne Empfang, wenn Du sie einmal geöffnet hast</li>
-              <li>Kommt per QR-Code aus der Infomail aufs Handy</li>
-              <li>Meldung mit einem Tipp an den Jagdkoordinator</li>
-            </ul>
-            <a class="link-arrow" href="standkarte.html">Standkarte öffnen</a>
+      <div class="grid">
+        <!-- Next hunt: the one thing worth knowing on any given day. -->
+        <article class="panel panel--next" id="p-next">
+          <header class="panel-head">
+            <h2>Nächste Jagd</h2>
+            <a class="panel-link" href="events.html">alle Jagden</a>
+          </header>
+          <div class="panel-body" id="next-body">
+            <p class="muted">wird geladen …</p>
           </div>
-          <div class="feature-visual">
-            <div class="viz viz--card">
-              <div class="mini-card">
-                <div class="mini-band">STANDKARTE</div>
-                <div class="mini-row"><span>Stand</span><b>Nr. 11 — Wildapfel</b></div>
-                <div class="mini-row"><span>Runde</span><b>Ansteller Runde I</b></div>
-                <div class="mini-row"><span>Jagdende</span><b>12:30</b></div>
-                <div class="mini-list">
-                  <div><i>1</i>09:42 · Schwarzwild ♀ · beschossen</div>
-                  <div><i>2</i>10:15 · Rehwild ♂ · gesehen</div>
-                  <div class="empty"><i>3</i></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+        </article>
 
-      <!-- --------------------------------------------------- Nachsuche -->
-      <section class="feature" id="nachsuche">
-        <div class="feature-inner">
-          <div class="feature-copy">
-            <p class="eyebrow">Nachsuche</p>
-            <h3>Anschussprotokoll, solange es frisch ist</h3>
-            <p>Stand, Uhrzeit, Kaliber, Stellung des Stückes beim Schuss, gefundene Pirschzeichen und der Anschuss im Entfernungskreis — direkt am Stand ausgefüllt und beim Nachsuchenführer, bevor die Erinnerung verblasst.</p>
-            <ul class="ticks">
-              <li>Anschuss und Fluchtrichtung in den Kreis tippen</li>
-              <li>Sitz der Kugel auf der Wildpose markieren</li>
-              <li>Als PDF an den Nachsuchenführer, offene Nachsuchen auf der Karte</li>
-            </ul>
-            <a class="cta cta--dark" href="nachsuche.html">Nachsuche melden</a>
+        <article class="panel" id="p-open">
+          <header class="panel-head">
+            <h2>Offene Nachsuchen</h2>
+            <a class="panel-link" href="karte.html">auf der Karte</a>
+          </header>
+          <div class="panel-body" id="open-body">
+            <p class="muted">wird geladen …</p>
           </div>
-          <div class="feature-visual">
-            <div class="viz viz--rings" aria-hidden="true">
-              <svg viewBox="0 0 240 240" role="img">
-                <circle cx="120" cy="120" r="34" />
-                <circle cx="120" cy="120" r="70" />
-                <circle cx="120" cy="120" r="106" />
-                <line x1="120" y1="14" x2="120" y2="226" />
-                <line x1="14" y1="120" x2="226" y2="120" />
-                <line x1="45" y1="45" x2="195" y2="195" />
-                <line x1="195" y1="45" x2="45" y2="195" />
-                <text x="120" y="30" text-anchor="middle">12 Uhr</text>
-                <g class="mark">
-                  <line x1="150" y1="88" x2="166" y2="72" />
-                  <line x1="166" y1="88" x2="150" y2="72" />
-                </g>
-              </svg>
-            </div>
-            <p class="viz-caption">30 m · 60 m · 100 m um den Sitz</p>
-          </div>
-        </div>
-      </section>
+        </article>
 
-      <!-- --------------------------------------------------------- CTA -->
-      <section class="closing">
-        <p class="eyebrow eyebrow--light">Waidmannsheil</p>
-        <h2>Das Revier passt in eine Hosentasche.</h2>
-        <div class="hero-actions">
-          <a class="cta cta--solid" href="karte.html">Karte öffnen</a>
-          <a class="cta cta--ghost" href="events.html">Jagd planen</a>
-        </div>
-      </section>
+        <article class="panel">
+          <header class="panel-head">
+            <h2>Strecke dieser Saison</h2>
+            <a class="panel-link" href="karte.html">Details</a>
+          </header>
+          <div class="panel-body">
+            <p class="big"><span id="d-total">—</span><small>Stück</small></p>
+            <ul class="species" id="d-species"><li class="muted">wird geladen …</li></ul>
+          </div>
+        </article>
+
+        <article class="panel">
+          <header class="panel-head">
+            <h2>Stände im Revier</h2>
+            <a class="panel-link" href="karte.html">Karte</a>
+          </header>
+          <div class="panel-body">
+            <p class="big"><span id="d-posts">—</span><small>Stände</small></p>
+            <div class="bars" id="d-areas"><p class="muted">wird geladen …</p></div>
+            <p class="sub-head">Bester Stand je Gebiet</p>
+            <ol class="toplist" id="d-top"><li class="muted">wird geladen …</li></ol>
+          </div>
+        </article>
+
+        <article class="panel">
+          <header class="panel-head">
+            <h2>Kommende Jagden</h2>
+            <a class="panel-link" href="events.html">planen</a>
+          </header>
+          <div class="panel-body">
+            <ul class="huntlist" id="d-hunts"><li class="muted">wird geladen …</li></ul>
+          </div>
+        </article>
+      </div>
     </main>
 
     <footer class="foot">
-      <div class="foot-inner">
-        <div class="foot-brand">
-          <span class="brand-word">PREYE</span>
-          <img class="brand-mark" src="preye-mark.png" alt="" />
-          <p>Revierverwaltung für die Peenwerder Jagd.</p>
-        </div>
-        <nav aria-label="Werkzeuge">
-          <p class="foot-head">Werkzeuge</p>
-          <a href="karte.html">Karte &amp; Heatmap</a>
-          <a href="events.html">Jagdplanungstool</a>
-          <a href="standkarte.html">Standkarte</a>
-          <a href="nachsuche.html">Anschussprotokoll</a>
-        </nav>
-        <nav aria-label="Revier">
-          <p class="foot-head">Revier</p>
-          <a href="#revier">Stände</a>
-          <a href="#drueckjagd">Drückjagd</a>
-        </nav>
-      </div>
-      <p class="foot-legal">Privater Zugang · Peenwerder &amp; NPA Müritz</p>
+      <span>PREYE · Peenwerder &amp; NPA Müritz · interner Zugang</span>
+      <span id="foot-updated"></span>
     </footer>
 
     <script src="config.js"></script>
-    <script src="landing.js"></script>
+    <script src="dashboard.js"></script>
   </body>
 </html>
