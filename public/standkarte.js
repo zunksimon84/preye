@@ -653,7 +653,7 @@ function wireUi() {
     const params = new URLSearchParams();
     if (placement && placement.pos && placement.pos.post_id) params.set("stand", placement.pos.post_id);
     if (state.me) params.set("name", state.me);
-    location.href = "karte.html?" + params.toString() + "#protokoll";
+    location.href = "peenwerder.html?" + params.toString() + "#protokoll";
   });
 
   $("#stk-send").addEventListener("click", async () => {

@@ -387,3 +387,106 @@ body {
   .grid { grid-template-columns: 1fr; }
   .panel--next { grid-column: span 1; }
 }
+
+/* ------------------------------------------------------- Revier-Auswahl */
+
+.page-head { margin: 4px 0 var(--gap); }
+.page-head h1 {
+  margin: 0 0 4px;
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+  font-weight: 780;
+  letter-spacing: -0.022em;
+}
+.page-head p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+
+.reviere { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+
+.revier {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: clamp(18px, 2.6vw, 26px);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--ink);
+}
+a.revier { transition: border-color 0.14s, transform 0.1s, box-shadow 0.14s; }
+a.revier:hover {
+  border-color: var(--sea);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px -24px rgba(6, 32, 43, 0.55);
+}
+/* A Revier without stands cannot be entered — it says so instead of pretending. */
+.revier--soon { background: #f7fafa; border-style: dashed; }
+
+.revier-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.revier-head b { font-size: clamp(1.15rem, 2.2vw, 1.45rem); font-weight: 770; letter-spacing: -0.015em; }
+.revier-state {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--ink-faint);
+  border: 1px solid var(--rule);
+}
+.revier-state--live { background: #eaf6ec; border-color: #bfe0c6; color: #1d6b32; }
+
+.revier-sub { margin: 0; font-size: 13.5px; color: var(--ink-faint); }
+
+.revier-stats {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.revier-stats div { display: grid; gap: 1px; }
+.revier-stats dt {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.revier-stats dd { margin: 0; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.revier-note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+.revier-go { margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--pool); }
+.revier-go--alt { text-decoration: none; }
+a.revier-go--alt:hover { text-decoration: underline; }
+
+.reviere-foot { margin: var(--gap) 0 0; font-size: 13px; color: var(--ink-faint); max-width: 62ch; }
+
+@media (max-width: 820px) { .reviere { grid-template-columns: 1fr; } }
+
+/* A band across the grid: the panels under it hold one Revier's numbers, and
+   with a second Revier coming that has to be said, not assumed. */
+.grid-band {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 -2px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid transparent;
+  border-image: var(--ramp) 1;
+}
+.grid-band-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.grid-band-link { font-size: 12.5px; font-weight: 650; color: var(--pool); text-decoration: none; }
+.grid-band-link:hover { text-decoration: underline; }

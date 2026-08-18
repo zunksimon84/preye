@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#04141c" />
+    <title>PREYE — Meine Reviere</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" href="favicon-preye.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="PREYE" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <a class="skip" href="#board">Zum Inhalt springen</a>
+
+    <header class="bar" id="bar">
+      <a class="brand" href="index.html" aria-label="PREYE — Control Room">
+        <span class="brand-word">PREYE</span>
+        <img class="brand-mark" src="preye-mark.png" alt="" />
+      </a>
+      <nav class="bar-nav" id="nav" aria-label="Werkzeuge">
+        <a href="index.html">Control Room</a>
+        <a href="events.html">Drückjagd</a>
+        <a href="standkarte.html">Standkarte</a>
+        <a href="nachsuche.html">Nachsuche</a>
+      </nav>
+      <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menü">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <main id="board" class="board">
+      <div class="page-head">
+        <h1>Meine Reviere</h1>
+        <p>Wähle das Revier, in dem Du unterwegs bist.</p>
+      </div>
+
+      <div class="reviere">
+        <a class="revier" href="peenwerder.html">
+          <div class="revier-head">
+            <b>Peenwerder</b>
+            <span class="revier-state revier-state--live">eingerichtet</span>
+          </div>
+          <p class="revier-sub">Mecklenburg-Vorpommern · Hauptrevier, Nord, Nordrand, Ost</p>
+          <dl class="revier-stats">
+            <div><dt>Stände</dt><dd id="pw-posts">—</dd></div>
+            <div><dt>Strecke Saison</dt><dd id="pw-strecke">—</dd></div>
+            <div><dt>Jäger</dt><dd id="pw-hunters">—</dd></div>
+          </dl>
+          <span class="revier-go">Karte &amp; Strecke öffnen →</span>
+        </a>
+
+        <div class="revier revier--soon">
+          <div class="revier-head">
+            <b>Müritz NPA</b>
+            <span class="revier-state">Stände fehlen noch</span>
+          </div>
+          <p class="revier-sub">Nationalpark Müritz · Babke, Langenhagen, Schwarzenhof, Serrahn</p>
+          <dl class="revier-stats">
+            <div><dt>Stände</dt><dd>0</dd></div>
+            <div><dt>Drückjagden</dt><dd id="npa-hunts">—</dd></div>
+            <div><dt>Karte</dt><dd>—</dd></div>
+          </dl>
+          <p class="revier-note">
+            Drückjagden für dieses Revier lassen sich schon planen — die Stände sind
+            nur noch nicht in My Maps eingezeichnet, deshalb gibt es weder Karte noch
+            Heatmap. Sobald sie drin sind, erscheint das Revier hier wie Peenwerder.
+          </p>
+          <a class="revier-go revier-go--alt" href="events.html">Drückjagden ansehen →</a>
+        </div>
+      </div>
+
+      <p class="reviere-foot">
+        Weitere Reviere kommen dazu. Ein Revier braucht seine Stände in Google My Maps —
+        den Rest zieht die App sich selbst.
+      </p>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="reviere.js"></script>
+    <script src="pwa.js"></script>
+  </body>
+</html>

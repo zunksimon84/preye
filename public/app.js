@@ -1062,7 +1062,7 @@ function openProtocol() {
   requestAnimationFrame(() => protoFigures.forEach((f) => f.resize()));
 }
 // The Standkarte (standkarte.html) hands over here with
-// `karte.html?stand=HR-11&name=Max%20Mustermann#protokoll` so the hunter
+// `peenwerder.html?stand=HR-11&name=Max%20Mustermann#protokoll` so the hunter
 // doesn't retype what we already know about him.
 function applyProtocolDeepLink() {
   if (location.hash !== "#protokoll") return;

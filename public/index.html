@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#04141c" />
-    <title>PREYE — Übersicht</title>
+    <title>PREYE — Control Room</title>
     <meta name="robots" content="noindex" />
     <link rel="icon" type="image/png" href="favicon-preye.png" />
     <link rel="apple-touch-icon" href="icon-192.png" />
@@ -27,7 +27,7 @@
         <img class="brand-mark" src="preye-mark.png" alt="" />
       </a>
       <nav class="bar-nav" id="nav" aria-label="Werkzeuge">
-        <a href="karte.html">Karte</a>
+        <a href="reviere.html">Reviere</a>
         <a href="events.html">Drückjagd</a>
         <a href="standkarte.html">Standkarte</a>
         <a href="nachsuche.html">Nachsuche</a>
@@ -46,17 +46,17 @@
           <source src="hero.mp4" type="video/mp4" />
         </video>
         <div class="band-copy">
-          <h1>Peenwerder Jagd</h1>
+          <h1>Control Room</h1>
           <p id="band-sub">Revier, Strecke und Drückjagden</p>
         </div>
       </section>
 
       <!-- Everything the tool does, one tap away. -->
       <nav class="tiles" aria-label="Funktionen">
-        <a class="tile" href="karte.html">
+        <a class="tile" href="reviere.html">
           <span class="tile-icon" aria-hidden="true">◉</span>
-          <b>Karte &amp; Strecke</b>
-          <span>Heatmap, Stände, Strecke eintragen</span>
+          <b>Meine Reviere</b>
+          <span>Peenwerder, Müritz NPA — Karte, Stände, Strecke</span>
         </a>
         <a class="tile" href="events.html">
           <span class="tile-icon" aria-hidden="true">▤</span>
@@ -76,7 +76,6 @@
       </nav>
 
       <div class="grid">
-        <!-- Next hunt: the one thing worth knowing on any given day. -->
         <article class="panel panel--next" id="p-next">
           <header class="panel-head">
             <h2>Nächste Jagd</h2>
@@ -86,41 +85,6 @@
             <p class="muted">wird geladen …</p>
           </div>
         </article>
-
-        <article class="panel" id="p-open">
-          <header class="panel-head">
-            <h2>Offene Nachsuchen</h2>
-            <a class="panel-link" href="karte.html">auf der Karte</a>
-          </header>
-          <div class="panel-body" id="open-body">
-            <p class="muted">wird geladen …</p>
-          </div>
-        </article>
-
-        <article class="panel">
-          <header class="panel-head">
-            <h2>Strecke dieser Saison</h2>
-            <a class="panel-link" href="karte.html">Details</a>
-          </header>
-          <div class="panel-body">
-            <p class="big"><span id="d-total">—</span><small>Stück</small></p>
-            <ul class="species" id="d-species"><li class="muted">wird geladen …</li></ul>
-          </div>
-        </article>
-
-        <article class="panel">
-          <header class="panel-head">
-            <h2>Stände im Revier</h2>
-            <a class="panel-link" href="karte.html">Karte</a>
-          </header>
-          <div class="panel-body">
-            <p class="big"><span id="d-posts">—</span><small>Stände</small></p>
-            <div class="bars" id="d-areas"><p class="muted">wird geladen …</p></div>
-            <p class="sub-head">Bester Stand je Gebiet</p>
-            <ol class="toplist" id="d-top"><li class="muted">wird geladen …</li></ol>
-          </div>
-        </article>
-
         <article class="panel">
           <header class="panel-head">
             <h2>Kommende Jagden</h2>
@@ -128,6 +92,41 @@
           </header>
           <div class="panel-body">
             <ul class="huntlist" id="d-hunts"><li class="muted">wird geladen …</li></ul>
+          </div>
+        </article>
+        <div class="grid-band">
+          <span class="grid-band-name">Peenwerder</span>
+          <a class="grid-band-link" href="reviere.html">Revier wechseln</a>
+        </div>
+        <article class="panel" id="p-open">
+          <header class="panel-head">
+            <h2>Offene Nachsuchen</h2>
+            <a class="panel-link" href="peenwerder.html">auf der Karte</a>
+          </header>
+          <div class="panel-body" id="open-body">
+            <p class="muted">wird geladen …</p>
+          </div>
+        </article>
+        <article class="panel">
+          <header class="panel-head">
+            <h2>Strecke dieser Saison</h2>
+            <a class="panel-link" href="peenwerder.html">Details</a>
+          </header>
+          <div class="panel-body">
+            <p class="big"><span id="d-total">—</span><small>Stück</small></p>
+            <ul class="species" id="d-species"><li class="muted">wird geladen …</li></ul>
+          </div>
+        </article>
+        <article class="panel">
+          <header class="panel-head">
+            <h2>Stände im Revier</h2>
+            <a class="panel-link" href="peenwerder.html">Karte</a>
+          </header>
+          <div class="panel-body">
+            <p class="big"><span id="d-posts">—</span><small>Stände</small></p>
+            <div class="bars" id="d-areas"><p class="muted">wird geladen …</p></div>
+            <p class="sub-head">Bester Stand je Gebiet</p>
+            <ol class="toplist" id="d-top"><li class="muted">wird geladen …</li></ol>
           </div>
         </article>
       </div>
