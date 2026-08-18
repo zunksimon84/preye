@@ -91,7 +91,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 3px solid transparent;
+  border-bottom: 6px solid transparent;
   border-image: var(--brand-gradient) 1;
 }
 
@@ -3474,7 +3474,7 @@ body.rsvp-page {
   color: #fff;
   /* Same veiled ramp as every other bar. */
   background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient);
-  border-bottom: 3px solid transparent;
+  border-bottom: 6px solid transparent;
   border-image: var(--brand-gradient) 1;
 }
 
@@ -3781,7 +3781,7 @@ body.stk-page {
   position: static;
   background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--brand-gradient);
   color: #fff;
-  border-bottom: 3px solid transparent;
+  border-bottom: 6px solid transparent;
   border-image: var(--brand-gradient) 1;
   padding: calc(8px + var(--safe-top)) 12px 8px;
   display: flex;
