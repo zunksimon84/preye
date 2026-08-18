@@ -956,7 +956,7 @@ a.filter-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 11px;
   color: #111;
   font-size: 22px;
 }
@@ -1643,7 +1643,7 @@ body.rsvp-page #rsvp-topbar {
 .brand-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   text-decoration: none;
   color: inherit;
 }

@@ -74,7 +74,7 @@ body {
   border-bottom: 6px solid transparent;
   border-image: var(--ramp) 1;
 }
-.brand { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: #fff; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; }
 .brand-word { font-family: "Anta", ui-sans-serif, system-ui, sans-serif; font-size: 18px; letter-spacing: 1.3px; }
 .brand-mark { height: 24px; width: auto; display: block; }
 
