@@ -47,7 +47,14 @@
   --text: #1a1a1a;
   --muted: #6b6b6b;
   --border: #d0d5db;
-  --accent: #b94a2c;
+  /* Orange statt Rot. Drei Marken, weil eine Farbe hier zwei Aufgaben hatte:
+     --accent füllt (Pillen, Knöpfe, Ränder), --accent-ink ist die Schrift
+     darauf (weiß käme nur auf 3,2:1), --accent-text ist Orange als Schrift auf
+     hellem Grund (das volle Orange schafft dort nur 2,8:1). */
+  --accent: #ff5722;
+  --accent-hover: #f04a17;
+  --accent-ink: #2a0d04;
+  --accent-text: #b83f18;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
   /* visualViewport-derived browser-chrome insets (set by JS at runtime).
@@ -250,13 +257,13 @@ a.filter-btn {
 .filter-btn--alert {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .filter-btn--alert:hover {
-  background: #cc5231;
-  border-color: #cc5231;
-  color: #fff;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-ink);
 }
 
 #map {
@@ -2000,7 +2007,7 @@ body.rsvp-page #rsvp-topbar {
   line-height: 1;
   flex-shrink: 0;
 }
-.nsf-row .nsf-remove:hover { background: var(--bg); color: var(--accent); }
+.nsf-row .nsf-remove:hover { background: var(--bg); color: var(--accent-text); }
 .nsf-add { margin-top: 8px; }
 
 /* Contacts panel on the event detail page. */
@@ -2784,7 +2791,7 @@ body.rsvp-page #rsvp-topbar {
   cursor: pointer;
   line-height: 1;
 }
-.squad-delete:hover { background: #fbe9e7; color: var(--accent); }
+.squad-delete:hover { background: #fbe9e7; color: var(--accent-text); }
 
 .squad-field {
   display: flex;
@@ -2851,7 +2858,7 @@ body.rsvp-page #rsvp-topbar {
   line-height: 1;
   flex-shrink: 0;
 }
-.sr-remove:hover { background: #fbe9e7; color: var(--accent); }
+.sr-remove:hover { background: #fbe9e7; color: var(--accent-text); }
 
 .sr-coords { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
 .sr-coords-grid {
@@ -3082,7 +3089,7 @@ body.rsvp-page #rsvp-topbar {
   cursor: pointer;
   line-height: 1;
 }
-.hunter-remove:hover { background: var(--bg); color: var(--accent); }
+.hunter-remove:hover { background: var(--bg); color: var(--accent-text); }
 
 .link-btn { background: transparent; border: none; cursor: pointer; }
 
@@ -3489,7 +3496,7 @@ body.rsvp-page {
   padding: 24px 12px;
   color: var(--steel-dark);
 }
-.rsvp-state-error { color: var(--accent); }
+.rsvp-state-error { color: var(--accent-text); }
 .rsvp-state-accepted, .rsvp-state-declined {
   background: var(--card);
   border: 1px solid var(--border);
@@ -3721,7 +3728,7 @@ body.rsvp-page {
   line-height: 1;
   flex-shrink: 0;
 }
-.dog-row .dog-remove:hover { background: var(--card); color: var(--accent); }
+.dog-row .dog-remove:hover { background: var(--card); color: var(--accent-text); }
 .dog-add-btn {
   background: var(--card);
   border: 1px dashed var(--green-bright-edge);
@@ -3807,7 +3814,7 @@ body.stk-page {
 }
 
 .stk-state { margin: 24px 0; color: var(--muted); font-size: 14px; }
-.stk-state-error { color: var(--accent); }
+.stk-state-error { color: var(--accent-text); }
 
 .stk-hint {
   color: var(--muted);
@@ -4028,7 +4035,7 @@ body.stk-page {
 .stk-fg-list li { display: flex; gap: 8px; font-size: 13px; padding: 1px 0; }
 .stk-fg-group { color: var(--muted); min-width: 90px; }
 .stk-fg-ak { font-weight: 600; }
-.stk-fg-closed { font-size: 13px; color: var(--accent); }
+.stk-fg-closed { font-size: 13px; color: var(--accent-text); }
 .stk-freigaben-foot {
   margin: 8px 0 0;
   font-size: 12px;
@@ -4100,8 +4107,8 @@ body.stk-page {
 }
 .stk-actions .primary-btn.stk-alert {
   background: var(--accent);
-  border-color: #8f3a22;
-  color: #fff;
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 /* The shared .cancel-btn is a full-width sheet button; inside the action row
    it has to sit next to the primary buttons. */

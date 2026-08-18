@@ -1479,7 +1479,7 @@ function renderTimeline(data) {
   svg.innerHTML =
     `<line x1="${PAD_X}" y1="${H - PAD_Y}" x2="${W - PAD_X}" y2="${H - PAD_Y}" stroke="#d8d4c8" stroke-width="0.5"/>` +
     (todayX != null
-      ? `<line x1="${todayX.toFixed(1)}" y1="${PAD_Y}" x2="${todayX.toFixed(1)}" y2="${H - PAD_Y}" stroke="#b94a2c" stroke-width="0.6" stroke-dasharray="2 2"/>`
+      ? `<line x1="${todayX.toFixed(1)}" y1="${PAD_Y}" x2="${todayX.toFixed(1)}" y2="${H - PAD_Y}" stroke="#ff5722" stroke-width="0.7" stroke-dasharray="2 2"/>`
       : "") +
     `<path d="${segs.join(" ")}" fill="none" stroke="#1f3a1f" stroke-width="1.5" stroke-linejoin="round"/>`;
 

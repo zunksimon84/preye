@@ -28,7 +28,9 @@
   --tint: #eef4f3;
   --rule: #d5e3e1;
   --night: #04141c;
-  --alert: #b94a2c;
+  --alert: #ff5722;        /* Füllfarbe */
+  --alert-ink: #2a0d04;    /* Schrift darauf */
+  --alert-text: #b83f18;   /* Orange als Schrift auf Hell */
 
   --gap: clamp(14px, 2.6vw, 28px);
   --shell: 1280px;
@@ -173,7 +175,7 @@ body {
 }
 .tile b { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
 .tile span:last-child { font-size: 13px; color: var(--ink-faint); line-height: 1.35; }
-.tile--alert .tile-icon { color: var(--alert); }
+.tile--alert .tile-icon { color: var(--alert-text); }
 .tile--alert:hover { border-color: var(--alert); }
 
 /* ---------------------------------------------------------------- Panels */
