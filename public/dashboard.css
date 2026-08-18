@@ -103,9 +103,15 @@ body {
 
 .board { max-width: var(--shell); margin: 0 auto; padding: var(--gap) var(--gap) 40px; }
 
+/* Das Seitenverhältnis ist an das Video gebunden (1920x460). Vorher stand hier
+   eine feste Höhe — mit object-fit: cover schnitt das Band von einem
+   16:9-Video nur den mittleren Fünftel heraus, also alles außer Himmel und
+   ferner Waldkante. Waagerecht beschneiden ist gratis, weil die Szene
+   periodisch durchläuft; senkrecht zerstört es die Komposition. */
 .band {
   position: relative;
-  height: clamp(120px, 17vw, 168px);
+  aspect-ratio: 1920 / 460;
+  max-height: 300px;
   border-radius: 14px;
   overflow: hidden;
   background: var(--night);
@@ -370,6 +376,11 @@ body {
 }
 
 @media (max-width: 680px) {
+  /* Bei 360 px Breite ergäbe das Videoformat ein 87 px flaches Band — zu wenig,
+     um etwas zu zeigen. Hier also feste Höhe und seitlich beschneiden; das
+     kostet nichts, weil die Szene periodisch durchläuft. */
+  .band { aspect-ratio: auto; height: 148px; }
+
   .bar { flex-wrap: wrap; }
   .bar-season { display: none; }
   .burger { display: block; margin-left: auto; }
