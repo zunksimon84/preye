@@ -922,34 +922,44 @@ a.filter-btn {
   color: var(--muted);
 }
 
+/* ---------------- Privater Zugang ----------------
+   Die Karte stammte noch aus der Zeit vor dem Verlauf: weißer Kasten mit
+   Lime-Rahmen und Lime-Knopf auf schwarzem Grund. Jetzt der veilte Verlauf
+   als Hintergrund, die Rampe als Kante oben auf der Karte, und ein dunkler
+   Knopf statt des grünen — dieselbe Sprache wie Übersicht und Leisten. */
+
 #gate {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: #0e0e0e;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-}
-
-/* Higher specificity than #gate alone so the [hidden] attribute actually
-   hides the overlay — without this rule #gate { display: flex } wins
-   against the UA's [hidden] { display: none } and the gate is always
-   visible even in public mode. */
-#gate[hidden] {
-  display: none;
+  background:
+    linear-gradient(rgba(4, 20, 28, 0.62), rgba(4, 20, 28, 0.62)),
+    var(--brand-gradient);
 }
 
 .gate-card {
+  position: relative;
+  overflow: hidden;
   background: var(--card);
-  padding: 28px 24px;
-  border-radius: 14px;
+  padding: 34px 28px 28px;
+  border-radius: 16px;
   width: 100%;
-  max-width: 360px;
+  max-width: 372px;
   text-align: center;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-  border: 2px solid var(--green-bright);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 60px -28px rgba(2, 16, 22, 0.75);
+}
+/* Die Rampe als Kante — dasselbe Zeichen wie unter jeder Leiste. */
+.gate-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 5px;
+  background: var(--brand-gradient);
 }
 
 .gate-brand {
@@ -957,19 +967,19 @@ a.filter-btn {
   align-items: center;
   justify-content: center;
   gap: 11px;
-  color: #111;
-  font-size: 22px;
+  color: var(--text);
+  font-size: 23px;
 }
 
 .gate-brand .brand-eye {
-  height: 44px;
+  height: 46px;
   width: auto;
 }
 
 .gate-sub {
   color: var(--muted);
-  margin: 6px 0 18px;
-  font-size: 13px;
+  margin: 8px 0 22px;
+  font-size: 13.5px;
 }
 
 #gate-form {
@@ -981,27 +991,38 @@ a.filter-btn {
 #gate-pw {
   font: inherit;
   font-size: 16px;
-  padding: 12px;
+  padding: 13px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   text-align: center;
+  background: #fff;
+  transition: border-color 0.14s, box-shadow 0.14s;
+}
+#gate-pw:focus {
+  outline: none;
+  border-color: var(--sea-green);
+  box-shadow: 0 0 0 3px rgba(15, 154, 120, 0.18);
 }
 
 #gate-form button {
   padding: 13px;
-  background: var(--green-bright);
-  color: #111;
-  border: 1px solid var(--green-bright-edge);
+  background: var(--night);
+  color: #fff;
+  border: 1px solid var(--night);
   border-radius: 10px;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   font-size: 15px;
   cursor: pointer;
+  transition: background-color 0.14s, transform 0.08s;
 }
+#gate-form button:hover { background: #0b3240; border-color: #0b3240; }
+#gate-form button:active { transform: scale(0.985); }
+#gate-form button:disabled { opacity: 0.6; cursor: default; }
 
 .gate-error {
-  margin: 10px 0 0;
-  color: var(--accent);
+  margin: 12px 0 0;
+  color: var(--accent-text);
   font-size: 13px;
 }
 
