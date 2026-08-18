@@ -25,6 +25,7 @@ const SPECIES_FALLBACK = [
 ];
 
 const state = {
+  blank: false,   // blanko card, not tied to any hunt
   events: [],
   detail: null,   // { event, hunters, squads, freigaben_matrix }
   posts: [],      // Kanzeln from the bootstrap endpoint (for coordinates)
@@ -279,6 +280,7 @@ function renderMine() {
 // ---------- Beobachtungsliste ----------
 
 function listKey() {
+  if (state.blank) return "preye.stk.list.blanko";
   return "preye.stk.list." + (state.detail.event.id || "x") + "." + (state.me || "anon");
 }
 
@@ -356,16 +358,21 @@ function refreshSpeciesOptions() {
 
 // Plain-text version of the filled list, for WhatsApp / mail / share sheet.
 function buildReport() {
-  const ev = state.detail.event;
-  const placement = findMyPlacement(state.me);
-  const stand = placement && placement.pos
-    ? (placement.pos.post_name || placement.pos.label || "Klettersitz")
-    : "";
-  const lines = [
-    "Standkarte " + (ev.name || "") + " · " + formatDate(ev.date),
-    "Schütze: " + (state.me || "—") + (stand ? " · Stand: " + stand : ""),
-    "",
-  ];
+  let head, who;
+  if (state.blank) {
+    const d = blankData();
+    head = "Standkarte " + (d.jagd || "").trim() + (d.datum ? " · " + formatDate(d.datum) : "");
+    who = "Schütze: " + (d.name || "—") + (d.stand ? " · Stand: " + d.stand : "");
+  } else {
+    const ev = state.detail.event;
+    const placement = findMyPlacement(state.me);
+    const stand = placement && placement.pos
+      ? (placement.pos.post_name || placement.pos.label || "Klettersitz")
+      : "";
+    head = "Standkarte " + (ev.name || "") + " · " + formatDate(ev.date);
+    who = "Schütze: " + (state.me || "—") + (stand ? " · Stand: " + stand : "");
+  }
+  const lines = [head.trim(), who, ""];
   const rows = readList().filter((r) => r &&
     (r.time || r.art || r.sex || r.count || r.gesehen || r.beschossen || r.liegt || r.nachsuche));
   if (!rows.length) {
@@ -459,6 +466,104 @@ function renderOfflineNote() {
   }
 }
 
+
+// ---------- Blanko-Standkarte ----------
+//
+// Reached from the start page: a card for a hunt that isn't in the tool at
+// all — a neighbour's Drückjagd, a spontaneous Ansitz. Everything that would
+// normally be read out of the hunt becomes a field you fill in yourself. The
+// hunt-linked card (from a QR code, ?event=…) is untouched.
+//
+// Every keystroke goes to localStorage under one key, so the card survives a
+// reload on the Stand exactly like the Beobachtungsliste does.
+
+const BLANK_KEY = "preye.stk.blanko.v1";
+
+function blankData() {
+  try { return JSON.parse(localStorage.getItem(BLANK_KEY) || "{}"); } catch { return {}; }
+}
+
+function saveBlank() {
+  const out = {};
+  $$("[data-blank]").forEach((el) => { out[el.dataset.blank] = el.value; });
+  try { localStorage.setItem(BLANK_KEY, JSON.stringify(out)); } catch {}
+  // The heading mirrors the two fields that name the day.
+  $("#stk-title").textContent = out.jagd || "Standkarte";
+  $("#stk-subtitle").textContent =
+    [out.datum ? formatDate(out.datum) : "", out.revier].filter(Boolean).join(" · ");
+  $("#stk-banner-sub").textContent = out.revier || "";
+}
+
+function blankField(key, label, type = "text", placeholder = "") {
+  const v = escapeHtml(blankData()[key] || "");
+  return `<label class="stk-bl-field">
+      <span>${escapeHtml(label)}</span>
+      <input type="${type}" data-blank="${key}" value="${v}"
+             ${placeholder ? `placeholder="${escapeHtml(placeholder)}"` : ""} />
+    </label>`;
+}
+
+function renderBlankCard() {
+  const d = blankData();
+  document.title = "PREYE 👁 Standkarte (blanko)";
+  $("#stk-title").textContent = d.jagd || "Standkarte";
+  $("#stk-subtitle").textContent =
+    [d.datum ? formatDate(d.datum) : "", d.revier].filter(Boolean).join(" · ");
+  $("#stk-banner-sub").textContent = d.revier || "";
+
+  // Kopf: what names the day.
+  $("#stk-mine").hidden = false;
+  $("#stk-mine-hunter").textContent = "";
+  $("#stk-mine-body").innerHTML = `
+    <div class="stk-bl-grid">
+      ${blankField("jagd", "Jagd / Anlass", "text", "z.B. Drückjagd Forst Musterhausen")}
+      ${blankField("revier", "Revier / Teilgebiet", "text", "z.B. Nordrevier")}
+      ${blankField("datum", "Datum", "date")}
+      ${blankField("name", "Mein Name")}
+      ${blankField("stand", "Mein Stand", "text", "z.B. Kanzel 14, Buchenweg")}
+      ${blankField("runde", "Runde / Ansteller", "text", "optional")}
+    </div>`;
+  $(".stk-mine-label").textContent = "Meine Angaben";
+
+  // Zeiten: same fixed rules as always, the times typed in.
+  $("#stk-times").innerHTML = `
+    <div class="stk-bl-grid">
+      ${blankField("treffpunkt", "Treffpunkt")}
+      ${blankField("treff_time", "Treffzeit", "time")}
+      ${blankField("start_time", "Jagdbeginn", "time")}
+      ${blankField("end_time", "Jagdende", "time")}
+    </div>`;
+  $("#stk-briefing").hidden = true;
+
+  $("#stk-contacts").innerHTML = `
+    <div class="stk-bl-grid">
+      ${blankField("koord_name", "Jagdkoordinator")}
+      ${blankField("koord_tel", "Telefon", "tel")}
+      ${blankField("nsf_name", "Nachsuchenführer")}
+      ${blankField("nsf_tel", "Telefon", "tel")}
+      ${blankField("vet_name", "Tierarzt / Klinik")}
+      ${blankField("vet_tel", "Telefon", "tel")}
+    </div>`;
+
+  // Freigaben as free text, the way the paper card has them — a blank card is
+  // filled in a hurry, and the AK matrix belongs to a hunt that exists.
+  $("#stk-freigaben").innerHTML = `
+    <label class="stk-bl-field stk-bl-field--wide">
+      <textarea data-blank="freigaben" rows="4"
+        placeholder="z.B. Rot- und Damwild nach Ansage · Schwarzwild alles außer laktierende Bachen · Rehwild alles · kein Raubwild">${escapeHtml(d.freigaben || "")}</textarea>
+    </label>`;
+
+  renderList();
+  renderOfflineNote();
+
+  $("#stk-foot").textContent = "Waidmannsheil!";
+  $("#stk-card").hidden = false;
+  $("#stk-switch").hidden = false;
+  $("#stk-switch").textContent = "Jagd auswählen";
+  document.body.classList.add("stk-blanko");
+  setState("");
+}
+
 function renderCard() {
   const ev = state.detail.event;
   document.title = "PREYE 👁 Standkarte — " + (ev.name || "");
@@ -502,6 +607,8 @@ function renderEventPicker() {
       b.addEventListener("click", () => selectEvent(b.dataset.id));
     });
   }
+  const blankBtn = $("#stk-blank-btn");
+  if (blankBtn) blankBtn.hidden = false;
   $("#stk-pick-event").hidden = false;
   setState("");
 }
@@ -607,7 +714,26 @@ async function resetToEventPicker() {
 }
 
 function wireUi() {
-  $("#stk-switch").addEventListener("click", resetToEventPicker);
+  $("#stk-switch").addEventListener("click", () => {
+    state.blank = false;
+    document.body.classList.remove("stk-blanko");
+    $("#stk-switch").textContent = "Jagd wechseln";
+    resetToEventPicker();
+  });
+
+  const blankBtn = $("#stk-blank-btn");
+  if (blankBtn) blankBtn.addEventListener("click", () => {
+    state.blank = true;
+    $("#stk-pick-event").hidden = true;
+    $("#stk-pick-hunter").hidden = true;
+    setParams("", "");
+    history.replaceState(null, "", location.pathname + "?blanko=1");
+    renderBlankCard();
+  });
+  document.addEventListener("input", (e) => {
+    if (e.target.matches("[data-blank]")) saveBlank();
+  });
+
   const tbody = $("#stk-tbody");
   tbody.addEventListener("input", saveList);
   tbody.addEventListener("change", saveList);
@@ -640,8 +766,15 @@ function wireUi() {
   $("#stk-print").addEventListener("click", () => window.print());
 
   $("#stk-reset").addEventListener("click", () => {
-    if (!confirm("Alle Zeilen dieser Standkarte leeren?")) return;
+    const what = state.blank ? "Alle Eingaben dieser Standkarte leeren?" : "Alle Zeilen dieser Standkarte leeren?";
+    if (!confirm(what)) return;
     try { localStorage.removeItem(listKey()); } catch {}
+    if (state.blank) {
+      try { localStorage.removeItem(BLANK_KEY); } catch {}
+      renderBlankCard();
+      showToast("Zurückgesetzt");
+      return;
+    }
     renderList();
     showToast("Liste geleert");
   });
@@ -649,6 +782,11 @@ function wireUi() {
   // Hand over to the Anschuss-Protokoll on the map page, prefilled with the
   // Stand and the name we already know.
   $("#stk-anschuss").addEventListener("click", () => {
+    if (state.blank) {
+      // No Revier behind this card, so the Revier-free protocol it is.
+      location.href = "nachsuche.html";
+      return;
+    }
     const placement = findMyPlacement(state.me);
     const params = new URLSearchParams();
     if (placement && placement.pos && placement.pos.post_id) params.set("stand", placement.pos.post_id);
@@ -658,7 +796,9 @@ function wireUi() {
 
   $("#stk-send").addEventListener("click", async () => {
     const text = buildReport();
-    const ev = state.detail.event;
+    const ev = state.blank
+      ? { name: (blankData().jagd || "Standkarte"), coordinator_phone: blankData().koord_tel || "" }
+      : state.detail.event;
     if (navigator.share) {
       try {
         await navigator.share({ title: "Standkarte " + (ev.name || ""), text });
@@ -688,6 +828,13 @@ async function main() {
 
   if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
     setState("<p>Konfiguration fehlt: public/config.js</p>", "error");
+    return;
+  }
+
+  // From the start page: a blank card, tied to nothing.
+  if (params.get("blanko") === "1") {
+    state.blank = true;
+    renderBlankCard();
     return;
   }
 

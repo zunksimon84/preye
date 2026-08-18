@@ -4294,3 +4294,50 @@ body.nachsuche-page .proto-actions .cancel-btn { width: auto; margin-top: 0; }
   body.nachsuche-page #protocol-modal.ns-sheet { border: none; box-shadow: none; }
   @page { size: A4 portrait; margin: 10mm; }
 }
+
+/* --- Blanko-Standkarte: alles, was sonst aus der Jagd kommt, als Feld ---- */
+
+.stk-blank-btn {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  margin-top: 10px;
+  padding: 13px 15px;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font: inherit;
+  cursor: pointer;
+}
+.stk-blank-btn:hover { border-color: var(--sea-green); border-style: solid; }
+.stk-blank-btn b { font-size: 15px; }
+.stk-blank-btn span { font-size: 13px; color: var(--muted); }
+
+.stk-bl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 14px;
+}
+.stk-bl-field { display: grid; gap: 3px; }
+.stk-bl-field--wide { grid-column: 1 / -1; }
+.stk-bl-field > span {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stk-bl-field input,
+.stk-bl-field textarea {
+  font: inherit;
+  font-size: 14.5px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  width: 100%;
+  resize: vertical;
+}
+/* The Meine-Angaben block is a form here, not a filled-in summary. */
+body.stk-blanko .stk-mine { background: var(--card); }
