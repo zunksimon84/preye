@@ -1,4 +1,14 @@
-# Hero-Loop
+# Hero-Loop (Archiv)
+
+**Nicht mehr im Einsatz.** Der Hero auf der Übersicht ist seit August 2026 ein
+stehendes Bild (`public/hero.jpg`) mit einer Ken-Burns-Fahrt und einer
+driftenden Dunstschicht, beides in CSS — siehe `.band` in
+`public/dashboard.css`. Das spart die Videodateien ganz und bleibt auf jedem
+Schirm scharf.
+
+Die Skripte hier erzeugen den gerenderten Loop, der vorher dort lief. Sie
+bleiben liegen, weil die Loop-Mathematik unten wiederverwendbar ist, falls
+wieder ein bewegter Hintergrund gebraucht wird.
 
 Quelle des Videos in `public/hero.mp4` / `.webm` / `.jpg`.
 

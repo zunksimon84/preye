@@ -39,12 +39,13 @@
     </header>
 
     <main id="board" class="board">
-      <!-- A thin band, not a hero: enough to know whose tool this is. -->
+      <!-- Stehendes Bild mit Ken-Burns-Fahrt und einer driftenden Dunstschicht.
+           Zwei Ebenen, damit sich Zoom und Drift nicht ins Gehege kommen. -->
       <section class="band">
-        <video class="band-loop" autoplay muted loop playsinline preload="metadata" poster="hero.jpg">
-          <source src="hero.webm" type="video/webm" />
-          <source src="hero.mp4" type="video/mp4" />
-        </video>
+        <div class="band-media" aria-hidden="true">
+          <img class="band-img" src="hero.jpg" alt="" width="2200" height="733" />
+          <span class="band-haze"></span>
+        </div>
         <div class="band-copy">
           <h1>Control Room</h1>
           <p id="band-sub">Revier, Strecke und Drückjagden</p>
@@ -54,22 +55,22 @@
       <!-- Everything the tool does, one tap away. -->
       <nav class="tiles" aria-label="Funktionen">
         <a class="tile" href="reviere.html">
-          <span class="tile-icon" aria-hidden="true">◉</span>
+          <img class="tile-icon" src="icon-reviere.png" alt="" width="320" height="320" />
           <b>Meine Reviere</b>
           <span>Peenwerder, Müritz NPA — Karte, Stände, Strecke</span>
         </a>
         <a class="tile" href="events.html">
-          <span class="tile-icon" aria-hidden="true">▤</span>
+          <img class="tile-icon" src="icon-drueckjagd.png" alt="" width="320" height="320" />
           <b>Drückjagdplanung</b>
           <span>Jagden, Einladungen, Runden, Infomails</span>
         </a>
         <a class="tile" href="standkarte.html?blanko=1">
-          <span class="tile-icon" aria-hidden="true">▣</span>
+          <img class="tile-icon" src="icon-standkarte.png" alt="" width="320" height="320" />
           <b>Standkarte</b>
           <span>Leere Karte für den Jagdtag, offline nutzbar</span>
         </a>
         <a class="tile tile--alert" href="nachsuche.html">
-          <span class="tile-icon" aria-hidden="true">✕</span>
+          <img class="tile-icon" src="icon-nachsuche.png" alt="" width="320" height="320" />
           <b>Nachsuche melden</b>
           <span>Anschussprotokoll als PDF, ohne Revier</span>
         </a>
