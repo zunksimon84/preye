@@ -120,25 +120,28 @@ body {
   margin-bottom: var(--gap);
 }
 
-/* Ken Burns: sehr langsamer Zoom mit einem Hauch Schwenk. Das ist der
-   übliche Weg, einem stehenden Bild Leben zu geben — ein pulsierender
-   Weichzeichner, wie er manchmal vorgeschlagen wird, liest sich dagegen als
-   Ladezustand oder Darstellungsfehler.
+/* Ken Burns: langsamer Zoom mit Schwenk. Das ist der übliche Weg, einem
+   stehenden Bild Leben zu geben — ein pulsierender Weichzeichner, wie er
+   manchmal vorgeschlagen wird, liest sich dagegen als Ladezustand.
 
-   `alternate` fährt die Bewegung zurück statt zu springen, 44 s sind langsam
-   genug, dass man sie nicht als Bewegung wahrnimmt, sondern nur merkt, dass
-   das Bild nicht tot ist. */
+   Erster Anlauf war 1,075× über 44 s. Das lief nachweislich, war aber mit
+   etwa 1 px/s Randversatz unter der Schwelle, ab der das Auge Bewegung
+   überhaupt registriert — technisch animiert, gefühlt stillstehend. Jetzt
+   1,13× über 26 s, also gut 3 px/s: sichtbar, ohne zu zappeln.
+
+   `alternate` fährt die Bewegung zurück statt zu springen. */
 .band-media { position: absolute; inset: 0; }
 .band-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transform-origin: 62% 34%;   /* zwischen Adler und Lichtung, so bleiben beide im Bild */
-  animation: kenburns 44s ease-in-out infinite alternate;
+  animation: kenburns 26s ease-in-out infinite alternate;
+  will-change: transform;
 }
 @keyframes kenburns {
   from { transform: scale(1) translate3d(0, 0, 0); }
-  to   { transform: scale(1.075) translate3d(-1.2%, -1.0%, 0); }
+  to   { transform: scale(1.13) translate3d(-2.2%, -1.6%, 0); }
 }
 
 /* Driftender Dunst darüber: ein sehr weicher, breiter Schleier, der quer
@@ -150,12 +153,12 @@ body {
     radial-gradient(60% 90% at 20% 55%, rgba(198, 224, 200, 0.16), transparent 70%),
     radial-gradient(45% 80% at 62% 40%, rgba(214, 236, 228, 0.13), transparent 72%),
     radial-gradient(55% 85% at 88% 62%, rgba(190, 220, 205, 0.10), transparent 70%);
-  animation: haze 63s linear infinite;
+  animation: haze 38s linear infinite;
   pointer-events: none;
 }
 @keyframes haze {
-  from { transform: translate3d(-8%, 0, 0); }
-  to   { transform: translate3d(8%, 0, 0); }
+  from { transform: translate3d(-10%, 0, 0); }
+  to   { transform: translate3d(10%, 0, 0); }
 }
 
 .band-copy {
