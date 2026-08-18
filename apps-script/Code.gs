@@ -45,6 +45,10 @@ const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_de
 // Jagdart. Bis August 2026 gab es nur Drückjagden, deshalb ist die Spalte bei
 // allen Altbeständen leer — leer wird als "drueckjagd" gelesen.
 const HUNT_KINDS = ["drueckjagd", "gruppenansitz"];
+
+// Steht als Fußzeile unter jedem erzeugten PDF. Muss zu PDF_WATERMARK in
+// protokoll-lib.js und der Druckregel in style.css passen.
+const PDF_WATERMARK = "preye.org - the hunting OS";
 function huntKind_(value) {
   const v = String(value || "").trim().toLowerCase();
   return HUNT_KINDS.indexOf(v) >= 0 ? v : "drueckjagd";
@@ -4299,6 +4303,18 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       size: 9, italic: true, color: SOFT, before: 14, line: 1.0,
       align: DocumentApp.HorizontalAlignment.CENTER,
     });
+
+    // Wasserzeichen auf jeder Seite des PDFs. Die Fußzeile eines Google Docs
+    // wiederholt sich von selbst, deshalb reicht ein Absatz.
+    const footer = doc.addFooter();
+    const mark = footer.appendParagraph(PDF_WATERMARK);
+    mark.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    mark.editAsText()
+      .setFontFamily(FONT)
+      .setFontSize(7.5)
+      .setForegroundColor("#9a9a9a")
+      .setBold(false)
+      .setItalic(false);
 
     doc.saveAndClose();
     const pdfBlob = DriveApp.getFileById(docId).getAs("application/pdf").setName(filename + ".pdf");

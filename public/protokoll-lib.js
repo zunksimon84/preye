@@ -161,11 +161,86 @@ export function flattenFormControlsForPdf(clonedDoc, sheetEl) {
 // Libraries are lazy-loaded. The `.exporting` class temporarily un-clips the
 // modal and lays it out at a fixed document width so html2canvas captures the
 // whole form, not just the part scrolled into view.
+// Blöcke, die ein Seitenumbruch nicht zerschneiden darf. Der Umbruch fiel
+// vorher stur alle 842pt und lief dabei mitten durch den Kasten für Stück II.
+// Die Liste steht hier und nicht als Attribut im Markup, weil das Protokoll
+// auf zwei Seiten liegt (Modal in der Karte, nachsuche.html) und sonst an
+// beiden Stellen gepflegt werden müsste.
+//
+// .proto-bottom steht bewusst mit drin, obwohl es die Pirschzeichen-Kästen
+// schon enthält: es ist eine Flex-Zeile mit dem Ringdiagramm daneben, ein
+// Umbruch mittendrin zerschneidet also immer beide Spalten. Damit landet der
+// ganze Fuß — Stück I, Stück II, Diagramm und die Meldung darunter —
+// geschlossen auf der letzten Seite.
+const PDF_KEEP_TOGETHER = [
+  ".proto-figure",
+  ".proto-pirsch-block",
+].join(", ");
+
+// Zusammenhängende Abschnitte, die als ein Block gelten. Die Umrisse aller
+// Treffer werden zu einem Kasten vereinigt.
+//
+// Der Fuß des Protokolls gehört zusammen: die Pirschzeichen zu beiden Stücken,
+// das Ringdiagramm daneben und die Meldung an den Nachsuchenführer darunter.
+// Wer das Protokoll weitergibt, will das auf einem Blatt haben und nicht den
+// Kasten für Stück II auf der einen und die Bemerkung auf der nächsten Seite.
+// Passt der Fuß nicht auf eine Seite, greift die Einzelliste oben und
+// verhindert wenigstens, dass mitten durch einen Kasten gebrochen wird.
+const PDF_KEEP_GROUPS = [
+  [".proto-bottom", ".proto-meldung"],
+];
+
+// Höhe des Streifens am Seitenfuß, in dem das Wasserzeichen steht. Der Inhalt
+// hört darüber auf, damit die Zeile nichts überdeckt.
+const PDF_FOOTER_H = 24;
+const PDF_WATERMARK = "preye.org - the hunting OS";
+
+function drawWatermark(pdf, pageW, pageH) {
+  const pages = pdf.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    pdf.setPage(i);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(155);
+    pdf.text(PDF_WATERMARK, pageW / 2, pageH - 9, { align: "center" });
+  }
+  pdf.setTextColor(0);
+}
+
+// Teilt die Gesamthöhe in Seiten auf und zieht einen Umbruch nach oben, wenn
+// er sonst durch einen der Blöcke oben liefe. `keeps` sind {top, bottom} in
+// derselben Einheit wie `totalH`.
+function planPages(totalH, pageH, keeps) {
+  const pages = [];
+  let offset = 0;
+  let guard = 0;
+  while (offset < totalH - 1 && guard++ < 200) {
+    let end = offset + pageH;
+    if (end < totalH - 1) {
+      let cut = end;
+      for (const k of keeps) {
+        // Straddelt der Block die Kante? Dann oberhalb von ihm umbrechen.
+        // 2pt Luft nach oben, damit Rundungen nicht doch die Oberkante anschneiden.
+        if (k.top > offset + 1 && k.top < end && k.bottom > end) cut = Math.min(cut, k.top - 2);
+      }
+      // Ein Block, der selbst höher als eine Seite ist, lässt sich nicht
+      // retten — dann bleibt es beim normalen Umbruch, statt eine fast leere
+      // Seite zu erzeugen.
+      if (cut > offset + pageH * 0.2) end = cut;
+    }
+    pages.push({ top: offset, height: Math.min(end, totalH) - offset });
+    offset = Math.min(end, totalH);
+  }
+  return pages;
+}
+
 export async function generateProtocolPdf({ modal, sheet, figures }) {
   await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
   const el = sheet;
   let canvas;
+  let keepsCss = [];
+  let sheetCssH = 0;
   modal.classList.add("exporting");
   try {
     void modal.offsetHeight;             // force the reflow before measuring
@@ -175,7 +250,35 @@ export async function generateProtocolPdf({ modal, sheet, figures }) {
       backgroundColor: "#ffffff",
       useCORS: true,
       windowWidth: 800,
-      onclone: (doc) => flattenFormControlsForPdf(doc, sheet),
+      onclone: (doc) => {
+        flattenFormControlsForPdf(doc, sheet);
+        // Erst hier messen, nicht am lebenden Bogen. flattenFormControlsForPdf
+        // ersetzt jedes Eingabefeld durch ein div, und die sind ein paar Pixel
+        // anders hoch — der gerenderte Bogen war dadurch 15px kürzer als der
+        // gemessene, und der Umbruch landete knapp innerhalb des Blocks statt
+        // davor. Im Klon stimmen die Positionen mit dem überein, was gleich
+        // gezeichnet wird.
+        const root = doc.getElementById(sheet.id);
+        if (!root) return;
+        const sheetRect = root.getBoundingClientRect();
+        if (!sheetRect.height) return;
+        sheetCssH = sheetRect.height;
+        const rel = (n) => {
+          const r = n.getBoundingClientRect();
+          return { top: r.top - sheetRect.top, bottom: r.bottom - sheetRect.top };
+        };
+        keepsCss = [...root.querySelectorAll(PDF_KEEP_TOGETHER)].map(rel);
+        PDF_KEEP_GROUPS.forEach((selectors) => {
+          const boxes = selectors
+            .flatMap((sel) => [...root.querySelectorAll(sel)])
+            .map(rel);
+          if (!boxes.length) return;
+          keepsCss.push({
+            top: Math.min(...boxes.map((b) => b.top)),
+            bottom: Math.max(...boxes.map((b) => b.bottom)),
+          });
+        });
+      },
     });
   } finally {
     modal.classList.remove("exporting");
@@ -183,18 +286,34 @@ export async function generateProtocolPdf({ modal, sheet, figures }) {
     figures.forEach((f) => f.resize());
   }
 
-  const imgData = canvas.toDataURL("image/jpeg", 0.92);
   const JsPDF = window.jspdf.jsPDF;
   const pdf = new JsPDF({ unit: "pt", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
+  const usableH = pageH - PDF_FOOTER_H;
   const imgH = pageW * (canvas.height / canvas.width);
-  pdf.addImage(imgData, "JPEG", 0, 0, pageW, imgH);
-  let offset = pageH;
-  while (offset < imgH - 1) {
-    pdf.addPage();
-    pdf.addImage(imgData, "JPEG", 0, -offset, pageW, imgH);
-    offset += pageH;
-  }
+
+  // CSS-Pixel → PDF-Punkte
+  const scale = sheetCssH ? imgH / sheetCssH : 1;
+  const keeps = keepsCss.map((k) => ({ top: k.top * scale, bottom: k.bottom * scale }));
+
+  const pages = planPages(imgH, usableH, keeps);
+  const pxPerPt = canvas.height / imgH;
+  const slice = document.createElement("canvas");
+  const sctx = slice.getContext("2d");
+
+  pages.forEach((page, i) => {
+    if (i > 0) pdf.addPage();
+    // Jede Seite als eigener Ausschnitt statt eines langen Bildes mit
+    // negativem Versatz — nur so lässt sich eine Seite früher enden lassen.
+    slice.width = canvas.width;
+    slice.height = Math.max(1, Math.round(page.height * pxPerPt));
+    sctx.fillStyle = "#ffffff";
+    sctx.fillRect(0, 0, slice.width, slice.height);
+    sctx.drawImage(canvas, 0, -Math.round(page.top * pxPerPt));
+    pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, pageW, page.height);
+  });
+
+  drawWatermark(pdf, pageW, pageH);
   return pdf.output("datauristring").split(",")[1];
 }

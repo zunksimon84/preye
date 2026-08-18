@@ -4377,3 +4377,37 @@ body.stk-blanko .stk-mine { background: var(--card); }
   color: #fff;
 }
 .event-art--gruppenansitz { background: var(--sea-green); }
+
+/* ---------------------------------------------------------------------------
+   Druck: Wasserzeichen und Umbruch.
+   Gilt für alle drei Druckwege — Protokoll aus der Karte, nachsuche.html und
+   die Standkarte. Der Text muss zu PDF_WATERMARK in protokoll-lib.js und
+   Code.gs passen.
+   --------------------------------------------------------------------------- */
+@media print {
+  /* Ein position:fixed-Element wiederholt der Browser im Druck auf jeder
+     Seite — deshalb steht das Wasserzeichen an body und nicht am Inhalt.
+     Als Pseudo-Element überlebt es auch die Regel weiter oben, die auf der
+     Kartenseite alle Kinder von body außer dem Protokoll ausblendet. */
+  body::after {
+    content: "preye.org - the hunting OS";
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    text-align: center;
+    font-size: 7.5pt;
+    color: #9a9a9a;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Dieselben Blöcke, die auch das PDF nicht zerschneidet. Beim Drucken setzt
+     der Browser den Umbruch selbst, deshalb muss es hier noch einmal stehen.
+     Anders als im PDF lässt sich "Fuß am Stück" hier nicht ausdrücken — es
+     verhindert aber, dass ein Kasten mittendrin aufgetrennt wird. */
+  .proto-figure,
+  .proto-pirsch-block,
+  .proto-bottom,
+  .proto-meldung { break-inside: avoid; }
+}
