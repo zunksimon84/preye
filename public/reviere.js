@@ -24,7 +24,6 @@
   // Everything on the map today belongs to Peenwerder, so the whole bootstrap
   // is that Revier's count. When a second Revier gets its stands, this needs to
   // split by area — the areas are already on every post.
-  const NPA = ["Babke", "Langenhagen", "Schwarzenhof", "Serrahn"];
 
   get("bootstrap").then((d) => {
     $("#pw-posts").textContent = String((d.posts || []).length);
@@ -36,8 +35,9 @@
   }).catch(() => {});
 
   get("events-list").then((list) => {
-    const npa = (Array.isArray(list) ? list : []).filter((e) =>
-      NPA.some((a) => String(e.teilgebiet || "").includes(a)));
-    $("#npa-hunts").textContent = String(npa.length);
+    const events = Array.isArray(list) ? list : [];
+    const count = (key) => events.filter((e) => window.preyeEventInRevier(e, key)).length;
+    $("#pw-hunts").textContent = String(count("peenwerder"));
+    $("#npa-hunts").textContent = String(count("mueritz"));
   }).catch(() => {});
 })();

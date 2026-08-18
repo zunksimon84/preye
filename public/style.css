@@ -4269,3 +4269,38 @@ body.nachsuche-page .proto-actions .cancel-btn { width: auto; margin-top: 0; }
 }
 /* The Meine-Angaben block is a form here, not a filled-in summary. */
 body.stk-blanko .stk-mine { background: var(--card); }
+
+/* Revier-Filter über der Jagdliste. Kommt von der Revier-Übersicht per
+   ?revier=… und muss sichtbar sein: eine still gefilterte Liste liest sich
+   wie eine kaputte. */
+#events-filter { margin: 0 0 14px; }
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 14px;
+}
+.filter-chip b { font-weight: 750; }
+.filter-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.filter-clear {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--night);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  text-decoration: none;
+}
+.filter-clear:hover { background: var(--accent); }

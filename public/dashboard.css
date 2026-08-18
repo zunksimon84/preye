@@ -472,8 +472,11 @@ body {
   text-decoration: none;
   color: var(--ink);
 }
-a.revier { transition: border-color 0.14s, transform 0.1s, box-shadow 0.14s; }
-a.revier:hover {
+a.revier,
+.revier:has(.revier-pano[href]) { transition: border-color 0.14s, transform 0.1s, box-shadow 0.14s; }
+a.revier:hover,
+.revier:has(.revier-pano[href]:hover),
+.revier:has(.revier-go:hover) {
   border-color: var(--sea);
   transform: translateY(-2px);
   box-shadow: 0 16px 32px -24px rgba(6, 32, 43, 0.55);
@@ -501,8 +504,8 @@ a.revier:hover {
 .revier-stats {
   margin: 4px 0 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 10px 12px;
 }
 .revier-stats div { display: grid; gap: 1px; }
 .revier-stats dt {
@@ -523,12 +526,37 @@ a.revier:hover {
   border-top: 1px solid var(--rule);
 }
 .revier-go { margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--pool); }
-.revier-go--alt { text-decoration: none; }
-a.revier-go--alt:hover { text-decoration: underline; }
+/* Beide Wege aus der Karte sehen gleich aus — vorher war der eine unterstrichen
+   und der andere nicht, was wie zwei verschiedene Dinge aussah. */
+a.revier-go { text-decoration: none; }
+a.revier-go:hover { text-decoration: underline; }
+
+/* Peenwerder hat zwei Ziele — die Karte und seine Drückjagden. Sie stehen
+   nebeneinander, bis der Platz eng wird; dann untereinander. Der Trenner ist
+   ein Rand, keine Pipe, damit er beim Umbruch von selbst verschwindet. */
+.revier-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+}
+.revier-links .revier-go { margin-left: 0; margin-right: 0; }
+.revier-links .revier-go + .revier-go {
+  padding-left: 16px;
+  border-left: 1px solid var(--rule);
+}
+/* Auf dem Handy untereinander. Ein border-left als Trenner weiß nichts vom
+   Umbruch und stünde sonst als loser Strich vor dem zweiten Link. */
+@media (max-width: 560px) {
+  .revier-links { flex-direction: column; gap: 10px; }
+  .revier-links .revier-go + .revier-go { border-left: 0; padding-left: 0; }
+}
 
 .reviere-foot { margin: var(--gap) 0 0; font-size: 13px; color: var(--ink-faint); max-width: 62ch; }
 
 @media (max-width: 820px) { .reviere { grid-template-columns: 1fr; } }
+/* 3+1 sieht aus wie ein Fehler; zwei Reihen zu zweit lesen sich als Block. */
+@media (max-width: 560px) { .revier-stats { grid-template-columns: repeat(2, 1fr); } }
 
 /* A band across the grid: the panels under it hold one Revier's numbers, and
    with a second Revier coming that has to be said, not assumed. */
@@ -572,11 +600,15 @@ a.revier-go--alt:hover { text-decoration: underline; }
 .revier-sub,
 .revier-stats,
 .revier-note,
+.revier-links,
 .revier-go { margin-left: clamp(18px, 2.6vw, 26px); margin-right: clamp(18px, 2.6vw, 26px); }
 .revier-sub { margin-top: 14px; }
 .revier-stats { margin-top: 12px; }
 .revier-go { display: inline-block; margin-top: 14px; margin-bottom: clamp(18px, 2.6vw, 26px); }
 .revier-note { margin-top: 12px; }
+.revier-links { margin-top: 14px; margin-bottom: clamp(18px, 2.6vw, 26px); }
+.revier-links .revier-go { margin-top: 0; margin-bottom: 0; }
+.revier-pano[href] { display: block; text-decoration: none; }
 
 .sr-only {
   position: absolute;

@@ -45,21 +45,25 @@
       </div>
 
       <div class="reviere">
-        <a class="revier" href="peenwerder.html">
-          <div class="revier-pano">
+        <div class="revier">
+          <a class="revier-pano" href="peenwerder.html" aria-label="Peenwerder – Karte und Strecke öffnen">
             <img src="revier-peenwerder.jpg" alt="Peenwerder, Mecklenburg-Vorpommern"
                  width="1600" height="264" loading="lazy" />
             <span class="revier-state revier-state--live">eingerichtet</span>
-          </div>
+          </a>
           <b class="sr-only">Peenwerder</b>
           <p class="revier-sub">Hauptrevier, Nord, Nordrand, Ost</p>
           <dl class="revier-stats">
             <div><dt>Stände</dt><dd id="pw-posts">—</dd></div>
             <div><dt>Strecke Saison</dt><dd id="pw-strecke">—</dd></div>
+            <div><dt>Drückjagden</dt><dd id="pw-hunts">—</dd></div>
             <div><dt>Jäger</dt><dd id="pw-hunters">—</dd></div>
           </dl>
-          <span class="revier-go">Karte &amp; Strecke öffnen →</span>
-        </a>
+          <p class="revier-links">
+            <a class="revier-go" href="peenwerder.html">Karte &amp; Strecke öffnen →</a>
+            <a class="revier-go revier-go--alt" href="events.html?revier=peenwerder">Drückjagden ansehen →</a>
+          </p>
+        </div>
 
         <div class="revier revier--soon">
           <div class="revier-pano">
@@ -79,7 +83,7 @@
             nur noch nicht in My Maps eingezeichnet, deshalb gibt es weder Karte noch
             Heatmap. Sobald sie drin sind, erscheint das Revier hier wie Peenwerder.
           </p>
-          <a class="revier-go revier-go--alt" href="events.html">Drückjagden ansehen →</a>
+          <a class="revier-go revier-go--alt" href="events.html?revier=mueritz">Drückjagden ansehen →</a>
         </div>
       </div>
 
@@ -90,6 +94,7 @@
     </main>
 
     <script src="config.js"></script>
+    <script src="reviere-def.js"></script>
     <script src="gate.js" data-autogate></script>
     <script src="reviere.js"></script>
     <script src="pwa.js"></script>

@@ -12,6 +12,11 @@
 //   nachsuche.html  — leeres Anschussprotokoll, kein Backend, keine
 //                     Revierdaten. Das Ding muss im Wald aufgehen, auch wenn
 //                     sonst nichts geht.
+//   standkarte.html — der QR-Code in der Infomail führt direkt dorthin. Die
+//                     Jäger scannen ihn am Jagdtag auf dem Parkplatz; die
+//                     Karte hinter ein Passwort zu legen, das sie nicht haben,
+//                     würde den QR-Code wertlos machen. Der Link trägt die
+//                     Jagd-ID, ist also nicht zu erraten.
 //
 // Solange die Seite öffentlich geschaltet ist (Script Property site_mode ≠
 // "private"), tut das Modul nichts — die Maske erscheint erst, wenn im Sheet

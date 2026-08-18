@@ -190,15 +190,55 @@ function pickEventAnimal(id) {
   return EVENT_ANIMALS[Math.abs(h) % EVENT_ANIMALS.length];
 }
 
+// Von der Revier-Übersicht kommt man mit ?revier=peenwerder hierher und will
+// dann nur dessen Jagden sehen. Der Filter steht sichtbar über der Liste und
+// lässt sich mit einem Klick wieder abwerfen — sonst wundert man sich, warum
+// die Hälfte der Jagden fehlt.
+function activeRevier() {
+  const key = new URLSearchParams(location.search).get("revier");
+  if (!key || !window.PREYE_REVIERE) return null;
+  return window.PREYE_REVIERE.find((r) => r.key === key) || null;
+}
+
+function visibleEvents() {
+  const revier = activeRevier();
+  if (!revier) return state.events;
+  return state.events.filter((e) => window.preyeEventInRevier(e, revier.key));
+}
+
+function renderRevierFilter(shown, total) {
+  const host = $("#events-filter");
+  if (!host) return;
+  const revier = activeRevier();
+  if (!revier) { host.hidden = true; host.innerHTML = ""; return; }
+  host.hidden = false;
+  host.innerHTML =
+    '<span class="filter-chip">' +
+      '<b>' + escapeHtml(revier.name) + '</b>' +
+      '<span class="filter-count">' + shown + ' von ' + total + '</span>' +
+      '<a class="filter-clear" href="events.html" aria-label="Filter aufheben">×</a>' +
+    '</span>';
+}
+
 function renderEventsList() {
   const list = $("#events-list");
-  $("#events-empty").hidden = state.events.length > 0;
-  if (!state.events.length) { list.innerHTML = ""; return; }
+  const events = visibleEvents();
+  renderRevierFilter(events.length, state.events.length);
+  const empty = $("#events-empty");
+  empty.hidden = events.length > 0;
+  if (!events.length) {
+    const revier = activeRevier();
+    empty.textContent = revier
+      ? "Für " + revier.name + " ist noch keine Drückjagd angelegt."
+      : "Noch keine Veranstaltungen angelegt.";
+    list.innerHTML = "";
+    return;
+  }
   // Backend sorts ascending by date; we insert a year-divider whenever the
   // year changes so it's visually obvious where a calendar year ends.
   let lastYear = null;
   const parts = [];
-  for (const ev of state.events) {
+  for (const ev of events) {
     const year = (ev.date || "").slice(0, 4);
     if (year && year !== lastYear) {
       parts.push(`<div class="year-divider"><span>${escapeHtml(year)}</span></div>`);
