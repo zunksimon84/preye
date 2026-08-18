@@ -1839,7 +1839,9 @@ body.rsvp-page #rsvp-topbar {
 /* Two reviere side-by-side, each with its own column of checkboxes. */
 .ev-revier-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Zwei Reviere plus die Spalte "ohne Revier"; auto-fit, damit ein drittes
+     Revier keine Zahl in der CSS umstößt. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 14px;
   margin-top: 6px;
 }
@@ -1860,6 +1862,7 @@ body.rsvp-page #rsvp-topbar {
 }
 .ev-checkbox {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
   font-size: 14px;
@@ -1868,6 +1871,11 @@ body.rsvp-page #rsvp-topbar {
   cursor: pointer;
 }
 .ev-checkbox input[type="checkbox"] { transform: scale(1.1); }
+/* `.ev-form label` setzt flex-direction: column, damit Beschriftung über Feld
+   steht. Bei einem Ankreuzfeld ist das falsch herum — das Kästchen stand über
+   dem Wort. Diese Regel muss (0,2,1) sein, um (0,1,1) zu schlagen; eine
+   spätere Zeile allein reicht nicht, weil .ev-checkbox nur (0,1,0) hat. */
+.ev-form label.ev-checkbox { flex-direction: row; }
 
 .ev-fieldset-contacts { margin-top: 4px; }
 .ev-fieldset-contacts .contact-row {
@@ -4278,37 +4286,94 @@ body.nachsuche-page .proto-actions .cancel-btn { width: auto; margin-top: 0; }
 /* The Meine-Angaben block is a form here, not a filled-in summary. */
 body.stk-blanko .stk-mine { background: var(--card); }
 
-/* Revier-Filter über der Jagdliste. Kommt von der Revier-Übersicht per
-   ?revier=… und muss sichtbar sein: eine still gefilterte Liste liest sich
-   wie eine kaputte. */
-#events-filter { margin: 0 0 14px; }
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 8px 7px 14px;
+/* ---------------------------------------------------------------------------
+   Filter über der Jagdliste: Revier, Kalenderjahr, Jagdart.
+   --------------------------------------------------------------------------- */
+.ev-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--card);
-  font-size: 14px;
 }
-.filter-chip b { font-weight: 750; }
-.filter-count {
-  font-size: 12px;
+.ev-filter {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ev-filter select {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+/* Die Zahl trägt die Leiste: ohne sie sieht eine gefilterte Liste aus wie
+   eine leere. Sitzt auf der Grundlinie der Auswahlfelder. */
+.ev-filter-count {
+  margin-left: auto;
+  padding-bottom: 8px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-.filter-clear {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--night);
-  color: #fff;
-  font-size: 15px;
-  line-height: 1;
-  text-decoration: none;
+.ev-filter-reset {
+  margin-bottom: 1px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-text);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
 }
-.filter-clear:hover { background: var(--accent); }
+.ev-filter-reset:hover { border-color: var(--accent); }
+
+@media (max-width: 600px) {
+  .ev-filter { flex: 1 1 calc(50% - 6px); }
+  .ev-filter select { width: 100%; }
+  .ev-filter-count { margin-left: 0; padding-bottom: 0; }
+}
+
+/* Jagdart im Formular */
+.ev-radio-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.ev-radio { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+
+/* Dritte Spalte im Revier-Raster: ausdrücklich kein Revier. */
+.ev-revier-col--none { align-content: start; }
+.ev-revier-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Jagdart auf der Listenkarte — ein Wort reicht, um beides zu unterscheiden. */
+.event-art {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: var(--steel);
+  color: #fff;
+}
+.event-art--gruppenansitz { background: var(--sea-green); }

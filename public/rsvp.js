@@ -91,6 +91,12 @@ async function loadInvite() {
     setState("");
     $("#rsvp-card").hidden = false;
     escapeText($("#rsvp-hunter"), data.hunter);
+    // Eine Einladung kann inzwischen auch für einen Gruppenansitz sein.
+    // Die Präposition hängt am Geschlecht: zur Drückjagd, zum Gruppenansitz.
+    const ansitz = data.event.art === "gruppenansitz";
+    const artName = ansitz ? "Gruppenansitz" : "Drückjagd";
+    $("#rsvp-art").textContent = artName;
+    $("#rsvp-lead").textContent = "Du bist eingeladen " + (ansitz ? "zum " : "zur ") + artName + ":";
     escapeText($("#rsvp-event-name"), data.event.name);
     showMeta("date", formatDate(data.event.date));
     showMeta("treffpunkt", data.event.treffpunkt);

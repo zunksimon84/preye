@@ -40,7 +40,15 @@ const POST_TYPES = ["Kanzel", "Drückjagdbock", "Leiter"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
-const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer", "freigaben"];
+const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer", "freigaben", "art"];
+
+// Jagdart. Bis August 2026 gab es nur Drückjagden, deshalb ist die Spalte bei
+// allen Altbeständen leer — leer wird als "drueckjagd" gelesen.
+const HUNT_KINDS = ["drueckjagd", "gruppenansitz"];
+function huntKind_(value) {
+  const v = String(value || "").trim().toLowerCase();
+  return HUNT_KINDS.indexOf(v) >= 0 ? v : "drueckjagd";
+}
 
 // Canonical species / gender / AK matrix for the Freigaben section in
 // the Infomail PDF. Stays in this one place so the backend filters and
@@ -1746,6 +1754,7 @@ function eventsList_() {
       name: String(ev.name || ""),
       date: toDateString_(ev.date),
       teilgebiet: String(ev.teilgebiet || ""),
+      art: huntKind_(ev.art),
       rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
       treffpunkt_lat: numOrEmpty_(ev.treffpunkt_lat),
@@ -1835,6 +1844,7 @@ function eventDetail_(params) {
       name: String(ev.name || ""),
       date: toDateString_(ev.date),
       teilgebiet: String(ev.teilgebiet || ""),
+      art: huntKind_(ev.art),
       rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
       treffpunkt_lat: numOrEmpty_(ev.treffpunkt_lat),
@@ -1883,6 +1893,7 @@ function eventCreate_(body) {
     name: name,
     date: date,
     teilgebiet: String(body.teilgebiet || "").trim(),
+    art: huntKind_(body.art),
     rsvp_deadline: String(body.rsvp_deadline || "").trim(),
     treffpunkt: String(body.treffpunkt || "").trim(),
     treffpunkt_lat: numOrEmpty_(body.treffpunkt_lat),
@@ -1941,6 +1952,7 @@ function eventUpdate_(body) {
     name: name,
     date: date,
     teilgebiet: String(body.teilgebiet || "").trim(),
+    art: huntKind_(body.art),
     rsvp_deadline: String(body.rsvp_deadline || "").trim(),
     treffpunkt: String(body.treffpunkt || "").trim(),
     treffpunkt_lat: numOrEmpty_(body.treffpunkt_lat),
@@ -2564,6 +2576,7 @@ function rsvpInfo_(params) {
     event: {
       name: String(ev.name || ""),
       date: toDateString_(ev.date),
+      art: huntKind_(ev.art),
       teilgebiet: String(ev.teilgebiet || ""),
       rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),

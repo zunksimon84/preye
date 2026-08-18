@@ -190,47 +190,108 @@ function pickEventAnimal(id) {
   return EVENT_ANIMALS[Math.abs(h) % EVENT_ANIMALS.length];
 }
 
-// Von der Revier-Übersicht kommt man mit ?revier=peenwerder hierher und will
-// dann nur dessen Jagden sehen. Der Filter steht sichtbar über der Liste und
-// lässt sich mit einem Klick wieder abwerfen — sonst wundert man sich, warum
-// die Hälfte der Jagden fehlt.
-function activeRevier() {
-  const key = new URLSearchParams(location.search).get("revier");
-  if (!key || !window.PREYE_REVIERE) return null;
-  return window.PREYE_REVIERE.find((r) => r.key === key) || null;
+// Filter über der Jagdliste: Revier, Kalenderjahr, Jagdart. Der Stand steht in
+// der Adresszeile (?revier=…&jahr=…&art=…) — so bleibt der Link von der
+// Revier-Übersicht gültig und ein gefilterter Blick lässt sich weitergeben.
+// Geschrieben wird mit replaceState, damit der Zurück-Knopf weiter zur
+// vorherigen Seite führt und nicht durch Filterstände wandert.
+const FILTERS = [
+  { key: "revier", el: "#filter-revier", all: "Alle Reviere" },
+  { key: "jahr",   el: "#filter-jahr",   all: "Alle Jahre" },
+  { key: "art",    el: "#filter-art",    all: "Alle Jagdarten" },
+];
+
+function readFilters() {
+  const q = new URLSearchParams(location.search);
+  const out = {};
+  FILTERS.forEach((f) => { out[f.key] = q.get(f.key) || ""; });
+  return out;
+}
+
+function writeFilters(next) {
+  const q = new URLSearchParams(location.search);
+  Object.entries(next).forEach(([k, v]) => {
+    if (v) q.set(k, v); else q.delete(k);
+  });
+  const qs = q.toString();
+  history.replaceState(null, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
+}
+
+function eventYear(ev) {
+  return String(ev.date || "").slice(0, 4);
 }
 
 function visibleEvents() {
-  const revier = activeRevier();
-  if (!revier) return state.events;
-  return state.events.filter((e) => window.preyeEventInRevier(e, revier.key));
+  const f = readFilters();
+  return state.events.filter((ev) => {
+    if (f.revier && !window.preyeEventInRevier(ev, f.revier)) return false;
+    if (f.jahr && eventYear(ev) !== f.jahr) return false;
+    if (f.art && (ev.art || "drueckjagd") !== f.art) return false;
+    return true;
+  });
 }
 
-function renderRevierFilter(shown, total) {
-  const host = $("#events-filter");
+function fillSelect(sel, allLabel, options, value) {
+  sel.innerHTML = [{ v: "", t: allLabel }].concat(options)
+    .map((o) => `<option value="${escapeHtml(o.v)}"${o.v === value ? " selected" : ""}>${escapeHtml(o.t)}</option>`)
+    .join("");
+}
+
+function renderFilters(shown) {
+  const host = $("#ev-filters");
   if (!host) return;
-  const revier = activeRevier();
-  if (!revier) { host.hidden = true; host.innerHTML = ""; return; }
   host.hidden = false;
-  host.innerHTML =
-    '<span class="filter-chip">' +
-      '<b>' + escapeHtml(revier.name) + '</b>' +
-      '<span class="filter-count">' + shown + ' von ' + total + '</span>' +
-      '<a class="filter-clear" href="events.html" aria-label="Filter aufheben">×</a>' +
-    '</span>';
+  const f = readFilters();
+
+  fillSelect($("#filter-revier"), "Alle Reviere",
+    window.PREYE_REVIERE.map((r) => ({ v: r.key, t: r.name }))
+      .concat([{ v: window.PREYE_REVIER_NONE.key, t: window.PREYE_REVIER_NONE.name }]),
+    f.revier);
+
+  // Die Jahre kommen aus den Terminen selbst — eine feste Liste wäre nach zwei
+  // Saisons falsch. Das laufende Jahr ist immer dabei, auch wenn nichts drin steht.
+  const years = new Set(state.events.map(eventYear).filter(Boolean));
+  years.add(String(new Date().getFullYear()));
+  fillSelect($("#filter-jahr"), "Alle Jahre",
+    [...years].sort().map((y) => ({ v: y, t: y })), f.jahr);
+
+  fillSelect($("#filter-art"), "Alle Jagdarten",
+    window.PREYE_JAGDARTEN.map((a) => ({ v: a.key, t: a.name })), f.art);
+
+  const active = FILTERS.some((x) => f[x.key]);
+  $("#filter-count").textContent = active
+    ? shown + " von " + state.events.length
+    : state.events.length + (state.events.length === 1 ? " Jagd" : " Jagden");
+  $("#filter-reset").hidden = !active;
+}
+
+function wireFilters() {
+  FILTERS.forEach((f) => {
+    const sel = $(f.el);
+    if (!sel) return;
+    sel.addEventListener("change", () => {
+      writeFilters({ [f.key]: sel.value });
+      renderEventsList();
+    });
+  });
+  const reset = $("#filter-reset");
+  if (reset) reset.addEventListener("click", () => {
+    writeFilters({ revier: "", jahr: "", art: "" });
+    renderEventsList();
+  });
 }
 
 function renderEventsList() {
   const list = $("#events-list");
   const events = visibleEvents();
-  renderRevierFilter(events.length, state.events.length);
+  renderFilters(events.length);
   const empty = $("#events-empty");
   empty.hidden = events.length > 0;
   if (!events.length) {
-    const revier = activeRevier();
-    empty.textContent = revier
-      ? "Für " + revier.name + " ist noch keine Drückjagd angelegt."
-      : "Noch keine Veranstaltungen angelegt.";
+    const active = FILTERS.some((f) => readFilters()[f.key]);
+    empty.textContent = state.events.length && active
+      ? "Keine Jagd passt zu diesem Filter."
+      : "Noch keine Jagd angelegt.";
     list.innerHTML = "";
     return;
   }
@@ -262,7 +323,10 @@ function renderEventCard(ev) {
             <h3>${escapeHtml(ev.name)}</h3>
             <span class="event-date">${escapeHtml(dateStr)}</span>
           </div>
-          ${ev.treffpunkt ? `<p class="event-meta">${escapeHtml(ev.treffpunkt)}${ev.treff_time ? " · " + escapeHtml(ev.treff_time) : ""}</p>` : ""}
+          <p class="event-meta">
+            <span class="event-art event-art--${escapeHtml(ev.art || "drueckjagd")}">${escapeHtml((window.PREYE_JAGDARTEN.find((a) => a.key === (ev.art || "drueckjagd")) || {}).name || "")}</span>
+            ${ev.treffpunkt ? escapeHtml(ev.treffpunkt) + (ev.treff_time ? " · " + escapeHtml(ev.treff_time) : "") : ""}
+          </p>
           <div class="event-stats">
             <span class="stat stat-invited">${s.invited} eingeladen</span>
             <span class="stat stat-accepted">${s.accepted} ✓</span>
@@ -318,6 +382,7 @@ async function submitNewEvent(e) {
       name: $("#ev-name").value.trim(),
       date: $("#ev-date").value,
       teilgebiet,
+      art: ($("input[name=art]:checked") || {}).value || "drueckjagd",
       rsvp_deadline: $("#ev-rsvp-deadline").value,
       treffpunkt: $("#ev-treffpunkt").value.trim(),
       treffpunkt_lat: tpLatStr ? Number(tpLatStr) : "",
@@ -336,6 +401,7 @@ async function submitNewEvent(e) {
     const data = await postJson(body);
     invalidateCache("events-list");
     e.target.reset();
+    buildNewEventForm(); // reset() räumt die erzeugten Felder nicht auf
     $("#nsf-rows").innerHTML = "";
     showToast("Veranstaltung angelegt ✓");
     location.hash = "#/event/" + encodeURIComponent(data.id);
@@ -392,7 +458,11 @@ function renderEventDetail() {
     }
     infoRows.push({ label: "Treffpunkt", html: html });
   }
-  if (teilgebietValue) infoRows.push({ label: teilgebietLabel, value: teilgebietValue });
+  const artName = (window.PREYE_JAGDARTEN.find((a) => a.key === (event.art || "drueckjagd")) || {}).name;
+  if (artName) infoRows.push({ label: "Jagdart", value: artName });
+  infoRows.push(teilgebietValue
+    ? { label: teilgebietLabel, value: teilgebietValue }
+    : { label: "Revier", value: window.PREYE_REVIER_NONE.name });
   if (event.rsvp_deadline) infoRows.push({ label: "Anmeldeschluss", value: formatLongDate(event.rsvp_deadline) });
   const times = [
     event.treff_time ? { label: "Treff", value: event.treff_time + " Uhr" } : null,
@@ -2457,27 +2527,12 @@ function openEventEditor() {
       <label>Name<input type="text" id="edit-ev-name" required value="${escapeHtml(event.name)}" /></label>
       <label>Datum<input type="date" id="edit-ev-date" required value="${escapeHtml(event.date)}" /></label>
       <fieldset class="ev-fieldset">
+        <legend>Jagdart</legend>
+        <div class="ev-radio-row" id="edit-art-row"></div>
+      </fieldset>
+      <fieldset class="ev-fieldset">
         <legend>Teilgebiet(e) <span class="muted">(mehrfach wählbar, auch revierübergreifend)</span></legend>
-        <div class="ev-revier-grid">
-          <div class="ev-revier-col">
-            <p class="ev-revier-title">Peenwerder</p>
-            <div class="ev-checkbox-grid ev-checkbox-grid--single">
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Hauptrevier"${tgCheck("Hauptrevier")} /> Hauptrevier</label>
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Ost"${tgCheck("Ost")} /> Ost</label>
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Nord"${tgCheck("Nord")} /> Nord</label>
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Nordrand"${tgCheck("Nordrand")} /> Nordrand</label>
-            </div>
-          </div>
-          <div class="ev-revier-col">
-            <p class="ev-revier-title">NPA-Müritz</p>
-            <div class="ev-checkbox-grid ev-checkbox-grid--single">
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Babke"${tgCheck("Babke")} /> Babke</label>
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Langenhagen"${tgCheck("Langenhagen")} /> Langenhagen</label>
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Schwarzenhof"${tgCheck("Schwarzenhof")} /> Schwarzenhof</label>
-              <label class="ev-checkbox"><input type="checkbox" name="edit-teilgebiet" value="Serrahn"${tgCheck("Serrahn")} /> Serrahn</label>
-            </div>
-          </div>
-        </div>
+        <div class="ev-revier-grid" id="edit-revier-grid">${window.preyeRevierGrid("edit-teilgebiet", [...tgSet])}</div>
       </fieldset>
       <label>Anmeldeschluss <span class="muted">(leer = 2 Wochen vor dem Termin)</span><input type="date" id="edit-ev-rsvp-deadline" value="${escapeHtml(event.rsvp_deadline || "")}" /></label>
       <label>Treffpunkt<input type="text" id="edit-ev-treffpunkt" value="${escapeHtml(event.treffpunkt || "")}" /></label>
@@ -2511,6 +2566,9 @@ function openEventEditor() {
       </fieldset>
     </form>
   `;
+  renderArtRow($("#edit-art-row"), "edit-art", event.art);
+  window.preyeWireRevierGrid($("#edit-revier-grid"), "edit-teilgebiet");
+
   // Pre-populate Nachsuchenführer rows.
   const nsfTarget = $("#edit-nsf-rows");
   (event.nachsuchenfuehrer || []).forEach((p) => addNsfRowTo(nsfTarget, p.name, p.phone));
@@ -2542,6 +2600,7 @@ async function saveEventEdit() {
     if (!ok) return;
   }
   const teilgebiet = $$("input[name=edit-teilgebiet]:checked").map((c) => c.value).join(", ");
+  const art = ($("input[name=edit-art]:checked") || {}).value || "drueckjagd";
   const nachsuchenfuehrer = $$("#edit-nsf-rows .nsf-row").map((row) => ({
     name: row.querySelector(".nsf-name").value.trim(),
     phone: row.querySelector(".nsf-phone").value.trim(),
@@ -2560,6 +2619,7 @@ async function saveEventEdit() {
       name: $("#edit-ev-name").value.trim(),
       date: $("#edit-ev-date").value,
       teilgebiet,
+      art,
       rsvp_deadline: $("#edit-ev-rsvp-deadline").value,
       treffpunkt: $("#edit-ev-treffpunkt").value.trim(),
       treffpunkt_lat: tpLatStr ? Number(tpLatStr) : "",
@@ -2694,7 +2754,25 @@ async function resetTemplate() {
   }
 }
 
+// Jagdart und Teilgebiete werden erzeugt, nicht getippt — sonst stünde jede
+// neue Option zweimal im Markup (Anlegen und Bearbeiten).
+function renderArtRow(host, inputName, selected) {
+  const value = selected || "drueckjagd";
+  host.innerHTML = window.PREYE_JAGDARTEN.map((a) => `
+    <label class="ev-radio"><input type="radio" name="${escapeHtml(inputName)}" value="${escapeHtml(a.key)}"${a.key === value ? " checked" : ""} /> ${escapeHtml(a.name)}</label>
+  `).join("");
+}
+
+function buildNewEventForm() {
+  renderArtRow($("#ev-art-row"), "art", "drueckjagd");
+  const grid = $("#ev-revier-grid");
+  grid.innerHTML = window.preyeRevierGrid("teilgebiet", []);
+  window.preyeWireRevierGrid(grid, "teilgebiet");
+}
+
 function wireUi() {
+  buildNewEventForm();
+  wireFilters();
   $("#new-event-btn").addEventListener("click", () => { location.hash = "#/new"; });
   $("#new-event-form").addEventListener("submit", submitNewEvent);
   $("#ev-treffpunkt-here").addEventListener("click", () => fillTreffpunktCoords("#ev-treffpunkt-lat", "#ev-treffpunkt-lng"));
