@@ -15,8 +15,10 @@ Zwei Sachen hängen daran:
 
 ## Fertig und live (nur Pages, ohne Bereitstellung)
 
-- **Bedienfarbe Grau→Blau** (`edfc922`). Verlauf `#d1d7dc → #81b1e0` auf
-  Knöpfen, Kacheln, Hero, Toast; `#a7c3df` flach auf Tabellenköpfen. Token
+- **Bedienfarbe Grau→Blau**. Verlauf `#cdd7e1 → #4f99dc` auf Knöpfen,
+  Kacheln, Hero, Toast; `#84b5e3` flach auf Tabellenköpfen. Der Rand der
+  gefüllten Flächen ist eine getönte Haarlinie plus Schatten
+  (`--ctl-hairline` / `--ctl-lift`) statt einer vollen Randfarbe. Token
   heißen `--ctl-*`, nicht mehr `--green-*`.
 - Vorschau-Knöpfe je Runde und Treibergruppe im Infomail-Fenster
   (Oberfläche steht, wirkt erst nach der Bereitstellung).
@@ -33,8 +35,8 @@ Zwei Sachen hängen daran:
 ## Noch grün, bewusst nicht angefasst
 
 - `.infomail-opt` („Schützen einbeziehen") — fest eingetragenes `#16a34a`
-  mit eigenem Aus-Zustand. Ein/Aus-Anzeige, keine Bedienfarbe. Der lauteste
-  Grünblock, der übrig ist; auf Zuruf umstellbar.
+  mit eigenem Aus-Zustand. **Bleibt so, ausdrücklich entschieden am
+  19.08.2026.** Ein/Aus-Anzeige, keine Bedienfarbe.
 - `--green-dark` / `--green-mid`: dunkle Waldtöne für Schrift und die
   Standkarten-Leiste.
 - Zusagen/Absagen, Fehler-Toasts, Löschknöpfe, die Punkte im

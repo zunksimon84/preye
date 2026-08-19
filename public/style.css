@@ -10,24 +10,37 @@
 
      Warum das nicht in dieselbe Falle läuft wie das Lime, obwohl der
      Markenverlauf links blau anfängt: --pool-blue-deep hat Luminanz 0,09,
-     das Blau hier 0,44. Fünf Blendstufen Abstand — die Kante steht, auch
+     das Blau hier 0,30 und das graue Ende 0,67. Die Kante steht, auch
      direkt unter dem Streifen.
+
+     Der zweite Durchgang machte das Blau tiefer (0,745 → 0,665 in OKLCH,
+     mehr Farbe) und das graue Ende blaustichig: mit dem hellen Blau las
+     die Fläche fast als reines Grau.
 
      --ctl-fill ist ein Verlauf und gehört deshalb ausschließlich hinter
      `background:`. Für Ränder, Schrift und alles, was eine einzelne Farbe
      braucht, gibt es --ctl / --ctl-edge / --ctl-ink. */
-  --ctl-grey: #d1d7dc;   /* Anfang des Verlaufs */
-  --ctl-blue: #81b1e0;   /* Ende des Verlaufs */
+  --ctl-grey: #cdd7e1;   /* Anfang des Verlaufs — leicht blaustichig, sonst
+                            liest die Fläche als reines Grau */
+  --ctl-blue: #4f99dc;   /* Ende des Verlaufs */
   --ctl-fill: linear-gradient(135deg, var(--ctl-grey) 0%, var(--ctl-blue) 100%);
+  /* Der Rand der gefüllten Flächen. Eine volle Randfarbe zeichnet die Kante
+     hart nach und lässt die Fläche wie aufgeklebt wirken; getönt und flach
+     dazu ein Schatten setzt sie stattdessen auf die Seite. --ctl-edge bleibt
+     für die Stellen, wo ein Rand auf Weiß sichtbar sein MUSS — Karten beim
+     Überfahren, "Mein Stand" auf der Standkarte. Dort verschwände eine
+     Haarlinie. */
+  --ctl-hairline: rgba(24, 80, 140, 0.16);
+  --ctl-lift: 0 1px 2px rgba(20, 50, 85, 0.10), 0 6px 16px -6px rgba(20, 50, 85, 0.22);
   /* Die Mitte des Verlaufs als einzelne Farbe. Für kleine Flächen, die einen
      eigenen Verlauf nicht tragen — Tabellenköpfe (jede Zelle finge ihn neu
      an), Zählpillen, Zierkanten. */
-  --ctl: #a7c3df;
-  --ctl-edge: #5d96cb;
-  --ctl-tint: #eaf3fb;   /* Füllung hinterlegter Zeilen */
-  /* Als Schrift auf Weiß taugt --ctl-edge nicht (3,1:1). Dafür dieser Wert:
-     6,3:1 auf Weiß, 5,9:1 auf --ctl-tint. */
-  --ctl-ink: #266397;
+  --ctl: #84b5e3;
+  --ctl-edge: #3c8bd0;
+  --ctl-tint: #e7f2fc;   /* Füllung hinterlegter Zeilen */
+  /* Als Schrift auf Weiß taugt --ctl-edge nicht (3,6:1). Dafür dieser Wert:
+     6,6:1 auf Weiß, 5,8:1 auf --ctl-tint. */
+  --ctl-ink: #186099;
   /* Brand gradient — the Lunge Evo Run colourway: pool blue at the heel,
      through green, into the yellow-green at the toe. The warm end is the
      existing brand lime, so every lime button on the site still ties back
@@ -642,9 +655,10 @@ a.filter-btn {
   letter-spacing: 0.3px;
   background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 10px;
   cursor: pointer;
+  box-shadow: var(--ctl-lift);
 }
 
 #f-submit:disabled {
@@ -896,11 +910,12 @@ a.filter-btn {
   font-variant-numeric: tabular-nums;
   color: #111;
   background: var(--ctl);
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 999px;
   padding: 2px 12px;
   min-width: 36px;
   text-align: center;
+  box-shadow: var(--ctl-lift);
 }
 
 #strecke-list .empty {
@@ -1014,10 +1029,11 @@ a.filter-btn {
   align-items: center;
   justify-content: center;
   background: var(--ctl-fill);
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 6px;
   padding: 8px 12px;
   margin-bottom: 10px;
+  box-shadow: var(--ctl-lift);
 }
 
 .proto-banner-title {
@@ -1375,9 +1391,10 @@ a.filter-btn {
   letter-spacing: 0.3px;
   background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 10px;
   cursor: pointer;
+  box-shadow: var(--ctl-lift);
 }
 
 #proto-submit:disabled { opacity: 0.5; }
@@ -1419,11 +1436,12 @@ a.filter-btn {
   padding: 7px 12px;
   background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 7px;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
+  box-shadow: var(--ctl-lift);
 }
 
 /* Phone layout for the Anschuss-Protokoll — the 7-column table is unusable
@@ -2005,7 +2023,7 @@ body.rsvp-page #rsvp-topbar {
 .primary-btn {
   background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 6px;
   padding: 10px 16px;
   font: inherit;
@@ -2013,6 +2031,7 @@ body.rsvp-page #rsvp-topbar {
   font-weight: 700;
   letter-spacing: 0.2px;
   cursor: pointer;
+  box-shadow: var(--ctl-lift);
 }
 .primary-btn:disabled { opacity: 0.55; }
 .primary-btn.small { padding: 7px 12px; font-size: 13px; }
@@ -2047,11 +2066,11 @@ body.rsvp-page #rsvp-topbar {
 /* "Landing page" hero for the event detail view. */
 .ev-hero {
   background: var(--ctl-fill);
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 12px;
   padding: 18px 18px 16px;
   color: #111;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--ctl-lift);
 }
 .ev-hero-title {
   margin: 0;
@@ -2296,7 +2315,7 @@ body.rsvp-page #rsvp-topbar {
 
 .squad-tile {
   background: var(--ctl-fill);
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 12px;
   padding: 14px 14px 12px;
   text-align: left;
@@ -2308,7 +2327,7 @@ body.rsvp-page #rsvp-topbar {
   gap: 4px;
   min-height: 92px;
   transition: transform 0.08s, box-shadow 0.12s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--ctl-lift);
 }
 .squad-tile:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
@@ -3566,13 +3585,14 @@ body.rsvp-page {
   flex: 1;
   background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--ctl-edge);
+  border: 1px solid var(--ctl-hairline);
   border-radius: 7px;
   padding: 12px;
   font: inherit;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--ctl-lift);
 }
 .rsvp-decline {
   flex: 1;
