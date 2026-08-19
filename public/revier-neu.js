@@ -6,7 +6,7 @@
 
 import {
   readTextFile, parseGpx, parseTable, sniffColumns, looksLikeHeader,
-  parseLatLng, parsePair, looksSwapped, normaliseStand, validateBatch,
+  parseLatLng, parsePair, looksSwapped, normaliseStand, prepareBatch, validateBatch,
   suggestClusters, distanceMetres,
 } from "./geo-import.js";
 
@@ -209,7 +209,7 @@ async function handleFiles(files) {
         if (g.skipped.routePoints) {
           note.push(`${g.skipped.routePoints} ${g.skipped.routePoints === 1 ? "Routenpunkt" : "Routenpunkte"} übergangen`);
         }
-        addRows(g.points.map(normaliseStand), f.name, g.points.length, note.join(" · "), g.track);
+        addRows(prepareBatch(g.points), f.name, g.points.length, note.join(" · "), g.track);
       } else if (/\.(xlsx|xls)$/i.test(f.name)) {
         msg.textContent = "Excel-Dateien kann diese Seite nicht lesen. " +
           "In Excel: Datei → Speichern unter → „CSV UTF-8“ — oder die Zellen kopieren und unten einfügen.";

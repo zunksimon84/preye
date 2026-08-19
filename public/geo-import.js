@@ -390,7 +390,8 @@ export function classifyPoint(point) {
     return { kind: "kein-stand", reason: symSagtNein ? "Beobachtung (Symbol)" : "kein Sitz im Namen" };
   }
   if (geplant) {
-    return { kind: "unsicher", reason: "klingt nach Vorhaben, nicht nach vorhandenem Sitz" };
+    return { kind: "unsicher", geplant: true,
+             reason: "klingt nach Vorhaben, nicht nach vorhandenem Sitz" };
   }
   if (hatSitzwort && !vornDran && negWort) {
     return { kind: "unsicher", reason: "Sitzwort steht hinten — eher eine Wegbeschreibung" };
@@ -399,6 +400,74 @@ export function classifyPoint(point) {
     return { kind: "unsicher", reason: "Symbol spricht für eine Beobachtung" };
   }
   return { kind: "stand", reason: symSagtStand ? "Sitzwort und Symbol" : "Sitzwort im Namen" };
+}
+
+// Zweiter Durchgang: aus der Datei lernen, welches Symbol für Sitze steht.
+//
+// Simons Beobachtung: er vergibt innerhalb eines Teilgebiets für Sitze immer
+// dieselbe Pin-Farbe. Wenn also ein Symbol bei den sicher erkannten Ständen
+// vorkommt und bei keiner Beobachtung, dann spricht dasselbe Symbol auch bei
+// einem unklaren Namen für einen Sitz.
+//
+// Das schlägt die fest eingetragenen Farbnamen, weil es mit jeder App
+// funktioniert. SYM_STAND / SYM_NOT_STAND bleiben als Vorannahme für den Fall,
+// dass die Datei zu wenig hergibt.
+//
+// Bewusst nur in die positive Richtung und bewusst nicht über Vorhaben hinweg:
+// eine geplante Kanzel bleibt geplant, egal welche Farbe ihr Pin hat.
+export function classifyBatch(points) {
+  const erst = points.map((p) => ({ p, c: classifyPoint(p) }));
+
+  // Wer wie oft mit welchem Symbol?
+  const tally = {};
+  erst.forEach(({ p, c }) => {
+    const sym = String(p.sym || "").toLowerCase().trim();
+    if (!sym) return;
+    tally[sym] = tally[sym] || { stand: 0, kein: 0 };
+    if (c.kind === "stand") tally[sym].stand++;
+    else if (c.kind === "kein-stand") tally[sym].kein++;
+  });
+
+  // Ein Symbol gilt als sitztypisch, wenn es bei mindestens zwei sicheren
+  // Ständen vorkommt und überwiegend dort.
+  //
+  // Über ein Verhältnis, nicht über „keine einzige Ausnahme“: sonst genügt ein
+  // einziger anders benannter Punkt derselben Farbe, um das Signal zu
+  // löschen — und weil genau solche Punkte die Kandidaten fürs Hochstufen
+  // sind, schlägt sich die Regel dann selbst aus dem Rennen.
+  //
+  // 0,75 trennt sauber: in den geprüften Dateien lagen die eindeutigen
+  // Symbole bei 1,0 und die gemischten bei 0,18 bis 0,44.
+  const sitztypisch = {};
+  Object.keys(tally).forEach((sym) => {
+    const t = tally[sym];
+    sitztypisch[sym] = t.stand >= 2 && t.stand / (t.stand + t.kein) >= 0.75;
+  });
+
+  return erst.map(({ p, c }) => {
+    const sym = String(p.sym || "").toLowerCase().trim();
+    if (!sym || !sitztypisch[sym]) return { ...c };
+    const anzahl = tally[sym].stand;
+    if (c.kind === "unsicher" && !c.geplant) {
+      return { kind: "stand", reason: `Symbol wie ${anzahl} sichere Sitze in dieser Datei` };
+    }
+    if (c.kind === "kein-stand") {
+      // Nur bis „unsicher“ hochstufen, nicht bis „Stand“. Ein Punkt ohne
+      // jedes Sitzwort bleibt eine Entscheidung für den Menschen.
+      return { kind: "unsicher", reason: `Symbol wie ${anzahl} sichere Sitze — Name sagt nichts` };
+    }
+    return { ...c };
+  });
+}
+
+// Eine ganze Datei aufbereiten: Namen und Nummern je Punkt, danach der
+// lernende Durchgang über die Symbole. Das ist der Weg, den die Oberfläche
+// nimmt — normaliseStand allein kennt die Datei nicht und kann deshalb nichts
+// aus ihr lernen.
+export function prepareBatch(points) {
+  const norm = points.map(normaliseStand);
+  const klassen = classifyBatch(points);
+  return norm.map((r, i) => ({ ...r, kind: klassen[i].kind, kindReason: klassen[i].reason }));
 }
 
 // ---------------------------------------------------------------------------
