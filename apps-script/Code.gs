@@ -229,7 +229,7 @@ const DOG_BREEDS = [
 // "Ansteller Runden" (Schützen led by an Ansteller) and "Treibergruppen"
 // (Treiber led by a Hundeführer). Both share the same row schema; the
 // "type" column distinguishes them ("ansteller" / "treiber"; empty = ansteller).
-const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions", "type", "start_pos"];
+const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions", "type", "start_pos", "infomail_sent_at", "infomail_count"];
 const ADDRESS_BOOK_HEADER = ["name", "email", "language"];
 
 // Outgoing "From" address for all GmailApp.sendEmail calls. Must be a
@@ -3028,6 +3028,11 @@ function eventDetail_(params) {
         positions: Array.isArray(positions) ? positions : [],
         briefing: String(s.briefing || ""),
         start_pos: (startPos && typeof startPos === "object") ? startPos : null,
+        // Nachweis über verschickte Infomails. Ohne den lässt sich nicht
+        // sagen, wer schon Bescheid weiß — und genau das braucht man, wenn
+        // sich am Vorabend noch etwas ändert und man nachfassen will.
+        infomail_sent_at: String(s.infomail_sent_at || ""),
+        infomail_count: Number(s.infomail_count) || 0,
       };
     });
   let nsfList = [];
@@ -4158,7 +4163,9 @@ function eventInfomailsPreview_(body) {
   const detail = eventDetail_({ id: eventId });
   if (detail.error) return detail;
   const ev = normalizeEventDates_(detail.event);
-  const ansteller = (detail.squads || []).filter(function (s) { return (s.type || "ansteller") === "ansteller"; });
+  // Treibergruppen zählen mit. Bis August 2026 filterten Vorschau und Versand
+  // beide auf "ansteller" — Treiber bekamen also gar keine Infomail.
+  const alleGruppen = (detail.squads || []);
   const hunters = detail.hunters || [];
   const huntersByName = {};
   hunters.forEach(function (h) { huntersByName[(h.hunter || "").toLowerCase()] = h; });
@@ -4171,8 +4178,13 @@ function eventInfomailsPreview_(body) {
   const noEmail = [];
   const notAccepted = [];
   let sample = null; // first eligible recipient — used for the preview render
-  for (const squad of ansteller) {
+  // Je Gruppe eine Zeile für die Auswahlliste: wie viele bekämen eine, und
+  // wann ging zuletzt eine raus.
+  const gruppen = [];
+  for (const squad of alleGruppen) {
     const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
+    const istTreiber = String(squad.type || "").toLowerCase() === "treiber";
+    let inGruppe = 0;
     for (let pi = 0; pi < positions.length; pi++) {
       const pos = positions[pi];
       const isAnsteller = pi === 0;
@@ -4181,8 +4193,33 @@ function eventInfomailsPreview_(body) {
       if (!h.email) { noEmail.push(pos.hunter + " (keine E-Mail)"); continue; }
       if (h.status !== "accepted") { notAccepted.push(pos.hunter + " (Status: " + (h.status || "offen") + ")"); continue; }
       recipients++;
+      inGruppe++;
       if (isAnsteller) anstellerRecipients++;
-      if (!sample) sample = { squad: squad, positions: positions, pos: pos, hunter: h };
+      // Die Vorschau soll das Blatt zeigen, das die meisten bekommen — also
+      // eines aus einer Ansteller-Runde, wenn es die gibt.
+      if (!sample && !istTreiber) sample = { squad: squad, positions: positions, pos: pos, hunter: h };
+    }
+    gruppen.push({
+      id: squad.id,
+      name: displayRundeNameServer_(squad.name),
+      type: istTreiber ? "treiber" : "ansteller",
+      recipients: inGruppe,
+      infomail_sent_at: squad.infomail_sent_at || "",
+      infomail_count: squad.infomail_count || 0,
+    });
+  }
+  if (!sample) {
+    // Nur Treibergruppen — dann eben eine davon.
+    for (const squad of alleGruppen) {
+      const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
+      for (const pos of positions) {
+        const h = huntersByName[pos.hunter.toLowerCase()];
+        if (h && h.email && h.status === "accepted") {
+          sample = { squad: squad, positions: positions, pos: pos, hunter: h };
+          break;
+        }
+      }
+      if (sample) break;
     }
   }
   const props = PropertiesService.getScriptProperties();
@@ -4227,7 +4264,10 @@ function eventInfomailsPreview_(body) {
   // (or null → frontend defaults to "all on").
   return {
     ok: true,
-    runden: ansteller.length,
+    runden: gruppen.filter(function (g) { return g.type === "ansteller"; }).length,
+    // Die Auswahlliste im Fenster: je Gruppe Name, Art, Empfängerzahl und
+    // wann zuletzt eine Infomail rausging.
+    gruppen: gruppen,
     recipients: recipients,
     ansteller_recipients: anstellerRecipients,
     no_email: noEmail,
@@ -4254,7 +4294,15 @@ function eventInfomailsSend_(body) {
 
   const ev = normalizeEventDates_(detail.event);
   const allHunters = detail.hunters || [];
-  const ansteller = (detail.squads || []).filter(function (s) { return (s.type || "ansteller") === "ansteller"; });
+  // Welche Gruppen? Ohne Angabe: alle. Das ist der übliche Fall, und wer eine
+  // auslassen will, hakt sie ab — nicht umgekehrt. Beim Nachfassen schickt
+  // man dagegen gezielt an eine oder zwei.
+  const nurIds = Array.isArray(body.squad_ids)
+    ? body.squad_ids.map(function (x) { return String(x); })
+    : null;
+  const gruppen = (detail.squads || []).filter(function (sq) {
+    return !nurIds || nurIds.indexOf(String(sq.id)) >= 0;
+  });
   const posts = readPosts_();
   const postsById = {};
   posts.forEach(function (p) { postsById[p.id] = p; });
@@ -4280,7 +4328,8 @@ function eventInfomailsSend_(body) {
 
   let sent = 0;
   const errors = [];
-  for (const squad of ansteller) {
+  const versandProGruppe = {};   // squad-id → wie viele Mails rausgingen
+  for (const squad of gruppen) {
     const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
     if (!positions.length) continue;
 
@@ -4295,7 +4344,9 @@ function eventInfomailsSend_(body) {
     } catch (err) {
       pdfError = String(err && err.message || err);
     }
-    const subject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(squad.name);
+    const istTreiber = String(squad.type || "").toLowerCase() === "treiber";
+    const subject = "Info zur Drückjagd: " + ev.name + " — " +
+                    (istTreiber ? (squad.name || "Treibergruppe") : displayRundeNameServer_(squad.name));
 
     for (let i = 0; i < positions.length; i++) {
       if (anstellerOnly && i > 0) break; // Only the Ansteller (index 0)
@@ -4309,6 +4360,7 @@ function eventInfomailsSend_(body) {
         if (pdfBlob) opts.attachments = [pdfBlob];
         GmailApp.sendEmail(h.email, subject, htmlToPlain_(html), opts);
         sent++;
+        versandProGruppe[squad.id] = (versandProGruppe[squad.id] || 0) + 1;
       } catch (err) {
         errors.push({ hunter: pos.hunter, error: String(err && err.message || err) });
       }
@@ -4317,7 +4369,29 @@ function eventInfomailsSend_(body) {
       errors.push({ hunter: displayRundeNameServer_(squad.name), error: "PDF build: " + pdfError });
     }
   }
-  return { ok: true, sent: sent, errors: errors };
+  // Nachweis je Gruppe fortschreiben. Der Zähler zählt Versandvorgänge, nicht
+  // E-Mails — beim Nachfassen will man wissen, wie oft man die Gruppe schon
+  // angeschrieben hat, nicht wie viele Adressen dahinterstehen.
+  const ids = Object.keys(versandProGruppe);
+  if (ids.length) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ensureSheet_(ss, SHEETS.event_squads, EVENT_SQUAD_HEADER);
+    const header = sheetHeader_(sheet);
+    const cId = header.indexOf("id");
+    const cAt = header.indexOf("infomail_sent_at");
+    const cN = header.indexOf("infomail_count");
+    const lastRow = sheet.getLastRow();
+    if (cAt >= 0 && cN >= 0 && lastRow > 1) {
+      const rows = sheet.getRange(2, 1, lastRow - 1, header.length).getValues();
+      const now = new Date().toISOString();
+      for (let i = 0; i < rows.length; i++) {
+        if (ids.indexOf(String(rows[i][cId]).trim()) < 0) continue;
+        sheet.getRange(i + 2, cAt + 1).setValue(now);
+        sheet.getRange(i + 2, cN + 1).setValue((Number(rows[i][cN]) || 0) + 1);
+      }
+    }
+  }
+  return { ok: true, sent: sent, errors: errors, perSquad: versandProGruppe };
 }
 
 function positionCoords_(pos, postsById) {
@@ -5360,6 +5434,12 @@ function standkarteUrl_(ev, hunterName) {
 // Design tokens — kept at the top so a future tweak (different accent,
 // tighter spacing, larger fonts) is a one-spot change.
 function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
+  // Treibergruppen bekommen dasselbe Blatt ohne Karte: sie laufen hinter dem
+  // Hundeführer her und stehen nicht auf nummerierten Kanzeln. Freigaben
+  // bleiben drauf — sie sind den ganzen Tag im Trieb und bekommen mit, was
+  // geschossen wird. Der QR-Code zur Standkarte bleibt auch: Treiber sollen
+  // ihre Beobachtungen mitgeben.
+  const istTreiber = String(squad.type || "").toLowerCase() === "treiber";
   const rundeLabel = displayRundeNameServer_(squad.name);
   const cleanName = function (s) { return String(s || "").replace(/[\\\/?%*:|"<>]/g, " "); };
   const filename = recipientPos
@@ -5443,14 +5523,17 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     headerTable.setBorderColor("#ffffff").setBorderWidth(0);
     const headerRow = headerTable.appendTableRow();
     const leftCell = headerRow.appendTableCell();
-    const rightCell = headerRow.appendTableCell();
-    headerTable.setColumnWidth(0, LEFT_COL);
-    headerTable.setColumnWidth(1, MAP_W_PT);
-    [leftCell, rightCell].forEach(function (c) {
+    // Ohne Karte gibt es keine zweite Spalte — die linke bekommt die ganze
+    // Breite, sonst stünde der Text in einer schmalen Säule mit Leerraum
+    // daneben.
+    const rightCell = istTreiber ? null : headerRow.appendTableCell();
+    headerTable.setColumnWidth(0, istTreiber ? (LEFT_COL + MAP_W_PT) : LEFT_COL);
+    if (rightCell) headerTable.setColumnWidth(1, MAP_W_PT);
+    [leftCell, rightCell].filter(Boolean).forEach(function (c) {
       c.setPaddingTop(0).setPaddingBottom(0);
     });
-    leftCell.setPaddingLeft(0).setPaddingRight(14);
-    rightCell.setPaddingLeft(0).setPaddingRight(0);
+    leftCell.setPaddingLeft(0).setPaddingRight(istTreiber ? 0 : 14);
+    if (rightCell) rightCell.setPaddingLeft(0).setPaddingRight(0);
 
     // --- Left column: DATUM, TREFFPUNKT, ZEITEN, ANSTELLER, (DEIN STAND), FREIGABEN ---
     appendCellLabel(leftCell, "DATUM");
@@ -5514,7 +5597,7 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     // versions, so we only call styleParagraph after content lands.
     let mapBlob = null;
     let mapError = "";
-    const mbox = fetchMapboxMap_(positions, postsById);
+    const mbox = istTreiber ? { blob: null, error: "" } : fetchMapboxMap_(positions, postsById);
     if (mbox.blob) {
       mapBlob = mbox.blob;
     } else if (/Kein MAPBOX_TOKEN/.test(mbox.error)) {
@@ -5525,8 +5608,10 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       mapError = mbox.error;
     }
 
-    const mapPara = rightCell.getChild(0).asParagraph();
-    if (mapBlob) {
+    const mapPara = rightCell ? rightCell.getChild(0).asParagraph() : null;
+    if (!mapPara) {
+      // Treibergruppe — es gibt keine rechte Spalte.
+    } else if (mapBlob) {
       const img = mapPara.appendInlineImage(mapBlob);
       const ratio = img.getHeight() / img.getWidth();
       img.setWidth(MAP_W_PT);
@@ -5546,7 +5631,7 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     }
 
     // === Roster table (full width) =============================
-    const rosterLabel = body.appendParagraph("RUNDE");
+    const rosterLabel = body.appendParagraph(istTreiber ? "TREIBERGRUPPE" : "RUNDE");
     styleParagraph(rosterLabel, {
       size: 7.5, bold: true, color: SOFT, before: 14, after: 4, line: 1.0,
     });
@@ -5554,7 +5639,7 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     const table = body.appendTable();
     table.setBorderColor(BORDER).setBorderWidth(0.5);
     const head = table.appendTableRow();
-    ["Nr.", "Schütze", "Stand"].forEach(function (h) {
+    (istTreiber ? ["Nr.", "Treiber", ""] : ["Nr.", "Schütze", "Stand"]).forEach(function (h) {
       const c = head.appendTableCell(h);
       const p = c.getChild(0).asParagraph();
       styleParagraph(p, { size: 8, bold: true, color: SOFT, line: 1.0 });
@@ -5569,7 +5654,8 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       styleParagraph(numCell.getChild(0).asParagraph(), {
         size: 10, bold: true, color: ACCENT, line: 1.0,
       });
-      const hunterCell = row.appendTableCell(p.hunter + (i === 0 ? " (Ansteller)" : ""));
+      const hunterCell = row.appendTableCell(
+        p.hunter + (i === 0 ? (istTreiber ? " (Hundeführer)" : " (Ansteller)") : ""));
       styleParagraph(hunterCell.getChild(0).asParagraph(), {
         size: 10, bold: !!isMe, color: INK, line: 1.0,
       });

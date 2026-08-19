@@ -4472,3 +4472,32 @@ body.stk-blanko .stk-mine { background: var(--card); }
 }
 .hunter-setpick button:hover { border-color: var(--sea-green); color: var(--sea-green); }
 .hunter-setpick-x { color: var(--muted) !important; }
+
+/* Auswahl, welche Runden und Gruppen eine Infomail bekommen. Alle
+   vorausgewählt — abhaken statt anhaken, weil "alle" der übliche Fall ist. */
+.infomail-gruppe {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  cursor: pointer;
+}
+.infomail-gruppe:last-child { border-bottom: 0; }
+.infomail-gruppe--leer { opacity: 0.5; cursor: default; }
+.infomail-gruppe-name { font-weight: 700; }
+.infomail-gruppe-typ { font-size: 12px; color: var(--muted); }
+.infomail-gruppe-n { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.infomail-gruppe-sent {
+  grid-column: 2 / -1;
+  font-size: 12px; color: var(--muted);
+}
+/* Schon verschickt: der Nachweis soll ins Auge fallen, wenn man zum zweiten
+   Mal in diesem Fenster steht und nachfassen will. */
+.infomail-gruppe-sent.is-sent { color: var(--sea-green); font-weight: 650; }
+@media (max-width: 560px) {
+  .infomail-gruppe { grid-template-columns: auto 1fr; }
+  .infomail-gruppe-typ, .infomail-gruppe-n { grid-column: 2; }
+}

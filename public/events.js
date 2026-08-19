@@ -2472,6 +2472,15 @@ function scheduleFreigabenSave(eventId) {
   }, 600);
 }
 
+// "14.12., 19:30" — kurz genug für eine Zeile in der Auswahlliste.
+function formatDateTimeShort(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString("de-DE", {
+    day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
 function openInfomailPreviewModal(preview) {
   const body = $("#infomail-body");
   const warns = [];
@@ -2493,7 +2502,30 @@ function openInfomailPreviewModal(preview) {
   const fullCount = preview.recipients || 0;
   const anstellerOnlyCount = preview.ansteller_recipients || 0;
 
-  const summary = `
+  // Wer bekommt eine? Alle vorausgewählt, abhaken statt anhaken — der übliche
+  // Fall ist "alle", und das Nachfassen an eine einzelne Gruppe ist die
+  // Ausnahme. Der Nachweis steht daneben, damit man beim zweiten Mal sieht,
+  // wen man schon angeschrieben hat.
+  const gruppen = preview.gruppen || [];
+  const gruppenHtml = gruppen.length ? `
+    <div class="infomail-section">
+      <div class="infomail-section-heading">📬 Wer bekommt eine?</div>
+      ${gruppen.map((g) => {
+        const wann = g.infomail_sent_at
+          ? `zuletzt ${formatDateTimeShort(g.infomail_sent_at)}${g.infomail_count > 1 ? ` · ${g.infomail_count}×` : ""}`
+          : "noch nicht verschickt";
+        return `<label class="infomail-gruppe${g.recipients ? "" : " infomail-gruppe--leer"}">
+          <input type="checkbox" class="infomail-gruppe-cb" value="${escapeHtml(g.id)}"
+                 ${g.recipients ? "checked" : "disabled"} data-n="${g.recipients}" />
+          <span class="infomail-gruppe-name">${escapeHtml(g.name)}</span>
+          <span class="infomail-gruppe-typ">${g.type === "treiber" ? "Treibergruppe" : "Ansteller-Runde"}</span>
+          <span class="infomail-gruppe-n">${g.recipients} Empfänger</span>
+          <span class="infomail-gruppe-sent${g.infomail_sent_at ? " is-sent" : ""}">${escapeHtml(wann)}</span>
+        </label>`;
+      }).join("")}
+    </div>` : "";
+
+  const summary = gruppenHtml + `
     <div class="infomail-section infomail-options-section">
       <div class="infomail-section-heading">⚙️ Versand-Optionen</div>
       <label class="infomail-opt" for="infomail-include-schuetzen">
@@ -2517,18 +2549,28 @@ function openInfomailPreviewModal(preview) {
   const updateRecipientLine = () => {
     const inclSchuetzen = $("#infomail-include-schuetzen").checked;
     infomailIncludeSchuetzen = inclSchuetzen;
-    const n = inclSchuetzen ? fullCount : anstellerOnlyCount;
-    const runden = preview.runden || 0;
+    // Nur die angehakten Gruppen zählen. Ohne das behauptet die Zeile eine
+    // Empfängerzahl, die der Versand gar nicht bedient.
+    const gewaehlt = $$(".infomail-gruppe-cb").filter((c) => c.checked);
+    const n = gruppen.length
+      ? gewaehlt.reduce((sum, c) => {
+          const g = gruppen.find((x) => x.id === c.value) || {};
+          return sum + (inclSchuetzen ? Number(c.dataset.n) : (g.type === "treiber" ? Number(c.dataset.n) : 1));
+        }, 0)
+      : (inclSchuetzen ? fullCount : anstellerOnlyCount);
+    const runden = gewaehlt.length || (preview.runden || 0);
     const value = inclSchuetzen
-      ? `${n} Schütze${n === 1 ? "" : "n"} in ${runden} Ansteller-Runde${runden === 1 ? "" : "n"}`
-      : `${n} Ansteller (Schützen werden nicht angeschrieben)`;
+      ? `${n} Person${n === 1 ? "" : "en"} in ${runden} Gruppe${runden === 1 ? "" : "n"}`
+      : `${n} Ansteller und Hundeführer (übrige Schützen werden nicht angeschrieben)`;
     $("#infomail-recipients-line").innerHTML =
       '<span class="infomail-meta-label">Empfänger</span>' +
       '<span class="infomail-meta-value"><strong>' + n + '</strong> ' + escapeHtml(value.replace(/^\d+\s/, "")) + '</span>';
     const opt = $("#infomail-include-schuetzen").closest(".infomail-opt");
     if (opt) opt.classList.toggle("infomail-opt--off", !inclSchuetzen);
     const sendBtn = $("#infomail-send");
-    sendBtn.textContent = inclSchuetzen ? "An alle Schützen versenden" : "Nur an Ansteller versenden";
+    sendBtn.textContent = n
+      ? `An ${n} Person${n === 1 ? "" : "en"} versenden`
+      : "Nichts ausgewählt";
     sendBtn.disabled = !n;
   };
 
@@ -2591,6 +2633,7 @@ function openInfomailPreviewModal(preview) {
     body.innerHTML = warnsHtml + summary + '<p class="muted">Keine zustellbaren Empfänger — bitte erst Zusagen einsammeln.</p>';
   }
   $("#infomail-include-schuetzen").addEventListener("change", updateRecipientLine);
+  $$(".infomail-gruppe-cb").forEach((c) => c.addEventListener("change", updateRecipientLine));
   updateRecipientLine();
   $("#infomail-backdrop").hidden = false;
   $("#infomail-modal").hidden = false;
@@ -2612,10 +2655,14 @@ async function confirmSendInfomails() {
   const oldText = btn.textContent;
   btn.textContent = "Sende …";
   try {
+    const gewaehlt = $$(".infomail-gruppe-cb").filter((c) => c.checked).map((c) => c.value);
     const data = await postJson({
       action: "event-infomails-send",
       event_id: state.currentEvent.event.id,
       ansteller_only: !$("#infomail-include-schuetzen").checked,
+      // Leer heißt im Backend "alle" — hier schicken wir immer die Auswahl mit,
+      // damit ein versehentlich leerer Haken nicht doch an alle geht.
+      squad_ids: gewaehlt,
     });
     closeInfomailPreviewModal();
     if (data.errors && data.errors.length) {
@@ -2624,6 +2671,9 @@ async function confirmSendInfomails() {
     } else {
       showToast(`${data.sent} Infomail${data.sent === 1 ? "" : "s"} versendet ✓`);
     }
+    // Damit "zuletzt verschickt" beim nächsten Öffnen stimmt.
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    await loadEventDetail(state.currentEvent.event.id);
   } catch (err) {
     showToast(err.message || "Fehler", "error");
   } finally {
