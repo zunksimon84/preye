@@ -460,6 +460,12 @@ function doPost(e) {
       const r = postAdd_(body);
       return json_(r, r.error ? 400 : 200);
     }
+    // Ein Revier anlegen, aus der Weboberfläche. Ruft dieselbe geprüfte
+    // Funktion wie das Formular im Sheet — zwei Eingänge, eine Prüfung.
+    if (action === "revier-create") {
+      const r = createRevierFromForm(body);
+      return json_(r, r.error ? 400 : 200);
+    }
     if (action === "posts-batch-upsert") {
       const r = postsBatchUpsert_(body);
       return json_(r, r.error ? 400 : 200);
@@ -2347,11 +2353,15 @@ function createRevierFromForm(form) {
   upsertByKey_(ensureSheet_(ss, SHEETS.revier_areas, REVIER_AREA_HEADER), areaRecords, ["revier", "area"]);
   invalidateRevierCache_();
 
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    "Revier „" + name + "“ angelegt. Stände jetzt über den Import anlegen.",
-    "Fertig", 8
-  );
-  return { ok: true, key: key };
+  // toast() gibt es nur in der Tabellenoberfläche. Über /exec aufgerufen wirft
+  // es, deshalb eingepackt.
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      "Revier „" + name + "“ angelegt. Stände jetzt über den Import anlegen.",
+      "Fertig", 8
+    );
+  } catch (err) { /* aus dem Web aufgerufen */ }
+  return { ok: true, key: key, name: name, areas: areaNames };
 }
 
 function onOpen() {

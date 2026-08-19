@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#04141c" />
+    <meta name="robots" content="noindex" />
+    <title>PREYE 👁 Revier einrichten</title>
+    <link rel="icon" href="favicon-preye.png" />
+    <!--
+      Bewusst OHNE style.css. Die Datei hat 4400 Zeilen, von denen viele ohne
+      Klassennamen der Kartenseite gehören (#topbar, #map, #sheet). Wer sie
+      einbindet, erbt eine fest positionierte Kopfleiste und Modalregeln, die
+      er nie wollte. Die paar Formularstile stehen in revier-neu.css.
+    -->
+    <link rel="stylesheet" href="dashboard.css" />
+    <link rel="stylesheet" href="gate.css" />
+    <link rel="stylesheet" href="revier-neu.css" />
+  </head>
+  <body class="revier-neu-page">
+    <!-- Dieselbe Leiste wie überall. Die Klassennamen sind nicht beliebig:
+         dashboard.css gestaltet .brand-mark / .bar-nav / .burger, und ohne sie
+         steht hier eine Reihe blau unterstrichener Verweise. -->
+    <header class="bar" id="bar">
+      <a class="brand" href="index.html" aria-label="PREYE — Übersicht">
+        <img class="brand-mark" src="preye-mark.png" alt="" />
+        <span class="brand-word">PREYE</span>
+      </a>
+      <nav class="bar-nav" id="nav" aria-label="Werkzeuge">
+        <a href="reviere.html">Reviere</a>
+        <a href="index.html">Control Room</a>
+        <a href="events.html">Jagdplanungen</a>
+      </nav>
+      <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menü">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <main class="board rn-board">
+      <div class="page-head">
+        <h1 id="rn-title">Revier einrichten</h1>
+        <p id="rn-lead">Koordinaten aus GPX oder Tabelle einlesen, prüfen, anlegen.</p>
+      </div>
+
+      <ol class="rn-rail" id="rn-rail">
+        <li data-step="1"><span>1</span> Revier</li>
+        <li data-step="2"><span>2</span> Daten</li>
+        <li data-step="3"><span>3</span> Punkte prüfen</li>
+        <li data-step="4"><span>4</span> Anlegen</li>
+      </ol>
+
+      <p class="rn-draft" id="rn-draft" hidden></p>
+
+      <!-- 1 — Revier ------------------------------------------------------ -->
+      <section class="rn-step" data-step="1">
+        <div class="rn-card">
+          <div class="rn-choice">
+            <label class="rn-radio"><input type="radio" name="rn-mode" value="existing" checked /> In ein vorhandenes Revier</label>
+            <label class="rn-radio"><input type="radio" name="rn-mode" value="new" /> Neues Revier anlegen</label>
+          </div>
+
+          <div id="rn-existing">
+            <label>Revier<select id="rn-revier"></select></label>
+            <p class="rn-hint" id="rn-revier-hint"></p>
+          </div>
+
+          <div id="rn-new" hidden>
+            <label>Name<input id="rn-name" placeholder="z.B. Kleinsee" maxlength="40" /></label>
+            <div class="rn-row">
+              <label>Schlüssel<input id="rn-key" placeholder="kleinsee" maxlength="24" />
+                <small>Steht in der Adresse: <code id="rn-url">preye.org/karte.html?revier=…</code><br />
+                  Später nur mit Aufwand änderbar.</small></label>
+              <label>Kurzform<input id="rn-short" placeholder="Kleinsee" maxlength="24" />
+                <small>So steht es in E-Mails</small></label>
+            </div>
+            <label>ID-Präfix<input id="rn-prefix" placeholder="KS" maxlength="4" />
+              <small>2–4 Großbuchstaben, kommt vor jede Stand-Nummer: <code id="rn-idex">KS-…</code></small></label>
+            <label>Teilgebiete<textarea id="rn-areas" rows="4"
+              placeholder="Eins pro Zeile. Leer lassen = ein Gebiet, benannt nach dem Revier."></textarea>
+              <small>Namen müssen über alle Reviere eindeutig sein und dürfen kein Komma enthalten.</small></label>
+          </div>
+
+          <div class="rn-actions">
+            <button class="rn-primary" id="rn-to-2">Weiter</button>
+            <span class="rn-msg" id="rn-msg-1"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 — Daten ------------------------------------------------------- -->
+      <section class="rn-step" data-step="2" hidden>
+        <div class="rn-card">
+          <div class="rn-drop" id="rn-drop">
+            <p><b>GPX oder CSV hier ablegen</b></p>
+            <p class="rn-hint">
+              GPX vom Handgerät (Wegpunkte) oder eine Tabelle mit einer Zeile je Stand.
+              Mehrere Dateien nacheinander gehen auch — was Du ablegst, kommt zur Liste dazu.
+            </p>
+            <button class="rn-ghost" id="rn-pick">Datei wählen</button>
+            <input type="file" id="rn-file" accept=".gpx,.csv,.txt,.tsv" multiple hidden />
+          </div>
+
+          <details class="rn-paste">
+            <summary>Aus Excel einfügen</summary>
+            <p class="rn-hint">
+              Eine <code>.xlsx</code> kann diese Seite nicht lesen. Zwei Wege, beide
+              gehen sofort: entweder <b>Datei → Speichern unter → „CSV UTF-8"</b>,
+              oder die Zellen in Excel markieren, kopieren und hier einfügen —
+              das landet als tabulatorgetrennter Text in der Zwischenablage.
+            </p>
+            <textarea id="rn-paste" rows="5" placeholder="Zellen aus Excel hier einfügen"></textarea>
+            <button class="rn-ghost" id="rn-paste-go">Einfügen übernehmen</button>
+          </details>
+
+          <ul class="rn-sources" id="rn-sources"></ul>
+
+          <div class="rn-actions">
+            <button class="rn-ghost" data-back="1">Zurück</button>
+            <button class="rn-primary" id="rn-to-3" disabled>Weiter</button>
+            <span class="rn-msg" id="rn-msg-2"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 — Punkte prüfen ----------------------------------------------- -->
+      <section class="rn-step" data-step="3" hidden>
+        <div class="rn-summary" id="rn-summary"></div>
+        <div class="rn-split">
+          <div class="rn-mapwrap"><div id="rn-map"></div>
+            <p class="rn-legend"><span class="d neu"></span> neu <span class="d alt"></span> vorhanden
+              <span class="d konflikt"></span> Konflikt <span class="d aus"></span> abgewählt</p>
+          </div>
+          <div class="rn-tablewrap">
+            <div class="rn-bulk">
+              <label>Teilgebiet für alle: <select id="rn-bulk-area"></select></label>
+              <button class="rn-ghost small" id="rn-suggest">Gruppen vorschlagen</button>
+              <button class="rn-ghost small" id="rn-none">Alle abwählen</button>
+              <button class="rn-ghost small" id="rn-all">Alle auswählen</button>
+            </div>
+            <table class="rn-table"><thead><tr>
+              <th></th><th>Quelle</th><th>Name</th><th>Nr.</th><th>Typ</th><th>Teilgebiet</th><th>Lage</th>
+            </tr></thead><tbody id="rn-rows"></tbody></table>
+          </div>
+        </div>
+        <div class="rn-actions">
+          <button class="rn-ghost" data-back="2">Zurück</button>
+          <button class="rn-primary" id="rn-to-4">Weiter</button>
+        </div>
+      </section>
+
+      <!-- 4 — Anlegen ------------------------------------------------------ -->
+      <section class="rn-step" data-step="4" hidden>
+        <div class="rn-card">
+          <div id="rn-confirm"></div>
+          <div class="rn-actions">
+            <button class="rn-ghost" data-back="3">Zurück</button>
+            <button class="rn-primary" id="rn-go"></button>
+            <span class="rn-msg" id="rn-msg-4"></span>
+          </div>
+          <div class="rn-progress" id="rn-progress" hidden>
+            <div class="rn-bar"><span id="rn-bar"></span></div>
+            <p id="rn-progress-text"></p>
+          </div>
+          <div id="rn-result"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="viewport-insets.js"></script>
+    <script src="config.js"></script>
+    <script src="reviere-def.js"></script>
+    <script src="gate.js"></script>
+    <script type="module" src="revier-neu.js"></script>
+    <script src="pwa.js"></script>
+  </body>
+</html>

@@ -1,0 +1,160 @@
+/* Assistent zum Einrichten eines Reviers.
+   ---------------------------------------------------------------------------
+   Diese Seite lädt dashboard.css (Leiste, Karten, Farben) und NICHT style.css.
+   Die vierzig Zeilen Formularstil, die sie von dort bräuchte, stehen hier —
+   das ist billiger, als sich mit 4400 Zeilen Kaskade zu prügeln, von denen
+   viele ohne Klassennamen der Kartenseite gehören. */
+
+.revier-neu-page { background: var(--bg); }
+.rn-board { max-width: 1180px; }
+
+/* ---- Schrittleiste ---- */
+.rn-rail {
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+  list-style: none; margin: 0 0 var(--gap); padding: 0;
+  font-size: 13px; font-weight: 700; color: var(--ink-faint);
+}
+.rn-rail li { display: flex; align-items: center; gap: 8px; }
+.rn-rail span {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--tint); color: var(--ink-faint);
+  font-size: 12px; font-weight: 800;
+}
+.rn-rail li.done { color: var(--ink); cursor: pointer; }
+.rn-rail li.done span { background: var(--sea); color: #fff; }
+.rn-rail li.now { color: var(--ink); }
+.rn-rail li.now span {
+  background: linear-gradient(rgba(4, 20, 28, 0.3), rgba(4, 20, 28, 0.3)), var(--ramp);
+  color: #fff;
+}
+
+/* ---- Karte ---- */
+.rn-card {
+  background: var(--paper); border: 1px solid var(--rule); border-radius: 14px;
+  padding: clamp(18px, 2.6vw, 26px);
+  display: grid; gap: 14px;
+}
+.rn-card label { display: grid; gap: 4px; font-weight: 650; font-size: 14px; }
+.rn-card small { font-weight: 400; color: var(--ink-faint); font-size: 12px; line-height: 1.45; }
+.rn-card input[type="text"], .rn-card input:not([type]), .rn-card select, .rn-card textarea {
+  font: inherit; font-size: 15px; font-weight: 400;
+  padding: 8px 10px; border: 1px solid var(--rule); border-radius: 7px;
+  background: #fff; color: var(--ink); width: 100%; box-sizing: border-box;
+}
+.rn-card textarea { resize: vertical; }
+.rn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 620px) { .rn-row { grid-template-columns: 1fr; } }
+
+.rn-choice { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+/* Ankreuzfelder in einer Zeile. Die Regel, an der wir uns in style.css schon
+   einmal die Zähne ausgebissen haben — hier gibt es keine konkurrierende
+   label-Regel, deshalb reicht die Klasse. */
+.rn-radio { display: flex !important; flex-direction: row; align-items: center; gap: 7px; font-weight: 600; }
+.rn-radio input { width: auto; }
+
+.rn-hint { margin: 0; font-size: 13px; color: var(--ink-faint); line-height: 1.5; }
+.rn-msg { font-size: 13px; font-weight: 650; color: var(--alert-text, #b83f18); align-self: center; }
+
+.rn-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+.rn-primary, .rn-ghost {
+  font: inherit; font-size: 14px; font-weight: 700;
+  padding: 9px 18px; border-radius: 8px; cursor: pointer; border: 1px solid var(--rule);
+}
+.rn-primary { background: var(--sea); border-color: var(--sea); color: #fff; }
+.rn-primary:disabled { background: var(--tint); border-color: var(--rule); color: var(--ink-faint); cursor: default; }
+.rn-ghost { background: #fff; color: var(--ink); }
+.rn-ghost.small { padding: 5px 11px; font-size: 13px; }
+
+/* ---- Ablegefläche ---- */
+.rn-drop {
+  display: grid; gap: 8px; place-items: center; text-align: center;
+  min-height: 190px; padding: 24px;
+  border: 2px dashed var(--rule); border-radius: 12px; background: #fff;
+}
+.rn-drop.over { border-color: transparent; background: var(--tint);
+  border-image: var(--ramp) 1; }
+.rn-drop p { margin: 0; max-width: 46ch; }
+.rn-paste summary { cursor: pointer; font-weight: 650; font-size: 14px; }
+.rn-paste textarea { width: 100%; box-sizing: border-box; margin: 8px 0; font-family: ui-monospace, monospace; font-size: 12px; }
+
+.rn-sources { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rn-sources li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border: 1px solid var(--rule); border-radius: 8px; background: #fff; font-size: 14px;
+}
+.rn-sources b { font-weight: 700; }
+.rn-sources .rn-drop-warn { color: var(--alert-text, #b83f18); font-size: 13px; }
+.rn-sources button { margin-left: auto; }
+
+/* ---- Zusammenfassung ---- */
+.rn-summary {
+  display: flex; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 12px;
+}
+.rn-summary button {
+  font: inherit; font-size: 13px; font-weight: 700;
+  padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--rule); background: #fff; color: var(--ink);
+}
+.rn-summary button.on { border-color: var(--sea); color: var(--sea); }
+.rn-summary button.warn { color: var(--alert-text, #b83f18); }
+
+/* ---- Karte + Tabelle ---- */
+.rn-split { display: grid; grid-template-columns: minmax(320px, 44%) 1fr; gap: 14px; align-items: start; }
+@media (max-width: 1000px) { .rn-split { grid-template-columns: 1fr; } }
+.rn-mapwrap { position: sticky; top: 84px; }
+#rn-map { height: 58vh; min-height: 320px; border-radius: 12px; border: 1px solid var(--rule); background: var(--tint); }
+@media (max-width: 1000px) { #rn-map { height: 42vh; } .rn-mapwrap { position: static; } }
+.rn-legend { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); display: flex; gap: 14px; flex-wrap: wrap; }
+.rn-legend .d { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.rn-legend .neu { background: #2fa35f; }
+.rn-legend .alt { background: transparent; border: 2px solid #9a9a9a; }
+.rn-legend .konflikt { background: #ff5722; }
+.rn-legend .aus { background: #c9d0d6; }
+
+.rn-tablewrap { min-width: 0; overflow-x: auto; }
+.rn-bulk { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+.rn-bulk select { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--rule); border-radius: 6px; }
+.rn-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rn-table th {
+  text-align: left; font-size: 10.5px; font-weight: 800; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--ink-faint);
+  padding: 4px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap;
+}
+.rn-table td { padding: 3px 6px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.rn-table tr.sel td { background: var(--tint); }
+.rn-table tr.off td { opacity: 0.45; }
+.rn-table tr.err td { background: #fff2ee; }
+.rn-table input[type="text"], .rn-table select {
+  font: inherit; font-size: 13px; padding: 3px 6px;
+  border: 1px solid transparent; border-radius: 5px; background: transparent; width: 100%;
+  box-sizing: border-box; color: var(--ink);
+}
+.rn-table input[type="text"]:focus, .rn-table select:focus { border-color: var(--sea); background: #fff; outline: none; }
+.rn-table .src { color: var(--ink-faint); white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.rn-table .pos { font-variant-numeric: tabular-nums; color: var(--ink-faint); white-space: nowrap; font-size: 12px; }
+.rn-table .msg { display: block; font-size: 11.5px; color: var(--alert-text, #b83f18); }
+.rn-table td.nr input { width: 62px; }
+
+/* ---- Fortschritt ---- */
+.rn-progress { display: grid; gap: 6px; }
+.rn-bar { height: 8px; border-radius: 999px; background: var(--tint); overflow: hidden; }
+.rn-bar span { display: block; height: 100%; width: 0; background: var(--ramp); transition: width 0.2s; }
+.rn-draft {
+  margin: 0 0 var(--gap); padding: 10px 14px; border-radius: 10px;
+  background: #fff; border: 1px solid var(--rule); font-size: 14px;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+/* display: flex schlägt die Browserregel [hidden] { display: none }, weil eine
+   Klasse mehr wiegt als ein Attribut. Ohne diese Zeile steht der leere Kasten
+   immer da. Dieselbe Falle wie beim #gate, dort hat sie Tage gekostet. */
+.rn-draft[hidden] { display: none; }
+
+/* Der Typ ist ein ganzes Wort („Drückjagdbock"), nicht zwei Buchstaben. */
+.rn-table td:nth-child(5) { min-width: 116px; }
+.rn-table td:nth-child(6) { min-width: 118px; }
+#rn-result ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
+#rn-result li { margin: 2px 0; }
+
+.rn-missing summary { cursor: pointer; }
+.rn-missing p { margin: 6px 0 0; }
