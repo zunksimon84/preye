@@ -404,13 +404,27 @@ function doGet(e) {
     if (!checkToken_(params.token)) {
       return json_({ error: "private", code: "AUTH_REQUIRED" });
     }
-    if (action === "bootstrap") return json_(bootstrap_());
-    if (action === "aggregates") return json_(aggregates_(params));
+    // Die Registratur ist revierübergreifend und braucht deshalb keinen Filter.
+    if (action === "reviere") return json_(reviereList_());
+    // Alles Weitere läuft revierbezogen. Fehlt der Parameter, gilt das
+    // Standardrevier — NICHT "alle". Zwischengespeicherte alte Frontends
+    // schicken keinen mit, und die sollen exakt sehen, was sie heute sehen.
+    const rev = resolveRevierParam_(params.revier);
+    if (rev.error) return json_({ error: rev.error }, 400);
+    if (action === "bootstrap") return json_(bootstrap_(rev.key));
+    if (action === "aggregates") return json_(aggregates_(params, rev.key));
     if (action === "sync") return json_(syncPostsFromKml());
-    if (action === "history") return json_(history_(params));
-    if (action === "strecke") return json_(strecke_(params));
-    if (action === "nachsuche-list") return json_(nachsucheList_());
-    if (action === "events-list") return json_(eventsList_());
+    if (action === "history") return json_(history_(params, rev.key));
+    if (action === "strecke") return json_(strecke_(params, rev.key));
+    if (action === "nachsuche-list") return json_(nachsucheList_(rev.key));
+    // Ausnahme: die Jagdplanungen sind bewusst revierübergreifend und haben
+    // oben in der Liste einen eigenen Filter mit der Option „Alle Reviere".
+    // Würde hier ohne Parameter das Standardrevier greifen, könnte diese
+    // Option nie mehr alles zeigen. Also: nur filtern, wenn ausdrücklich
+    // danach gefragt wurde.
+    if (action === "events-list") {
+      return json_(eventsList_(params.revier ? rev.key : null));
+    }
     if (action === "event-detail") return json_(eventDetail_(params));
     if (action === "address-book") return json_(addressBookList_());
     if (action === "invite-preview") return json_(invitePreview_(params));
@@ -444,6 +458,10 @@ function doPost(e) {
     }
     if (action === "post-add") {
       const r = postAdd_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "posts-batch-upsert") {
+      const r = postsBatchUpsert_(body);
       return json_(r, r.error ? 400 : 200);
     }
     if (action === "posts-batch-add") {
@@ -512,21 +530,52 @@ function doPost(e) {
 
 // ---------- Handlers ----------
 
-function bootstrap_() {
+function bootstrap_(revierKey) {
+  const reg = revierRegistry_();
   return {
-    posts: readPosts_(),
+    posts: readPostsScoped_(revierKey),
+    // Jäger bleiben gemeinsam. Dieselben Leute jagen in beiden Revieren;
+    // getrennte Listen hießen, denselben Namen zweimal zu führen und die
+    // Strecke einer Person in zwei Hälften zu zerlegen.
     hunters: readHunters_(),
     species: SPECIES.slice(),
+    revier: revierKey || "",
+    areas: revierKey ? areasOfRevier_(revierKey) : reg.areas.map(function (a) { return a.area; }),
+    // Die Registratur gleich mitliefern, damit das Frontend keine zweite
+    // Anfrage braucht und seine eingebaute Liste überschreiben kann.
+    reviere: reviereList_().reviere,
   };
 }
 
-function strecke_(params) {
+// Die Registratur fürs Frontend, mit der Zahl der Stände je Revier — daraus
+// leitet die Revierauswahl ihr Statusmerkmal ab, statt es zu pflegen.
+function reviereList_() {
+  const reg = revierRegistry_();
+  const posts = readPosts_();
+  const counts = {};
+  for (let i = 0; i < posts.length; i++) {
+    const key = String(posts[i].revier || "").trim() || reg.areaToRevier[posts[i].area] || "";
+    if (key) counts[key] = (counts[key] || 0) + 1;
+  }
+  return {
+    default: defaultRevier_(),
+    reviere: reg.reviere.map(function (r) {
+      return {
+        key: r.key, name: r.name, short: r.short, status: r.status,
+        areas: r.areas.slice(), center: r.center, zoom: r.zoom,
+        pano: r.pano, vet: r.vet, posts: counts[r.key] || 0,
+      };
+    }),
+  };
+}
+
+function strecke_(params, revierKey) {
   const fromIso = params.from || null;
   const toIso = params.to || null;
   const from = fromIso ? new Date(fromIso) : null;
   const to = toIso ? new Date(toIso) : null;
 
-  const rows = readHarvests_();
+  const rows = readHarvestsScoped_(revierKey);
   const buckets = {}; // species → { count, by_gender: { m: {count,age{...}}, w, unknown } }
   function emptyAge() {
     return { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, unknown: 0 };
@@ -595,9 +644,16 @@ function strecke_(params) {
   };
 }
 
-function history_(params) {
+function history_(params, revierKey) {
   const post_id = String(params.post_id || "").trim();
   if (!post_id) return [];
+  // Der Stand legt das Revier ohnehin fest. Die Prüfung ist trotzdem da, damit
+  // eine geratene Stand-ID keinen Blick in ein fremdes Revier erlaubt.
+  if (revierKey) {
+    const byPost = postRevierMap_();
+    const owner = byPost[post_id] || defaultRevier_();
+    if (owner !== revierKey) return [];
+  }
   const limit = Math.min(Math.max(Number(params.limit) || 20, 1), 100);
   const rows = readHarvests_();
   const filtered = rows
@@ -625,7 +681,7 @@ function history_(params) {
   return filtered;
 }
 
-function aggregates_(params) {
+function aggregates_(params, revierKey) {
   const fromIso = params.from || null;     // inclusive ISO date or datetime
   const toIso = params.to || null;         // inclusive ISO date or datetime
   const species = params.species || null;  // single species or null
@@ -633,7 +689,7 @@ function aggregates_(params) {
   const from = fromIso ? new Date(fromIso) : null;
   const to = toIso ? new Date(toIso) : null;
 
-  const rows = readHarvests_();
+  const rows = readHarvestsScoped_(revierKey);
   const counts = {};
   for (const r of rows) {
     const ts = new Date(r.timestamp);
@@ -702,7 +758,12 @@ function logHarvest_(body) {
     post_id = cfg.prefix + uniqueIdSuffix_();
     const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
     sheet.appendRow(postRow_(
-      { id: post_id, name: niceLabel, area: cfg.area, lat: lat, lng: lng },
+      {
+        id: post_id, name: niceLabel, area: cfg.area, lat: lat, lng: lng,
+        // Klettersitz und Pirsch gehören keinem Teilgebiet an — ohne diese
+        // Zuordnung fielen sie aus jeder revierbezogenen Abfrage heraus.
+        revier: revierForEntry_(body, "", lat, lng),
+      },
       sheetHeader_(sheet)
     ));
     createdPost = { id: post_id, name: niceLabel, area: cfg.area, lat: lat, lng: lng };
@@ -755,6 +816,8 @@ function logHarvest_(body) {
     wind_dir: weather ? weather.wind_dir : "",
     gender: gender,
     age_class: ageClass,
+    revier: revierForEntry_(body, post_id, targetPost ? targetPost.lat : NaN,
+                            targetPost ? targetPost.lng : NaN),
   });
 
   const out = { ok: true, hunter: canonical };
@@ -820,6 +883,117 @@ function postAdd_(body) {
     lat: lat, lng: lng, type: type,
   });
   return { ok: true, id: id };
+}
+
+// Import von Ständen: anlegen ODER aktualisieren.
+//
+// postAdd_ kann nur anhängen. Damit ist ein zweiter Import nicht möglich — und
+// ein Import, den man nicht wiederholen kann, traut sich niemand zu benutzen.
+// Der Abnahmefall dafür ist: dieselbe Datei zweimal → 0 Änderungen.
+//
+// Geschrieben wird mit einem Kopfzeilen-Lesen und einem setValues für alle
+// Neuen, statt je Zeile einmal anzuhängen. Bei 90 Ständen ist das der
+// Unterschied zwischen "geht" und "läuft in die Zeitgrenze".
+function postsBatchUpsert_(body) {
+  const rows = Array.isArray(body.posts) ? body.posts : [];
+  if (!rows.length) return { ok: true, results: [] };
+  if (rows.length > 500) return { error: "zu viele Zeilen auf einmal (max 500)" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+  const header = sheetHeader_(sheet);
+  const col = {};
+  ["id", "name", "area", "lat", "lng", "type", "revier"].forEach(function (k) {
+    col[k] = header.indexOf(k);
+  });
+  const lastRow = sheet.getLastRow();
+  const existing = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, header.length).getValues()
+    : [];
+  const rowById = {};
+  for (let i = 0; i < existing.length; i++) {
+    rowById[String(existing[i][col.id]).trim()] = i;
+  }
+
+  const reg = revierRegistry_();
+  const results = [];
+  const appended = [];
+  const updates = [];   // {rowIdx, row}
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i] || {};
+    const name = String(r.name || "").trim();
+    const area = String(r.area || "").trim();
+    const lat = Number(r.lat);
+    const lng = Number(r.lng);
+    const areaDef = reg.areaByName[area];
+
+    if (!name) { results.push({ row: i + 1, action: "error", error: "Name fehlt" }); continue; }
+    if (name.length > 60) { results.push({ row: i + 1, action: "error", error: "Name zu lang", name: name }); continue; }
+    if (!areaDef) { results.push({ row: i + 1, action: "error", error: "Teilgebiet unbekannt: " + area, name: name }); continue; }
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) { results.push({ row: i + 1, action: "error", error: "Breitengrad ungültig", name: name }); continue; }
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) { results.push({ row: i + 1, action: "error", error: "Längengrad ungültig", name: name }); continue; }
+
+    let type = String(r.type || "").trim();
+    if (POST_TYPES.indexOf(type) === -1) type = "Kanzel";
+    const revierKey = areaDef.revier;
+
+    const givenId = String(r.id || "").trim();
+    const idx = givenId ? rowById[givenId] : undefined;
+
+    if (idx !== undefined) {
+      // Aktualisieren. Die ID bleibt, immer — an ihr hängen Erlegungen,
+      // Nachsuchen und Positionen in den Ansteller-Runden.
+      const cur = existing[idx];
+      const next = cur.slice();
+      if (col.name >= 0) next[col.name] = name;
+      if (col.area >= 0) next[col.area] = area;
+      if (col.lat >= 0) next[col.lat] = lat;
+      if (col.lng >= 0) next[col.lng] = lng;
+      if (col.type >= 0) next[col.type] = type;
+      if (col.revier >= 0) next[col.revier] = revierKey;
+      const changed = next.some(function (v, k) { return String(v) !== String(cur[k]); });
+      if (changed) {
+        updates.push({ rowIdx: idx + 2, row: next });
+        existing[idx] = next;
+        results.push({ row: i + 1, action: "updated", id: givenId, name: name });
+      } else {
+        results.push({ row: i + 1, action: "skipped", id: givenId, name: name });
+      }
+      continue;
+    }
+
+    const revier = reg.byKey[revierKey];
+    const revierPrefix = revier && revier.id_prefix ? revier.id_prefix + "-" : "";
+    let id = givenId;
+    if (!id || rowById[id] !== undefined) {
+      // Freie Nummer? Dann die sprechende ID, sonst der Zeitstempel — beides
+      // sind Muster, die im Blatt längst vorkommen.
+      const nr = String(r.nr || "").trim().toUpperCase();
+      const candidate = nr ? revierPrefix + areaDef.id_prefix + "-" + nr : "";
+      id = (candidate && rowById[candidate] === undefined)
+        ? candidate
+        : revierPrefix + areaDef.id_prefix + "-" + uniqueIdSuffix_();
+    }
+    const row = postRow_({
+      id: id, name: name, area: area, lat: lat, lng: lng,
+      type: type, revier: revierKey,
+    }, header);
+    appended.push(row);
+    rowById[id] = existing.length + appended.length - 1;
+    results.push({ row: i + 1, action: "added", id: id, name: name });
+  }
+
+  for (let u = 0; u < updates.length; u++) {
+    sheet.getRange(updates[u].rowIdx, 1, 1, header.length).setValues([updates[u].row]);
+  }
+  if (appended.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, appended.length, header.length).setValues(appended);
+  }
+
+  const tally = { added: 0, updated: 0, skipped: 0, error: 0 };
+  results.forEach(function (r) { tally[r.action]++; });
+  return { ok: true, results: results, tally: tally };
 }
 
 function postsBatchAdd_(body) {
@@ -982,6 +1156,11 @@ function postRow_(p, header) {
   put("lat", p.lat);
   put("lng", p.lng);
   put("type", p.type || "Kanzel");
+  // Ohne diese Zeile bekäme jeder neu angelegte Stand eine leere
+  // Revier-Spalte. Über das Teilgebiet ließe er sich zwar noch auflösen —
+  // Klettersitz und Pirsch aber nicht, die gehören keinem Teilgebiet an und
+  // fielen damit ins Standardrevier, egal wo sie stehen.
+  put("revier", p.revier || "");
   return row;
 }
 
@@ -1399,9 +1578,21 @@ function installArchiveTrigger() {
 // tables + bar charts: by species, by gender, by age class. Wipes and
 // re-creates the tab on each call so it's always fresh.
 
+// Baut das Gesamtblatt `stats` und zusätzlich ein `stats_<revier>` je Revier.
+// Das Gesamtblatt bleibt, damit nichts kaputtgeht, was jemand verlinkt hat.
 function rebuildStats() {
+  const reg = revierRegistry_();
+  const out = rebuildStatsFor_("stats", null, "Statistik");
+  for (let i = 0; i < reg.reviere.length; i++) {
+    const r = reg.reviere[i];
+    rebuildStatsFor_("stats_" + r.key, r.key, "Statistik " + r.name);
+  }
+  return out;
+}
+
+function rebuildStatsFor_(sheetName, revierKey, title) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const harvests = readHarvests_();
+  const harvests = readHarvestsScoped_(revierKey);
 
   const bySpecies = {};
   const byGender = { m: 0, w: 0, "?": 0 };
@@ -1434,16 +1625,16 @@ function rebuildStats() {
   }
 
   // Wipe and rebuild the stats tab.
-  let sheet = ss.getSheetByName("stats");
+  let sheet = ss.getSheetByName(sheetName);
   if (sheet) {
     const charts = sheet.getCharts();
     for (let c = 0; c < charts.length; c++) sheet.removeChart(charts[c]);
     sheet.clear();
   } else {
-    sheet = ss.insertSheet("stats");
+    sheet = ss.insertSheet(sheetName);
   }
 
-  sheet.getRange("A1").setValue("Statistik — aktualisiert " + new Date().toLocaleString("de-DE"))
+  sheet.getRange("A1").setValue(title + " — aktualisiert " + new Date().toLocaleString("de-DE"))
     .setFontWeight("bold");
 
   let row = 3;
@@ -1513,17 +1704,24 @@ function installStatsTrigger() {
 // Stand until someone marks it closed. If a recipient email + PDF were
 // supplied, the PDF is mailed from the script owner's Gmail.
 
-function nachsucheList_() {
+function nachsucheList_(revierKey) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, SHEETS.nachsuchen, NACHSUCHE_HEADER);
   const rows = readSheet_(SHEETS.nachsuchen, NACHSUCHE_HEADER);
   const posts = readPosts_();
   const postMap = {};
   for (let i = 0; i < posts.length; i++) postMap[posts[i].id] = posts[i];
+  const byPost = revierKey ? postRevierMap_() : {};
+  const fallback = revierKey ? defaultRevier_() : "";
   const out = [];
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (String(r.status || "open").toLowerCase() === "closed") continue;
+    if (revierKey) {
+      const key = String(r.revier || "").trim() ||
+        byPost[String(r.post_id || "").trim()] || fallback;
+      if (key !== revierKey) continue;
+    }
     const post = postMap[String(r.post_id || "")];
     if (!post || !Number.isFinite(post.lat) || !Number.isFinite(post.lng)) continue;
     const ts = new Date(r.created_at);
@@ -1544,10 +1742,15 @@ function nachsucheList_() {
 
 // Map a "Stand-Nr." string ("13", "Nr. 13", "HR-13", "13a", "DJB 63")
 // to a posts-tab row.
-function resolveStandToPost_(standNr) {
+// Sucht einen Stand über eine frei getippte Nummer ("13", "Nr. 13", "DJB 63").
+//
+// Mit mehr als einem Revier ist das gefährlich: "Nr. 13" gibt es in jedem
+// Revier, und eine Nachsuche würde am falschen Stand hängen. Deshalb wird,
+// wenn ein Revier bekannt ist, nur darin gesucht.
+function resolveStandToPost_(standNr, revierKey) {
   const s = String(standNr || "").trim();
   if (!s) return null;
-  const posts = readPosts_();
+  const posts = revierKey ? readPostsScoped_(revierKey) : readPosts_();
   for (let i = 0; i < posts.length; i++) {
     if (posts[i].id.toLowerCase() === s.toLowerCase()) return posts[i];
   }
@@ -1598,14 +1801,17 @@ function nachsucheCreate_(body) {
       postId = cfg.prefix + uniqueIdSuffix_();
       const postsSheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
       postsSheet.appendRow(postRow_(
-        { id: postId, name: niceLabel, area: cfg.area, lat: lat, lng: lng },
+        {
+          id: postId, name: niceLabel, area: cfg.area, lat: lat, lng: lng,
+          revier: revierForEntry_(body, "", lat, lng),
+        },
         sheetHeader_(postsSheet)
       ));
       post = { id: postId, name: niceLabel, area: cfg.area, lat: lat, lng: lng };
     }
   }
   if (!post && body.stand_nr) {
-    post = resolveStandToPost_(String(body.stand_nr));
+    post = resolveStandToPost_(String(body.stand_nr), revierForEntry_(body, "", NaN, NaN));
     if (post) postId = post.id;
   }
   const standNr = post ? String(post.name) : String(body.stand_nr || "").trim();
@@ -1622,6 +1828,8 @@ function nachsucheCreate_(body) {
     status: "open",
     closed_at: "",
     recipient: recipient,
+    revier: revierForEntry_(body, post ? post.id : "",
+                            post ? post.lat : NaN, post ? post.lng : NaN),
   });
 
   let emailed = false;
@@ -1681,12 +1889,485 @@ function nachsucheClose_(body) {
 const PROP_SITE_MODE = "siteMode";
 const PROP_ACCESS_HASH = "accessPasswordHash";
 
+// ============================================================================
+// Reviere anlegen und pflegen — die Menüpunkte, mit denen Simon das allein
+// macht. Alles hier ist wiederholbar: nichts überschreibt eine bestehende
+// Zelle, jede Zeile wird über ihren Schlüssel aktualisiert statt doppelt
+// angelegt.
+// ============================================================================
+
+function menu_backupSheet() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
+  const copy = DriveApp.getFileById(ss.getId()).makeCopy("PREYE Sicherung " + stamp);
+  ui.alert(
+    "Sicherungskopie angelegt:\n\n" + copy.getName() +
+    "\n\nSie liegt in Deinem Drive-Hauptordner.\n\n" +
+    "Hinweis: Der Versionsverlauf von Google Sheets stellt zwar Zellen wieder " +
+    "her, aber KEINE Skripteigenschaften. Die Einstellung defaultRevier und " +
+    "die Einladungsvorlagen wären davon nicht erfasst."
+  );
+}
+
+// Einmalig: Registratur anlegen, die beiden bekannten Reviere eintragen, die
+// revier-Spalten füllen. Beliebig oft wiederholbar.
+function menu_migrateReviere() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Ohne diese Prüfung liefe die Migration unter einer Code-Fassung, die die
+  // neuen Spalten nicht kennt — und der nächtliche Archivlauf würde danach
+  // stumm scheitern (Bereich 2x10, Daten 2x11).
+  if (HARVEST_HEADER.indexOf("revier") < 0 || POST_HEADER.indexOf("revier") < 0) {
+    ui.alert("Alte Code-Fassung. Bitte zuerst den neuen Code.gs einfügen und speichern.");
+    return;
+  }
+
+  const log = [];
+
+  // 1) Registratur anlegen und die beiden bekannten Reviere eintragen.
+  const revSheet = ensureSheet_(ss, SHEETS.reviere, REVIER_HEADER);
+  const areaSheet = ensureSheet_(ss, SHEETS.revier_areas, REVIER_AREA_HEADER);
+
+  const seedReviere = [
+    {
+      key: "peenwerder", name: "Peenwerder", short: "Peenwerder",
+      // Absichtlich ohne Präfix: die 95 Stand-IDs (HR-1, OST-DJB63, …) bleiben
+      // damit buchstabengleich, und kein Verweis in harvests, nachsuchen oder
+      // den Ansteller-Runden muss nachgezogen werden.
+      id_prefix: "", status: "live",
+      center_lat: 53.6262, center_lng: 12.8378, zoom: 13,
+      pano: "revier-peenwerder.jpg",
+      kml_url: "https://www.google.com/maps/d/kml?mid=1Mz4DY_G8uTFDT14YNepjb8vLbjwF6lM&forcekml=1",
+      vet_name: "", vet_phone: "", vet_address: "", vet_url: "",
+      sort: 1, notes: "",
+    },
+    {
+      key: "mueritz", name: "Müritz Nationalpark", short: "NPA-Müritz",
+      id_prefix: "MZ", status: "setup",
+      center_lat: "", center_lng: "", zoom: "",
+      pano: "revier-mueritz.jpg",
+      kml_url: "",
+      // Stand bisher fest in standkarte.js verdrahtet — gehört hierher.
+      vet_name: "Müritz-Tierklinik",
+      vet_phone: "03991 / 66 46 26",
+      vet_address: "Goethestraße 52, 17192 Waren",
+      vet_url: "https://www.xn--mritz-tierklinik-jzb.de/24hnotdienst",
+      sort: 2, notes: "Stände fehlen noch — über den Import anlegen.",
+    },
+  ];
+
+  const seedAreas = [
+    // Die vier Rechtecke stammen unverändert aus dem alten classifyByCoords_.
+    { revier: "peenwerder", area: "Hauptrevier", id_prefix: "HR",
+      bbox_s: 53.605, bbox_w: 12.810, bbox_n: 53.640, bbox_e: 12.850, sort: 1 },
+    { revier: "peenwerder", area: "Ost", id_prefix: "OST",
+      bbox_s: 53.610, bbox_w: 12.850, bbox_n: 53.625, bbox_e: 12.860, sort: 2 },
+    { revier: "peenwerder", area: "Nord", id_prefix: "N",
+      bbox_s: 53.640, bbox_w: 12.860, bbox_n: 53.654, bbox_e: 12.890, sort: 3 },
+    { revier: "peenwerder", area: "Nordrand", id_prefix: "NR",
+      bbox_s: 53.654, bbox_w: 12.870, bbox_n: 53.670, bbox_e: 12.895, sort: 4 },
+    { revier: "mueritz", area: "Babke", id_prefix: "MZBA",
+      bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: 1 },
+    { revier: "mueritz", area: "Langenhagen", id_prefix: "MZLH",
+      bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: 2 },
+    { revier: "mueritz", area: "Schwarzenhof", id_prefix: "MZSH",
+      bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: 3 },
+    { revier: "mueritz", area: "Serrahn", id_prefix: "MZSE",
+      bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: 4 },
+  ];
+
+  log.push("Reviere: " + upsertByKey_(revSheet, seedReviere, ["key"]) + " geschrieben");
+  log.push("Teilgebiete: " + upsertByKey_(areaSheet, seedAreas, ["revier", "area"]) + " geschrieben");
+  invalidateRevierCache_();
+
+  // 2) revier-Spalten anlegen und füllen.
+  ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+  ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
+  ensureSheet_(ss, SHEETS.nachsuchen, NACHSUCHE_HEADER);
+  ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+
+  PropertiesService.getScriptProperties().setProperty(PROP_DEFAULT_REVIER, "peenwerder");
+  invalidateRevierCache_();
+
+  const r = menu_backfillRevier_(true);
+  log.push("Stände: " + r.posts.filled + " zugeordnet, " + r.posts.blank + " ohne Zuordnung");
+  log.push("Erlegungen: " + r.harvests.filled + " zugeordnet, " + r.harvests.blank + " ohne");
+  log.push("Nachsuchen: " + r.nachsuchen.filled + " zugeordnet, " + r.nachsuchen.blank + " ohne");
+  log.push("Jagden: " + r.events.filled + " zugeordnet, " + r.events.blank + " ohne (= kein Revier)");
+  if (r.unresolved.length) {
+    log.push("");
+    log.push("Nicht auflösbar (auf peenwerder gesetzt):");
+    r.unresolved.slice(0, 15).forEach(function (u) { log.push("  " + u); });
+    if (r.unresolved.length > 15) log.push("  … und " + (r.unresolved.length - 15) + " weitere");
+  }
+
+  ui.alert("Migration abgeschlossen\n\n" + log.join("\n"));
+}
+
+function menu_backfillRevier() {
+  const r = menu_backfillRevier_(false);
+  SpreadsheetApp.getUi().alert(
+    "Revier-Zuordnung neu berechnet\n\n" +
+    "Stände: " + r.posts.filled + "\n" +
+    "Erlegungen: " + r.harvests.filled + "\n" +
+    "Nachsuchen: " + r.nachsuchen.filled + "\n" +
+    "Jagden: " + r.events.filled
+  );
+}
+
+// Füllt leere revier-Zellen. Bereits gefüllte bleiben unangetastet, deshalb
+// beliebig oft wiederholbar.
+function menu_backfillRevier_(silent) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const reg = revierRegistry_();
+  const fallback = defaultRevier_() || "peenwerder";
+  const unresolved = [];
+
+  function fill(sheetName, header, resolve) {
+    const sheet = ensureSheet_(ss, sheetName, header);
+    const h = sheetHeader_(sheet);
+    const revCol = h.indexOf("revier");
+    const lastRow = sheet.getLastRow();
+    if (revCol < 0 || lastRow < 2) return { filled: 0, blank: 0 };
+    const rows = sheet.getRange(2, 1, lastRow - 1, h.length).getValues();
+    const col = sheet.getRange(2, revCol + 1, lastRow - 1, 1).getValues();
+    let filled = 0, blank = 0;
+    for (let i = 0; i < rows.length; i++) {
+      if (String(col[i][0] || "").trim()) continue;      // schon gesetzt
+      const key = resolve(rows[i], h);
+      if (key) { col[i][0] = key; filled++; } else { blank++; }
+    }
+    sheet.getRange(2, revCol + 1, lastRow - 1, 1).setValues(col);
+    return { filled: filled, blank: blank };
+  }
+
+  const posts = fill(SHEETS.posts, POST_HEADER, function (row, h) {
+    const area = String(row[h.indexOf("area")] || "").trim();
+    const id = String(row[h.indexOf("id")] || "").trim();
+    const byArea = reg.areaToRevier[area];
+    if (byArea) return byArea;
+    // Klettersitz und Pirsch gehören keinem Teilgebiet an.
+    if (area === "Klettersitz" || area === "Pirsch" || !area) {
+      unresolved.push("Stand " + id + " (" + (area || "ohne Teilgebiet") + ")");
+      return fallback;
+    }
+    unresolved.push("Stand " + id + " (Teilgebiet „" + area + "“ unbekannt)");
+    return fallback;
+  });
+
+  invalidateRevierCache_();
+  const byPost = postRevierMap_();
+
+  const harvests = fill(SHEETS.harvests, HARVEST_HEADER, function (row, h) {
+    const pid = String(row[h.indexOf("post_id")] || "").trim();
+    const key = byPost[pid];
+    if (key) return key;
+    unresolved.push("Erlegung an Stand " + pid + " (Stand nicht gefunden)");
+    return fallback;
+  });
+
+  const nachsuchen = fill(SHEETS.nachsuchen, NACHSUCHE_HEADER, function (row, h) {
+    const pid = String(row[h.indexOf("post_id")] || "").trim();
+    return byPost[pid] || fallback;
+  });
+
+  // Bei den Jagden bleibt leer wirklich leer: eine Jagd ohne Teilgebiet ist
+  // eine ohne Revier, und genau das soll sie auch bleiben. Vorher wurde daraus
+  // still Peenwerder.
+  const events = fill(SHEETS.events, EVENT_HEADER, function (row, h) {
+    return revierKeysFromTeilgebiete_(row[h.indexOf("teilgebiet")]) || "";
+  });
+
+  return { posts: posts, harvests: harvests, nachsuchen: nachsuchen,
+           events: events, unresolved: unresolved };
+}
+
+// Schreibt Zeilen anhand eines Schlüssels: vorhandene werden aktualisiert,
+// fehlende angehängt. Nie doppelt, nie gelöscht.
+function upsertByKey_(sheet, records, keyCols) {
+  const header = sheetHeader_(sheet);
+  const lastRow = sheet.getLastRow();
+  const existing = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, header.length).getValues()
+    : [];
+  const keyOf = function (getter) {
+    return keyCols.map(function (c) { return String(getter(c) || "").trim(); }).join("\u0000");
+  };
+  const rowByKey = {};
+  for (let i = 0; i < existing.length; i++) {
+    const row = existing[i];
+    rowByKey[keyOf(function (c) { return row[header.indexOf(c)]; })] = i + 2;
+  }
+  let written = 0;
+  const appended = [];
+  for (let i = 0; i < records.length; i++) {
+    const rec = records[i];
+    const k = keyOf(function (c) { return rec[c]; });
+    const target = rowByKey[k];
+    if (target) {
+      const row = existing[target - 2].slice();
+      Object.keys(rec).forEach(function (field) {
+        const c = header.indexOf(field);
+        if (c >= 0) row[c] = rec[field];
+      });
+      sheet.getRange(target, 1, 1, header.length).setValues([row]);
+    } else {
+      const row = new Array(header.length).fill("");
+      Object.keys(rec).forEach(function (field) {
+        const c = header.indexOf(field);
+        if (c >= 0) row[c] = rec[field];
+      });
+      const created = header.indexOf("created_at");
+      if (created >= 0 && !row[created]) row[created] = new Date().toISOString();
+      appended.push(row);
+    }
+    written++;
+  }
+  if (appended.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, appended.length, header.length).setValues(appended);
+  }
+  return written;
+}
+
+// Bericht, ändert nichts. Das ist der Menüpunkt, den Simon vor und nach jedem
+// Import laufen lässt.
+function menu_checkReviere() {
+  const ui = SpreadsheetApp.getUi();
+  const reg = revierRegistry_();
+  if (!reg.reviere.length) {
+    ui.alert("Noch keine Reviere angelegt. Bitte „Migration ausführen“ starten.");
+    return;
+  }
+  const posts = readPosts_();
+  const out = ["Standardrevier: " + (defaultRevier_() || "— keins —"), ""];
+
+  const seenPrefix = {};
+  const problems = [];
+  reg.areas.forEach(function (a) {
+    if (!a.id_prefix) { problems.push("Teilgebiet „" + a.area + "“ hat kein ID-Präfix"); return; }
+    if (seenPrefix[a.id_prefix]) {
+      problems.push("Präfix „" + a.id_prefix + "“ doppelt: " + seenPrefix[a.id_prefix] + " und " + a.area);
+    }
+    seenPrefix[a.id_prefix] = a.area;
+    if (RESERVED_PREFIXES.indexOf(a.id_prefix) >= 0) {
+      problems.push("Präfix „" + a.id_prefix + "“ ist bereits anderweitig vergeben");
+    }
+    if (a.area.indexOf(",") >= 0) {
+      problems.push("Teilgebiet „" + a.area + "“ enthält ein Komma — das zerlegt die Jagd-Zuordnung");
+    }
+  });
+  const seenArea = {};
+  reg.areas.forEach(function (a) {
+    if (seenArea[a.area]) {
+      problems.push("Teilgebiet „" + a.area + "“ gibt es in " + seenArea[a.area] + " und " + a.revier);
+    }
+    seenArea[a.area] = a.revier;
+  });
+
+  reg.reviere.forEach(function (r) {
+    const mine = posts.filter(function (p) {
+      return (String(p.revier || "").trim() || reg.areaToRevier[p.area]) === r.key;
+    });
+    const ohneKoord = mine.filter(function (p) {
+      return !Number.isFinite(p.lat) || !Number.isFinite(p.lng);
+    }).length;
+    out.push(r.name + "  [" + r.key + "]");
+    out.push("   Status: " + r.status + (r.status === "setup" && mine.length ? "  ← kann auf „live“" : ""));
+    out.push("   Stände: " + mine.length + (ohneKoord ? "  (" + ohneKoord + " ohne Koordinaten)" : ""));
+    out.push("   Teilgebiete: " + (r.areas.length ? r.areas.join(", ") : "— keine —"));
+    const ohneBox = reg.areas.filter(function (a) {
+      return a.revier === r.key && !Number.isFinite(a.bbox.s);
+    }).length;
+    if (ohneBox) out.push("   " + ohneBox + " Teilgebiete ohne Rechteck (Zuordnung nur beim Import)");
+    out.push("");
+  });
+
+  const ohneRevier = posts.filter(function (p) {
+    return !String(p.revier || "").trim() && !reg.areaToRevier[p.area];
+  }).length;
+  if (ohneRevier) problems.push(ohneRevier + " Stände ohne Revier-Zuordnung — „Revier-Zuordnung neu berechnen“ ausführen");
+
+  if (problems.length) {
+    out.push("Zu prüfen:");
+    problems.forEach(function (x) { out.push("  • " + x); });
+  } else {
+    out.push("Keine Auffälligkeiten.");
+  }
+  ui.alert(out.join("\n"));
+}
+
+// Ein Formular, kein Abfragereigen. Zehn ui.prompt() hintereinander hinterlassen
+// bei einem Abbruch in der Mitte eine halbe Zeile in der Registratur — genau die
+// Sorte Zustand, wegen der es diesen Umbau gibt.
+function menu_newRevier() {
+  const html = HtmlService.createHtmlOutput(newRevierFormHtml_())
+    .setWidth(560).setHeight(620);
+  SpreadsheetApp.getUi().showModalDialog(html, "Neues Revier anlegen");
+}
+
+function newRevierFormHtml_() {
+  const reg = revierRegistry_();
+  const belegt = reg.reviere.map(function (r) { return r.key; }).join(", ") || "—";
+  return '' +
+'<style>' +
+'  body{font:13px/1.45 -apple-system,system-ui,sans-serif;margin:0;padding:18px;color:#1a1a1a}' +
+'  h3{margin:0 0 4px;font-size:15px}' +
+'  p.hint{margin:0 0 16px;color:#6b6b6b}' +
+'  label{display:block;margin:10px 0 2px;font-weight:600}' +
+'  small{display:block;color:#6b6b6b;font-weight:400;margin-top:2px}' +
+'  input,textarea{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #d0d5db;border-radius:5px;font:inherit}' +
+'  textarea{height:74px;resize:vertical}' +
+'  .row{display:flex;gap:10px}.row>div{flex:1}' +
+'  .actions{margin-top:18px;display:flex;gap:8px;align-items:center}' +
+'  button{padding:8px 16px;border-radius:6px;border:1px solid #d0d5db;background:#fff;font:inherit;cursor:pointer}' +
+'  button.primary{background:#0f9a78;border-color:#0f9a78;color:#fff;font-weight:700}' +
+'  #msg{color:#b83f18;font-weight:600}' +
+'</style>' +
+'<h3>Neues Revier anlegen</h3>' +
+'<p class="hint">Die Stände kommen danach über den Import, nicht hier.</p>' +
+'<label>Name<input id="name" placeholder="z.B. Kleinsee"></label>' +
+'<div class="row">' +
+'  <div><label>Schlüssel<input id="key" placeholder="kleinsee">' +
+'    <small>Steht in der Adresse, später nur mit Aufwand änderbar. Vergeben: ' + belegt + '</small></label></div>' +
+'  <div><label>Kurzform<input id="short" placeholder="Kleinsee"><small>So steht es in E-Mails</small></label></div>' +
+'</div>' +
+'<label>ID-Präfix<input id="prefix" placeholder="KS" maxlength="4">' +
+'  <small>2–4 Großbuchstaben, kommt vor jede Stand-Nummer (KS-SW-7)</small></label>' +
+'<label>Teilgebiete<textarea id="areas" placeholder="Eins pro Zeile. Leer lassen = ein Gebiet, benannt nach dem Revier."></textarea>' +
+'  <small>Namen müssen über alle Reviere eindeutig sein und dürfen kein Komma enthalten</small></label>' +
+'<div class="row">' +
+'  <div><label>Notfall-Tierklinik<input id="vet_name" placeholder="optional"></label></div>' +
+'  <div><label>Telefon<input id="vet_phone" placeholder="optional"></label></div>' +
+'</div>' +
+'<div class="actions">' +
+'  <button class="primary" onclick="go()">Revier anlegen</button>' +
+'  <button onclick="google.script.host.close()">Abbrechen</button>' +
+'  <span id="msg"></span>' +
+'</div>' +
+'<script>' +
+'  var n=document.getElementById("name"), k=document.getElementById("key"),' +
+'      sh=document.getElementById("short"), pf=document.getElementById("prefix");' +
+'  n.addEventListener("input", function(){' +
+'    if(!k.dataset.touched) k.value = n.value.toLowerCase()' +
+'      .replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss")' +
+'      .replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");' +
+'    if(!sh.dataset.touched) sh.value = n.value;' +
+'    if(!pf.dataset.touched) pf.value = n.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,2);' +
+'  });' +
+'  [k,sh,pf].forEach(function(el){ el.addEventListener("input", function(){ el.dataset.touched="1"; }); });' +
+'  function go(){' +
+'    document.getElementById("msg").textContent = "…";' +
+'    google.script.run' +
+'      .withSuccessHandler(function(r){' +
+'        if(r.error){ document.getElementById("msg").textContent = r.error; return; }' +
+'        google.script.host.close();' +
+'      })' +
+'      .withFailureHandler(function(e){ document.getElementById("msg").textContent = e.message; })' +
+'      .createRevierFromForm({' +
+'        name:n.value, key:k.value, short:sh.value, prefix:pf.value,' +
+'        areas:document.getElementById("areas").value,' +
+'        vet_name:document.getElementById("vet_name").value,' +
+'        vet_phone:document.getElementById("vet_phone").value' +
+'      });' +
+'  }' +
+'</script>';
+}
+
+// Wird aus dem Formular gerufen. Prüft alles, bevor irgendetwas geschrieben
+// wird, und legt Revier plus Teilgebiete in einem Zug an.
+function createRevierFromForm(form) {
+  const name = String(form.name || "").trim();
+  const key = String(form.key || "").trim().toLowerCase();
+  const short = String(form.short || name).trim();
+  const prefix = String(form.prefix || "").trim().toUpperCase();
+  if (!name) return { error: "Name fehlt." };
+  if (!/^[a-z][a-z0-9-]{1,23}$/.test(key)) {
+    return { error: "Schlüssel: Kleinbuchstaben, Ziffern und Bindestrich, 2–24 Zeichen." };
+  }
+  if (!/^[A-Z]{2,4}$/.test(prefix)) return { error: "ID-Präfix: 2–4 Großbuchstaben." };
+  if (RESERVED_PREFIXES.indexOf(prefix) >= 0) {
+    return { error: "Präfix „" + prefix + "“ ist bereits anderweitig vergeben." };
+  }
+
+  const reg = revierRegistry_();
+  if (reg.byKey[key]) return { error: "Den Schlüssel „" + key + "“ gibt es schon." };
+  for (let i = 0; i < reg.reviere.length; i++) {
+    if (reg.reviere[i].id_prefix && reg.reviere[i].id_prefix === prefix) {
+      return { error: "Präfix „" + prefix + "“ gehört schon zu " + reg.reviere[i].name + "." };
+    }
+  }
+
+  // Ohne Teilgebiete startet das Revier mit einem, das nach ihm heißt. Aufteilen
+  // geht später jederzeit; blind vorab zu gliedern hilft niemandem.
+  let areaNames = String(form.areas || "").split(/\r?\n/)
+    .map(function (a) { return a.trim(); }).filter(Boolean);
+  if (!areaNames.length) areaNames = [name];
+
+  const seen = {};
+  for (let i = 0; i < areaNames.length; i++) {
+    const a = areaNames[i];
+    if (a.indexOf(",") >= 0) {
+      return { error: "Teilgebiet „" + a + "“ enthält ein Komma. Das zerlegt die Zuordnung einer Jagd." };
+    }
+    if (seen[a]) return { error: "Teilgebiet „" + a + "“ steht doppelt in der Liste." };
+    seen[a] = true;
+    if (reg.areaByName[a]) {
+      return { error: "Teilgebiet „" + a + "“ gibt es schon in " + reg.areaByName[a].revier + "." };
+    }
+  }
+
+  // Teilgebiets-Präfixe: Revier-Präfix plus zwei Buchstaben, eindeutig gemacht.
+  const usedPrefixes = {};
+  reg.areas.forEach(function (a) { usedPrefixes[a.id_prefix] = true; });
+  const areaRecords = areaNames.map(function (a, i) {
+    let base = prefix + a.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+    let cand = base, n = 1;
+    while (usedPrefixes[cand]) { n++; cand = base + n; }
+    usedPrefixes[cand] = true;
+    return {
+      revier: key, area: a, id_prefix: cand,
+      bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: i + 1,
+    };
+  });
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  upsertByKey_(ensureSheet_(ss, SHEETS.reviere, REVIER_HEADER), [{
+    key: key, name: name, short: short, id_prefix: prefix, status: "setup",
+    center_lat: "", center_lng: "", zoom: "",
+    pano: "revier-" + key + ".jpg", kml_url: "",
+    vet_name: String(form.vet_name || "").trim(),
+    vet_phone: String(form.vet_phone || "").trim(),
+    vet_address: "", vet_url: "",
+    sort: reg.reviere.length + 1,
+    created_at: new Date().toISOString(),
+    notes: "Stände fehlen noch — über den Import anlegen.",
+  }], ["key"]);
+  upsertByKey_(ensureSheet_(ss, SHEETS.revier_areas, REVIER_AREA_HEADER), areaRecords, ["revier", "area"]);
+  invalidateRevierCache_();
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    "Revier „" + name + "“ angelegt. Stände jetzt über den Import anlegen.",
+    "Fertig", 8
+  );
+  return { ok: true, key: key };
+}
+
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu("🔒 Privacy")
     .addItem("Privat schalten (Passwort setzen)", "menu_setPrivate")
     .addItem("Öffentlich schalten", "menu_setPublic")
     .addItem("Status anzeigen", "menu_showStatus")
+    .addToUi();
+  ui.createMenu("🗺️ Reviere")
+    .addItem("Neues Revier anlegen…", "menu_newRevier")
+    .addItem("Reviere prüfen", "menu_checkReviere")
+    .addItem("Revier-Zuordnung neu berechnen", "menu_backfillRevier")
+    .addSeparator()
+    .addItem("Sicherungskopie anlegen", "menu_backupSheet")
+    .addItem("Migration ausführen (einmalig)", "menu_migrateReviere")
     .addToUi();
   ui.createMenu("📊 Statistik")
     .addItem("Aktualisieren", "menu_rebuildStats")
@@ -2144,12 +2825,22 @@ function safeStr_(v) {
 // `event_squads`. `address_book` stores reusable name+email contacts so
 // you don't retype them across events.
 
-function eventsList_() {
+function eventsList_(revierKey) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
   ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
-  const events = readSheet_(SHEETS.events, EVENT_HEADER);
+  let events = readSheet_(SHEETS.events, EVENT_HEADER);
   const hunters = readSheet_(SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  if (revierKey) {
+    const reg = revierRegistry_();
+    events = events.filter(function (ev) {
+      const stored = String(ev.revier || "").trim();
+      if (stored) return stored.split(/\s*,\s*/).indexOf(revierKey) >= 0;
+      // Altbestand ohne Spalte: über die Teilgebiete auflösen.
+      const parts = String(ev.teilgebiet || "").split(/\s*,\s*/).filter(Boolean);
+      return parts.some(function (a) { return reg.areaToRevier[a] === revierKey; });
+    });
+  }
   return events.map(function (ev) {
     const stats = { invited: 0, accepted: 0, declined: 0, pending: 0 };
     for (let i = 0; i < hunters.length; i++) {
@@ -2165,6 +2856,7 @@ function eventsList_() {
       name: String(ev.name || ""),
       date: toDateString_(ev.date),
       teilgebiet: String(ev.teilgebiet || ""),
+      revier: String(ev.revier || "").trim() || revierKeysFromTeilgebiete_(ev.teilgebiet),
       art: huntKind_(ev.art),
       rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
@@ -2304,6 +2996,7 @@ function eventCreate_(body) {
     name: name,
     date: date,
     teilgebiet: String(body.teilgebiet || "").trim(),
+    revier: revierKeysFromTeilgebiete_(body.teilgebiet),
     art: huntKind_(body.art),
     rsvp_deadline: String(body.rsvp_deadline || "").trim(),
     treffpunkt: String(body.treffpunkt || "").trim(),
@@ -2363,6 +3056,7 @@ function eventUpdate_(body) {
     name: name,
     date: date,
     teilgebiet: String(body.teilgebiet || "").trim(),
+    revier: revierKeysFromTeilgebiete_(body.teilgebiet),
     art: huntKind_(body.art),
     rsvp_deadline: String(body.rsvp_deadline || "").trim(),
     treffpunkt: String(body.treffpunkt || "").trim(),
@@ -2891,6 +3585,42 @@ function normalizeEventDates_(ev) {
 // Gruppenansitz ohne Revier verschickte damit eine Einladung nach Peenwerder.
 // Jetzt kommt in dem Fall ein leerer Text zurück, und der Platzhalter fällt
 // samt seinem Satz weg.
+// Die Revier-Schlüssel zu einer Teilgebietsliste ("Nord, Nordrand" →
+// "peenwerder"). Kommagetrennt, weil eine Jagd revierübergreifend sein darf.
+function revierKeysFromTeilgebiete_(raw) {
+  const parts = String(raw || "").split(/\s*,\s*/).filter(function (p) { return p; });
+  if (!parts.length) return "";
+  const reg = revierRegistry_();
+  const keys = [];
+  for (let i = 0; i < parts.length; i++) {
+    const k = reg.areaToRevier[parts[i]];
+    if (k && keys.indexOf(k) === -1) keys.push(k);
+  }
+  return keys.join(", ");
+}
+
+// Das Revier für eine Erlegung oder Nachsuche. Bewusst nicht als Pflichtfeld:
+// eine noch nicht aktualisierte App schickt keins mit, und dann darf das
+// Eintragen im Wald nicht scheitern. Reihenfolge: mitgeschickt, sonst über den
+// Stand, sonst über die Lage, sonst das Standardrevier.
+function revierForEntry_(body, postId, lat, lng) {
+  const given = String((body && body.revier) || "").trim();
+  if (given) {
+    const reg = revierRegistry_();
+    if (reg.byKey[given]) return given;
+  }
+  if (postId) {
+    const fromPost = postRevierMap_()[String(postId).trim()];
+    if (fromPost) return fromPost;
+  }
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    const reg = revierRegistry_();
+    const area = classifyByCoords_(lat, lng, null);
+    if (area && reg.areaToRevier[area]) return reg.areaToRevier[area];
+  }
+  return defaultRevier_();
+}
+
 function revierFromTeilgebiete_(raw) {
   const parts = String(raw || "").split(/\s*,\s*/).filter(function (p) { return p; });
   if (!parts.length) return "";
