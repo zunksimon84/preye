@@ -1,42 +1,41 @@
-# Offen — Stand 19.08.2026
+# Offen — Stand 19.08.2026, abends
 
-Notiz für den Wiedereinstieg nach dem Neustart. Alles committet und gepusht
-(`545d952`), Arbeitsverzeichnis sauber.
-
-## Muss noch bereitgestellt werden
+## Muss bereitgestellt werden
 
 `apps-script/Code.gs` → Apps Script → Bereitstellen → Bereitstellungen
 verwalten → ✏ → Version **Neue Version** → Bereitstellen.
 
-Drin ist nur noch `545d952`: die Naht hinter einem Platzhalter im
-Einladungstext (`einladen.{teilgebiete_satz}Ich bitte` blieb zusammen).
-**Reine Kosmetik im Vorlagen-Editor** — beim Versand fällt es nicht auf, weil
-die Platzhalter vorher ersetzt werden. Kann also warten.
+Zwei Sachen hängen daran:
+
+1. **Infomail-Vorschau je Gruppe** (`6fad91f`). Ohne Bereitstellung zeigen
+   alle Vorschau-Knöpfe dasselbe Blatt, und das Fenster sagt es auch — der
+   Hinweis „Das Backend ist noch die alte Fassung" ist genau dieser Fall.
+2. Die Naht hinter einem Platzhalter im Einladungstext (`545d952`). Reine
+   Kosmetik im Vorlagen-Editor, kann warten.
+
+## Fertig und live (nur Pages, ohne Bereitstellung)
+
+- **Bedienfarbe Grau→Blau** (`edfc922`). Verlauf `#d1d7dc → #81b1e0` auf
+  Knöpfen, Kacheln, Hero, Toast; `#a7c3df` flach auf Tabellenköpfen. Token
+  heißen `--ctl-*`, nicht mehr `--green-*`.
+- Vorschau-Knöpfe je Runde und Treibergruppe im Infomail-Fenster
+  (Oberfläche steht, wirkt erst nach der Bereitstellung).
 
 ## Simon wollte noch prüfen
 
-1. **Infomail-Fenster** öffnen — oben muss "Wer bekommt eine?" stehen, eine
-   Zeile je Ansteller-Runde *und* je Treibergruppe, alle angehakt, daneben
-   "zuletzt … (N×)".
+1. **Nach der Bereitstellung**: Infomail-Fenster öffnen, bei jeder Runde auf
+   „Vorschau" — Karte, Roster und Betreff müssen je Gruppe andere sein.
 2. **Einladung erstellen** — Absätze im Textfeld. Einmal im Vorlagen-Editor
    speichern ersetzt die umbruchlose Vorlage in den ScriptProperties dauerhaft.
-3. Das neue Grün (`#7fdc87`) im Betrieb ansehen. Ist seit heute live.
+3. Die neue Bedienfarbe im Betrieb ansehen. Der Browser hält .css bis zu
+   10 Minuten — frische Sitzung, nicht die laufende neu laden.
 
-## Schon fertig und live (Pages, ohne Bereitstellung)
+## Noch grün, bewusst nicht angefasst
 
-- Knopf-Grün 26° kühler, löst sich vom Markenverlauf
-- Spalte "Wo" in der Beobachtungsliste, nur für Treiber und Blanko-Karte
-- "Control Room" heißt "Operation Center"
-
-## Fertig und bereits bereitgestellt
-
-- Infomail-Verteilung: Auswahl je Gruppe, Nachweis in `infomail_sent_at` /
-  `infomail_count`, Treibergruppen bekommen überhaupt erstmals eine
-- Treiber-PDF ohne Karte, mit Freigaben und QR
-- Absätze im Einladungstext
-
-## Was ich noch nicht überprüfen konnte
-
-Die POST-Endpunkte (`event-infomails-preview`, `event-infomails-send`)
-brauchen das Passwort der Zugangssperre, das ich nicht habe. Deshalb sind
-Punkt 1 und 2 oben Simons Prüfung und nicht meine.
+- `.infomail-opt` („Schützen einbeziehen") — fest eingetragenes `#16a34a`
+  mit eigenem Aus-Zustand. Ein/Aus-Anzeige, keine Bedienfarbe. Der lauteste
+  Grünblock, der übrig ist; auf Zuruf umstellbar.
+- `--green-dark` / `--green-mid`: dunkle Waldtöne für Schrift und die
+  Standkarten-Leiste.
+- Zusagen/Absagen, Fehler-Toasts, Löschknöpfe, die Punkte im
+  Anschussprotokoll: Bedeutung, nicht Gestaltung.
