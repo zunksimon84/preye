@@ -1,11 +1,21 @@
 :root {
   --green-dark: #1f3a1f;
   --green-mid: #4a6a3a;
-  /* Brenneke-inspired bright lime, used for the topbar to give the app
-     a recognisable identity. Pairs with near-black text for the same
-     high-contrast look the poster uses. */
-  --green-bright: #b5d33a;
-  --green-bright-edge: #97b730;
+  /* Das Grün der Bedienelemente — Flächen, Kacheln, Zierlinien.
+     Bis 19.08.2026 war das derselbe Wert wie --lime, also exakt das warme
+     Ende des Markenverlaufs. Genau deshalb verschwamm es: der unverdunkelte
+     6-px-Streifen unter der Leiste läuft rechts ins Lime aus, und direkt
+     darunter saßen Kacheln in derselben Farbe. Jetzt um 26° kühler bei
+     gleicher Helligkeit, damit die Kante wieder steht. Der Verlauf selbst
+     bleibt unangetastet — er ist die Marke, siehe --lime weiter unten. */
+  --green-bright: #7fdc87;
+  --green-bright-edge: #5ebb6f;
+  --green-bright-hover: #6ac873;
+  --green-bright-soft: #99ea9e;  /* hellerer Partner für Verläufe auf Flächen */
+  --green-tint: #e7f9e8;         /* Füllung hinterlegter Zeilen */
+  /* Als Schrift auf Weiß taugt --green-bright-edge nicht (2,4:1). Dafür
+     dieser Wert: 5,5:1 auf Weiß, 5,0:1 auf --green-tint. */
+  --green-ink: #1d783c;
   /* Brand gradient — the Lunge Evo Run colourway: pool blue at the heel,
      through green, into the yellow-green at the toe. The warm end is the
      existing brand lime, so every lime button on the site still ties back
@@ -2024,7 +2034,7 @@ body.rsvp-page #rsvp-topbar {
 
 /* "Landing page" hero for the event detail view. */
 .ev-hero {
-  background: linear-gradient(135deg, var(--green-bright) 0%, #c1dc59 100%);
+  background: linear-gradient(135deg, var(--green-bright) 0%, var(--green-bright-soft) 100%);
   border: 1px solid var(--green-bright-edge);
   border-radius: 12px;
   padding: 18px 18px 16px;
@@ -2709,10 +2719,10 @@ body.rsvp-page #rsvp-topbar {
 
 .schuetze-row--ansteller {
   border-color: var(--green-bright-edge);
-  background: #f3f8df; /* very light lime */
+  background: var(--green-tint);
 }
 .schuetze-row--ansteller .sr-num {
-  color: var(--green-bright-edge);
+  color: var(--green-ink);
   font-weight: 700;
   flex: 0 0 auto;
   padding-right: 6px;
@@ -3630,7 +3640,7 @@ body.rsvp-page {
   cursor: pointer;
   accent-color: var(--green-bright-edge);
 }
-.rsvp-confirm a { color: var(--green-bright-edge); font-weight: 600; }
+.rsvp-confirm a { color: var(--green-ink); font-weight: 600; }
 .rsvp-confirm a:hover { text-decoration: underline; }
 .rsvp-role-back {
   margin-top: 10px;
@@ -3697,7 +3707,7 @@ body.rsvp-page {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: var(--green-bright-edge);
+  color: var(--green-ink);
   cursor: pointer;
   margin-bottom: 12px;
 }
