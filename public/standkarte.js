@@ -276,6 +276,7 @@ function renderMine() {
 
   box.hidden = false;
   body.innerHTML = rows.join("");
+  updateWoColumn();
 }
 
 // ---------- Beobachtungsliste ----------
@@ -295,6 +296,7 @@ function saveList() {
     art: $(".stk-in-art", tr).value,
     sex: (($(".gender-btn.active", tr) || {}).dataset || {}).gender || "",
     count: $(".stk-in-count", tr).value,
+    wo: ($(".stk-in-wo", tr) || {}).value || "",
     gesehen: $(".stk-cb-gesehen", tr).checked,
     beschossen: $(".stk-cb-beschossen", tr).checked,
     liegt: $(".stk-cb-liegt", tr).checked,
@@ -318,6 +320,18 @@ function speciesOptions(selected) {
     `<option${s === selected ? " selected" : ""}>${escapeHtml(s)}</option>`).join("");
 }
 
+// Die Spalte "Wo" bekommt nur, wer keinen festen Stand hat: Treiber laufen
+// durch den Trieb, und die Blanko-Karte weiß gar nichts über den Träger. Für
+// einen Schützen auf Nr. 14 wäre sie eine leere Spalte, die er neunmal
+// übergeht.
+function updateWoColumn() {
+  const table = document.querySelector(".stk-table");
+  if (!table) return;
+  const placement = state.blank ? null : findMyPlacement(state.me);
+  const mobil = state.blank || (placement && placement.squad.type !== "ansteller");
+  table.classList.toggle("stk-table--wo", !!mobil);
+}
+
 function renderList() {
   const saved = readList();
   const tbody = $("#stk-tbody");
@@ -337,6 +351,7 @@ function renderList() {
         </div>
       </td>
       <td class="stk-col-count" data-label="Anzahl"><select class="stk-in-count" aria-label="Anzahl Zeile ${n}">${countOptions(r.count || "")}</select></td>
+      <td class="stk-col-wo" data-label="Wo"><input type="text" class="stk-in-wo" value="${escapeHtml(r.wo || "")}" placeholder="Ort" aria-label="Wo Zeile ${n}" /></td>
       <td data-label="gesehen"><input type="checkbox" class="stk-cb-gesehen"${r.gesehen ? " checked" : ""} aria-label="gesehen Zeile ${n}" /></td>
       <td data-label="beschossen"><input type="checkbox" class="stk-cb-beschossen"${r.beschossen ? " checked" : ""} aria-label="beschossen Zeile ${n}" /></td>
       <td data-label="Stück liegt"><input type="checkbox" class="stk-cb-liegt"${r.liegt ? " checked" : ""} aria-label="Stück liegt Zeile ${n}" /></td>
@@ -344,6 +359,7 @@ function renderList() {
     </tr>`;
   }
   tbody.innerHTML = html;
+  updateWoColumn();
 }
 
 // The species list only arrives with the bootstrap call, which can land after
@@ -375,7 +391,7 @@ function buildReport() {
   }
   const lines = [head.trim(), who, ""];
   const rows = readList().filter((r) => r &&
-    (r.time || r.art || r.sex || r.count || r.gesehen || r.beschossen || r.liegt || r.nachsuche));
+    (r.time || r.art || r.sex || r.count || r.wo || r.gesehen || r.beschossen || r.liegt || r.nachsuche));
   if (!rows.length) {
     lines.push("Keine Beobachtungen eingetragen.");
   } else {
@@ -391,7 +407,8 @@ function buildReport() {
         r.liegt ? "Stück liegt" : "",
         r.nachsuche ? "NACHSUCHE" : "",
       ].filter(Boolean).join(", ");
-      lines.push(`${i + 1}. ${r.time || "--:--"} ${wild}${flags ? " — " + flags : ""}`.trim());
+      const wo = r.wo ? " @ " + r.wo : "";
+      lines.push(`${i + 1}. ${r.time || "--:--"} ${wild}${wo}${flags ? " — " + flags : ""}`.trim());
     });
   }
   return lines.join("\n");
