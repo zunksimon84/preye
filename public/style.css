@@ -31,6 +31,14 @@
      Überfahren, "Mein Stand" auf der Standkarte. Dort verschwände eine
      Haarlinie. */
   --ctl-hairline: rgba(24, 80, 140, 0.16);
+  /* Wer --ctl-fill mit einem Rand kombiniert, braucht dazu
+     background-origin: border-box. Die Kurzform `background:` setzt origin
+     auf padding-box — der Verlauf ist dann nur so groß wie die Polsterbox,
+     und der 1-px-Ring der Randbox zeigt wegen background-repeat: repeat die
+     gekachelte Wiederholung: links das blaue Ende, rechts das graue. Genau
+     eine Seite bekommt dadurch eine harte Kante, und im Entwurf sieht man
+     das nicht — gemessen war der linke Randstreifen (77,144,207), also die
+     Haarlinie über dem falschen Ende des Verlaufs. */
   --ctl-lift: 0 1px 2px rgba(20, 50, 85, 0.10), 0 6px 16px -6px rgba(20, 50, 85, 0.22);
   /* Die Mitte des Verlaufs als einzelne Farbe. Für kleine Flächen, die einen
      eigenen Verlauf nicht tragen — Tabellenköpfe (jede Zelle finge ihn neu
@@ -654,6 +662,7 @@ a.filter-btn {
   font-weight: 700;
   letter-spacing: 0.3px;
   background: var(--ctl-fill);
+  background-origin: border-box;
   color: #111;
   border: 1px solid var(--ctl-hairline);
   border-radius: 10px;
@@ -1029,6 +1038,7 @@ a.filter-btn {
   align-items: center;
   justify-content: center;
   background: var(--ctl-fill);
+  background-origin: border-box;
   border: 1px solid var(--ctl-hairline);
   border-radius: 6px;
   padding: 8px 12px;
@@ -1390,6 +1400,7 @@ a.filter-btn {
   font-weight: 700;
   letter-spacing: 0.3px;
   background: var(--ctl-fill);
+  background-origin: border-box;
   color: #111;
   border: 1px solid var(--ctl-hairline);
   border-radius: 10px;
@@ -1435,6 +1446,7 @@ a.filter-btn {
   margin-top: 8px;
   padding: 7px 12px;
   background: var(--ctl-fill);
+  background-origin: border-box;
   color: #111;
   border: 1px solid var(--ctl-hairline);
   border-radius: 7px;
@@ -2022,6 +2034,7 @@ body.rsvp-page #rsvp-topbar {
 
 .primary-btn {
   background: var(--ctl-fill);
+  background-origin: border-box;
   color: #111;
   border: 1px solid var(--ctl-hairline);
   border-radius: 6px;
@@ -2066,6 +2079,7 @@ body.rsvp-page #rsvp-topbar {
 /* "Landing page" hero for the event detail view. */
 .ev-hero {
   background: var(--ctl-fill);
+  background-origin: border-box;
   border: 1px solid var(--ctl-hairline);
   border-radius: 12px;
   padding: 18px 18px 16px;
@@ -2315,6 +2329,7 @@ body.rsvp-page #rsvp-topbar {
 
 .squad-tile {
   background: var(--ctl-fill);
+  background-origin: border-box;
   border: 1px solid var(--ctl-hairline);
   border-radius: 12px;
   padding: 14px 14px 12px;
@@ -3584,6 +3599,7 @@ body.rsvp-page {
 .rsvp-accept {
   flex: 1;
   background: var(--ctl-fill);
+  background-origin: border-box;
   color: #111;
   border: 1px solid var(--ctl-hairline);
   border-radius: 7px;
