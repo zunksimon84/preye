@@ -3417,20 +3417,28 @@ function eventInvitesSend_(body) {
   const colInvitedAt = headers.indexOf("invited_at");
   const colSetManually = headers.indexOf("set_manually");
 
+  // Probelauf: sagt, wer eine Einladung bekäme, und verschickt nichts.
+  // Ohne das lässt sich nicht prüfen, ob die Übersprungenen stimmen — außer
+  // indem man 22 Leuten eine Mail schickt und hinterher nachsieht.
+  const dry = truthy_(body.dry);
+
   let sent = 0, skipped = 0;
+  const empfaenger = [], uebersprungen = [];
   const errors = [];
   for (let i = 0; i < rows.length; i++) {
     if (String(rows[i][colEventId]) !== eventId) continue;
     const email = String(rows[i][colEmail] || "").trim();
-    if (!email) { skipped++; continue; }
+    if (!email) { skipped++; uebersprungen.push({ hunter: String(rows[i][colHunter] || ""), grund: "keine E-Mail" }); continue; }
     const invitedAt = String(rows[i][colInvitedAt] || "").trim();
-    if (onlyUnsent && invitedAt) { skipped++; continue; }
+    if (onlyUnsent && invitedAt) { skipped++; uebersprungen.push({ hunter: String(rows[i][colHunter] || ""), grund: "schon eingeladen" }); continue; }
     // Wer von Hand gesetzt wurde, hat schon zugesagt. Ihm eine Einladung mit
     // der Bitte um Rueckmeldung zu schicken, waere genau das, was das Setzen
     // ersparen soll. Die Infomail zur Jagd bekommt er trotzdem — die geht
     // einen anderen Weg und an alle Zugesagten.
     if (colSetManually >= 0 && String(rows[i][colSetManually] || "").trim()) {
-      skipped++; continue;
+      skipped++;
+      uebersprungen.push({ hunter: String(rows[i][colHunter] || ""), grund: "gesetzt, hat schon zugesagt" });
+      continue;
     }
     const hunter = String(rows[i][colHunter] || "");
     const hunterLang = colLanguage >= 0
@@ -3448,6 +3456,7 @@ function eventInvitesSend_(body) {
     const personalized = bodyTemplate.split("{forename}").join(forename);
     const plainBody = inviteBodyToPlain_(personalized, link);
     const htmlBody = inviteBodyToHtml_(personalized, link);
+    if (dry) { empfaenger.push({ hunter: hunter, email: email }); sent++; continue; }
     try {
       // GmailApp honors the alias `from`; MailApp would silently fall
        // back to the script owner.
@@ -3476,7 +3485,13 @@ function eventInvitesSend_(body) {
       }
     }
   }
-  return { ok: true, sent: sent, skipped: skipped, errors: errors };
+  return {
+    ok: true, dry: dry, sent: sent, skipped: skipped, errors: errors,
+    // Nur im Probelauf gefüllt — sonst würden 22 Namen bei jedem Versand
+    // durch die Leitung wandern, ohne dass sie jemand liest.
+    recipients: dry ? empfaenger : undefined,
+    skippedDetail: dry ? uebersprungen : undefined,
+  };
 }
 
 // Built-in default invitation templates. Saved overrides live in Script

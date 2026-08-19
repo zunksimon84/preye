@@ -772,8 +772,12 @@ function showInviteLang(lang, skipSave) {
 
 function updateInviteRecipientsLine() {
   const hunters = state.currentEvent?.hunters || [];
-  const sendable = hunters.filter((h) => h.email && !h.invited_at);
-  const total = hunters.filter((h) => h.email).length;
+  // Gesetzte Jäger haben schon zugesagt. Sie stehen nicht in der Empfängerzahl,
+  // weil der Versand sie überspringt — die Zeile soll sagen, was passiert, und
+  // nicht, wer eine E-Mail-Adresse hat.
+  const gesetzt = hunters.filter((h) => h.email && h.set_manually).length;
+  const sendable = hunters.filter((h) => h.email && !h.invited_at && !h.set_manually);
+  const total = hunters.filter((h) => h.email && !h.set_manually).length;
   const sent = total - sendable.length;
   let line;
   if (!total) {
@@ -788,6 +792,9 @@ function updateInviteRecipientsLine() {
     if (counts.en) parts.push(`${counts.en} 🇬🇧`);
     line = `Wird an ${sendable.length} Jäger versendet (${parts.join(" · ")})` +
            (sent ? `, ${sent} bereits versendet — werden übersprungen.` : ".");
+  }
+  if (gesetzt) {
+    line += ` ${gesetzt} gesetzte${gesetzt === 1 ? "r" : ""} bekommt keine Einladung.`;
   }
   $("#invite-recipients").textContent = line;
 }
