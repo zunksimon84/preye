@@ -4431,3 +4431,18 @@ body.stk-blanko .stk-mine { background: var(--card); }
   .proto-bottom,
   .proto-meldung { break-inside: avoid; }
 }
+
+/* Geschlecht je Stück im Anschussprotokoll. Die Knöpfe selbst kommen aus der
+   Beobachtungsliste der Standkarte (.gender-btn weiter oben) — hier nur die
+   Größe fürs Protokoll, wo die Tabelle schmaler ist. */
+.proto-sex { display: flex; gap: 4px; justify-content: center; }
+.proto-sex .gender-btn { width: 34px; height: 30px; font-size: 16px; border-radius: 6px; }
+.proto-cell-sex { text-align: center; }
+/* Ohne das druckt der Browser die Farbe des gewählten Knopfes nicht mit, und
+   auf dem Papier stünden zwei gleich aussehende Zeichen. */
+@media print {
+  .proto-sex .gender-btn {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

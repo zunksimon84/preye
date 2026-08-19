@@ -5,7 +5,7 @@
 
 // Canvas overlays and the PDF export are shared with the standalone
 // Nachsuche page (nachsuche.html), so they live in one place.
-import { setupProtocolFigure, wireWildFigures, generateProtocolPdf } from "./protokoll-lib.js";
+import { setupProtocolFigure, wireWildFigures, wireSexButtons, generateProtocolPdf } from "./protokoll-lib.js";
 
 const cfg = window.PEENWERDER_CONFIG || {};
 
@@ -960,6 +960,7 @@ function wireUi() {
   // Erst die Figuren registrieren, dann die Bögen daran hängen — der
   // Umschalter sucht seine Punkte über die Registry.
   protoWild = wireWildFigures($("#protocol-modal"), protoFigures);
+  protoSex = wireSexButtons($("#protocol-modal"));
   fillRangeSelects();
   $("#protocol-btn").addEventListener("click", openProtocol);
   $("#protocol-close").addEventListener("click", closeProtocol);
@@ -1062,6 +1063,7 @@ function wireUi() {
 const protoFigures = []; // { el, resize, clear }
 // Umschalter für die Wildbögen (Stück I / II), gesetzt in wireEvents().
 let protoWild = null;
+let protoSex = null;
 
 // Stand picker on the protocol — same Kanzel / Klettersitz / Pirsch toggle
 // as the harvest sheet. "post" = pick an existing Kanzel from the dropdown;
@@ -1158,6 +1160,7 @@ function resetProtocol() {
   protoFigures.forEach((f) => f.clear());
   // Ohne das bliebe der Bogen von Stück II stehen, obwohl seine Wildart weg ist.
   if (protoWild) protoWild.refresh();
+  if (protoSex) protoSex.clear();
   setProtoMode("post");
 }
 

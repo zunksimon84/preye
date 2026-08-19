@@ -174,6 +174,42 @@ export function wireWildFigures(root, figures) {
   return { refresh };
 }
 
+// Geschlecht je Stück: ♂ / ♀ zum Antippen, nochmal antippen hebt auf.
+//
+// Dieselbe Bedienung wie in der Beobachtungsliste der Standkarte, damit man
+// nicht zwei Sachen lernen muss. Kein verstecktes Eingabefeld dahinter: das
+// Protokoll hat keine Serialisierung, das PDF nimmt den sichtbaren Zustand.
+export function wireSexButtons(root) {
+  root.addEventListener("click", (e) => {
+    const btn = e.target.closest(".proto-sex .gender-btn");
+    if (!btn) return;
+    e.preventDefault();
+    const an = !btn.classList.contains("active");
+    btn.closest(".proto-sex").querySelectorAll(".gender-btn").forEach((o) => {
+      o.classList.remove("active");
+      o.setAttribute("aria-pressed", "false");
+    });
+    if (an) {
+      btn.classList.add("active");
+      btn.setAttribute("aria-pressed", "true");
+    }
+  });
+  return {
+    clear() {
+      root.querySelectorAll(".proto-sex .gender-btn").forEach((o) => {
+        o.classList.remove("active");
+        o.setAttribute("aria-pressed", "false");
+      });
+    },
+    // "m" / "w" / "" je Stück — für den Fall, dass der Wert später einmal
+    // gebraucht wird (Bericht, Strecke).
+    value(key) {
+      const box = root.querySelector(`[data-proto-sex="${key}"] .gender-btn.active`);
+      return box ? box.dataset.gender : "";
+    },
+  };
+}
+
 // html2canvas mis-positions the text inside form controls (it sat low and
 // got clipped in the PDF). So in the cloned document we swap every input /
 // select / time field for a plain <div> carrying the same text — divs render

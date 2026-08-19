@@ -255,7 +255,7 @@
           <thead>
             <tr>
               <th></th><th>Uhrzeit</th><th>Anzahl Schüsse</th><th>Wildart / gesch. kg</th>
-              <th>Anzahl Stücke</th><th>Beobachtungen (gezeichnet, krank …)</th><th>von Hund(en) verfolgt</th>
+              <th>Geschlecht</th><th>Anzahl Stücke</th><th>Beobachtungen (gezeichnet, krank …)</th><th>von Hund(en) verfolgt</th>
             </tr>
           </thead>
           <tbody>
@@ -273,6 +273,12 @@
                   <option>Rehwild</option>
                 </select>
                 <select data-proto="s1_kg" data-range="1-100" aria-label="geschätzte kg"></select>
+              </td>
+                            <td data-label="Geschlecht" class="proto-cell-sex">
+                <div class="proto-sex" data-proto-sex="s1">
+                  <button type="button" class="gender-btn" data-gender="m" title="männlich" aria-label="männlich" aria-pressed="false">♂</button>
+                  <button type="button" class="gender-btn" data-gender="w" title="weiblich" aria-label="weiblich" aria-pressed="false">♀</button>
+                </div>
               </td>
               <td data-label="Anzahl Stücke"><select data-proto="s1_stuecke" data-range="1-15"></select></td>
               <td data-label="Beobachtungen"><input data-proto="s1_beob" /></td>
@@ -296,6 +302,12 @@
                   <option>Rehwild</option>
                 </select>
                 <select data-proto="s2_kg" data-range="1-100" aria-label="geschätzte kg"></select>
+              </td>
+                            <td data-label="Geschlecht" class="proto-cell-sex">
+                <div class="proto-sex" data-proto-sex="s2">
+                  <button type="button" class="gender-btn" data-gender="m" title="männlich" aria-label="männlich" aria-pressed="false">♂</button>
+                  <button type="button" class="gender-btn" data-gender="w" title="weiblich" aria-label="weiblich" aria-pressed="false">♀</button>
+                </div>
               </td>
               <td data-label="Anzahl Stücke"><select data-proto="s2_stuecke" data-range="1-15"></select></td>
               <td data-label="Beobachtungen"><input data-proto="s2_beob" /></td>

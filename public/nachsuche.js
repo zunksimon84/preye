@@ -12,6 +12,7 @@
 import {
   setupProtocolFigure,
   wireWildFigures,
+  wireSexButtons,
   generateProtocolPdf,
 } from "./protokoll-lib.js";
 
@@ -20,6 +21,7 @@ const $ = (sel) => document.querySelector(sel);
 const figures = [];
 // Umschalter für die Wildbögen (Stück I / II), gesetzt in wire().
 let wildFigures = null;
+let sexButtons = null;
 
 let toastTimer = null;
 function showToast(msg, kind, ms = 2600) {
@@ -126,6 +128,7 @@ function resetSheet() {
   figures.forEach((f) => f.clear());
   // Ohne das bliebe der Bogen von Stück II stehen, obwohl seine Wildart weg ist.
   if (wildFigures) wildFigures.refresh();
+  if (sexButtons) sexButtons.clear();
   showToast("Zurückgesetzt");
 }
 
@@ -134,6 +137,7 @@ function wire() {
   // Erst die Figuren registrieren, dann die Bögen daran hängen — der
   // Umschalter sucht seine Punkte über die Registry.
   wildFigures = wireWildFigures($("#protocol-sheet"), figures);
+  sexButtons = wireSexButtons($("#protocol-sheet"));
   fillRangeSelects();
   requestAnimationFrame(() => figures.forEach((f) => f.resize()));
   window.addEventListener("resize", () => figures.forEach((f) => f.resize()));
