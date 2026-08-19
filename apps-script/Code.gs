@@ -1932,6 +1932,27 @@ function menu_migrateReviere() {
 
   const log = [];
 
+  // 0) Sicherungskopie — aber nur beim ERSTEN Lauf. Die Migration ist
+  //    wiederholbar, und bei jedem Wiederholen eine weitere Kopie ins Drive zu
+  //    legen wäre lästig. Ob es der erste Lauf ist, verrät das Fehlen des
+  //    Registraturblatts.
+  if (!ss.getSheetByName(SHEETS.reviere)) {
+    try {
+      const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
+      const copy = DriveApp.getFileById(ss.getId()).makeCopy("PREYE Sicherung " + stamp);
+      log.push("Sicherungskopie: " + copy.getName());
+    } catch (err) {
+      // Nicht weitermachen ohne Sicherung — das ist der einzige Schritt, der
+      // nicht nachholbar ist, wenn danach etwas schiefgeht.
+      ui.alert("Die Sicherungskopie ließ sich nicht anlegen:\n\n" + err.message +
+               "\n\nAbgebrochen. Bitte von Hand eine Kopie der Tabelle anlegen.");
+      return;
+    }
+  } else {
+    log.push("Registratur besteht schon — Wiederholungslauf, keine neue Sicherung.");
+  }
+  log.push("");
+
   // 1) Registratur anlegen und die beiden bekannten Reviere eintragen.
   const revSheet = ensureSheet_(ss, SHEETS.reviere, REVIER_HEADER);
   const areaSheet = ensureSheet_(ss, SHEETS.revier_areas, REVIER_AREA_HEADER);
@@ -2008,6 +2029,42 @@ function menu_migrateReviere() {
     r.unresolved.slice(0, 15).forEach(function (u) { log.push("  " + u); });
     if (r.unresolved.length > 15) log.push("  … und " + (r.unresolved.length - 15) + " weitere");
   }
+
+  // Direkt im Anschluss die beiden Prüfungen mitlaufen lassen. Vier Läufe von
+  // Hand sind vier Gelegenheiten, einen zu vergessen — und der letzte,
+  // archivePastSeasons, ist genau der, der sonst erst nachts um 01:00 und dann
+  // unbemerkt scheitert.
+  log.push("");
+  log.push("── Prüfung ──");
+  try {
+    const bericht = checkReviereReport_();
+    bericht.forEach(function (z) { log.push(z); });
+  } catch (err) {
+    log.push("Prüfung fehlgeschlagen: " + err.message);
+  }
+
+  log.push("");
+  log.push("── Saisonarchiv (der Lauf um 01:00) ──");
+  try {
+    const a = archivePastSeasons();
+    log.push("läuft durch, " + a.moved + " Zeilen verschoben");
+  } catch (err) {
+    log.push("FEHLER: " + err.message);
+    log.push("Bitte NICHT bereitstellen und diese Meldung weitergeben.");
+  }
+
+  log.push("");
+  log.push("── Statistik ──");
+  try {
+    rebuildStats();
+    log.push("Blätter neu gebaut");
+  } catch (err) {
+    log.push("Fehler: " + err.message);
+  }
+
+  log.push("");
+  log.push("Wenn oben nichts unter „Zu prüfen“ steht und das Archiv");
+  log.push("durchläuft: Bereitstellen → Neue Version.");
 
   ui.alert("Migration abgeschlossen\n\n" + log.join("\n"));
 }
@@ -2139,13 +2196,9 @@ function upsertByKey_(sheet, records, keyCols) {
 
 // Bericht, ändert nichts. Das ist der Menüpunkt, den Simon vor und nach jedem
 // Import laufen lässt.
-function menu_checkReviere() {
-  const ui = SpreadsheetApp.getUi();
+function checkReviereReport_() {
   const reg = revierRegistry_();
-  if (!reg.reviere.length) {
-    ui.alert("Noch keine Reviere angelegt. Bitte „Migration ausführen“ starten.");
-    return;
-  }
+  if (!reg.reviere.length) return ["Noch keine Reviere angelegt."];
   const posts = readPosts_();
   const out = ["Standardrevier: " + (defaultRevier_() || "— keins —"), ""];
 
@@ -2201,7 +2254,13 @@ function menu_checkReviere() {
   } else {
     out.push("Keine Auffälligkeiten.");
   }
-  ui.alert(out.join("\n"));
+  return out;
+}
+
+// Dünne Hülle. Der Bericht selbst steht in checkReviereReport_ und wird auch
+// von der Migration benutzt — sonst gäbe es zwei Fassungen derselben Prüfung.
+function menu_checkReviere() {
+  SpreadsheetApp.getUi().alert(checkReviereReport_().join("\n"));
 }
 
 // Ein Formular, kein Abfragereigen. Zehn ui.prompt() hintereinander hinterlassen
@@ -2377,7 +2436,7 @@ function onOpen() {
     .addItem("Revier-Zuordnung neu berechnen", "menu_backfillRevier")
     .addSeparator()
     .addItem("Sicherungskopie anlegen", "menu_backupSheet")
-    .addItem("Migration ausführen (einmalig)", "menu_migrateReviere")
+    .addItem("Migration ausführen (macht alles)", "menu_migrateReviere")
     .addToUi();
   ui.createMenu("📊 Statistik")
     .addItem("Aktualisieren", "menu_rebuildStats")
