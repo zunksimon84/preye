@@ -555,7 +555,12 @@ function renderHuntersList(hunters) {
     // vor. Bei einem gesetzten Eintrag nicht — und das ist bei Schützen und
     // Hundeführern ein Unterschied, den man vor der Jagd sehen will. Ein
     // Treiber führt keine Waffe, dort steht nichts.
-    const brauchtPapiere = h.status === "accepted" &&
+    // „nicht mitgeliefert" ist nicht dasselbe wie „nicht bestätigt". Solange
+    // das Backend die Felder nicht kennt (alte Fassung), darf hier nichts
+    // stehen — sonst behauptet die Liste bei jemandem, der über den Link
+    // zugesagt und beides bestätigt hat, es fehle etwas.
+    const kenntBestaetigungen = h.confirmed_jagdschein !== undefined;
+    const brauchtPapiere = kenntBestaetigungen && h.status === "accepted" &&
       (h.role === "Schütze/Standschnaller" || h.role === "Hundeführer");
     const fehlt = brauchtPapiere
       ? [!h.confirmed_jagdschein ? "Jagdschein" : "", !h.confirmed_vsg44 ? "VSG 4.4" : ""].filter(Boolean)
