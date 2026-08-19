@@ -993,18 +993,26 @@ function onHunterNamePick() {
 
 async function loadPostsIfNeeded() {
   if (state.postsLoaded) return;
-  // The map app caches bootstrap under the same key — re-use it.
-  const cached = readCache("bootstrap");
+  // Diese Seite arbeitet revierübergreifend: eine Jagd kann in jedem Revier
+  // liegen, und die Stände-Verwaltung zeigt alle. Deshalb ausdrücklich
+  // revier=all — ohne den Parameter läge das Standardrevier an, und die
+  // Revierkarte jeder fremden Jagd bliebe leer.
+  //
+  // Eigener Zwischenspeicher-Schlüssel: die Kartenseite legt unter ihrem
+  // Revier ab, und deren Ausschnitt wäre hier zu wenig.
+  const cached = readCache("bootstrap-all");
   if (cached && Array.isArray(cached.posts)) {
     state.posts = cached.posts;
+    if (cached.reviere) window.preyeApplyReviere(cached.reviere);
     state.postsLoaded = true;
     return;
   }
   try {
-    const data = await fetchJson("bootstrap");
+    const data = await fetchJson("bootstrap", { revier: "all" });
+    if (data.reviere) window.preyeApplyReviere(data.reviere);
     state.posts = Array.isArray(data.posts) ? data.posts : [];
     state.postsLoaded = true;
-    writeCache("bootstrap", null, data);
+    writeCache("bootstrap-all", null, data);
   } catch (err) {
     state.posts = [];
     state.postsLoaded = true; // avoid retry loop
@@ -1648,14 +1656,6 @@ async function addTreibergruppe() {
 // squad position references it. A Google-Maps-style live blue dot lets the
 // Ansteller orient himself in the field.
 
-// Which Teilgebiete belong to which Revier. An event in any one area of a
-// Revier shows that Revier's full cutout (all four areas) — the "PN Werder
-// cutout" Simon asked for, regardless of which Teilgebiete were ticked.
-const REVIERE = {
-  "Peenwerder": ["Hauptrevier", "Ost", "Nord", "Nordrand"],
-  "NPA-Müritz": ["Babke", "Langenhagen", "Schwarzenhof", "Serrahn"],
-};
-
 const PLAN_MARKER_FREE = "#f5c518";   // yellow — Stand not yet assigned
 // Fallback red for an assigned Stand whose Runde can't be placed on the
 // south→north gradient — shouldn't happen in practice (see anstellerRundeColors).
@@ -1702,8 +1702,11 @@ function ensurePlanMap() {
   if (planMap.loadPromise) return planMap.loadPromise;
   planMap.loadPromise = loadPlanMapsScript().then(() => {
     planMap.instance = new google.maps.Map($("#plan-map"), {
-      center: { lat: 53.6262, lng: 12.8378 }, // Peenwerder, same as app.js
-      zoom: 13,
+      // Nur bis fitBounds greift — die Karte wird erst gezeigt, wenn es Stände
+      // gibt, der Startpunkt ist also nie zu sehen. Vorher stand hier
+      // Peenwerders Mitte ein zweites Mal.
+      center: { lat: 51.2, lng: 10.4 },
+      zoom: 6,
       mapTypeId: "hybrid",
       mapTypeControl: false,
       streetViewControl: false,
@@ -1720,11 +1723,19 @@ function ensurePlanMap() {
 }
 
 // The set of Teilgebiet names whose Stände should appear for this event.
+// Eine Jagd in irgendeinem Teilgebiet eines Reviers zeigt dessen ganzen
+// Ausschnitt, nicht nur die angehakten Gebiete — der „PN-Werder-Ausschnitt",
+// den Simon wollte. Das ist Absicht und soll so bleiben.
+//
+// Die Zuordnung kam bis August 2026 aus einer eigenen Kopie hier im Code,
+// obwohl diese Seite reviere-def.js längst lädt. Und die Kopie war anders
+// verschlüsselt als das Original ("NPA-Müritz" gegen key "mueritz").
 function eventRevierAreas(event) {
-  const tg = new Set((event.teilgebiet || "").split(/\s*,\s*/).filter(Boolean));
+  const tg = (event.teilgebiet || "").split(/\s*,\s*/).filter(Boolean);
   const areas = new Set();
-  for (const list of Object.values(REVIERE)) {
-    if (list.some((a) => tg.has(a))) list.forEach((a) => areas.add(a));
+  for (const a of tg) {
+    const revier = window.preyeRevierForArea(a);
+    if (revier) revier.areas.forEach((x) => areas.add(x));
   }
   return areas;
 }
@@ -2103,9 +2114,36 @@ function addNsfRowTo(target, name, phone) {
 
 async function openPostsModal() {
   await loadPostsIfNeeded();
+  fillPostAreaSelect();
   refreshPostsStats();
   $("#posts-backdrop").hidden = false;
   $("#posts-modal").hidden = false;
+}
+
+// Teilgebiets-Auswahl und CSV-Hilfetext aus der Revierliste erzeugen. Beim
+// Öffnen, nicht beim Laden der Seite: ein Revier, das gerade in einem anderen
+// Tab angelegt wurde, taucht so beim nächsten Öffnen auf.
+function fillPostAreaSelect() {
+  const sel = $("#post-area");
+  if (sel) {
+    const keep = sel.value;
+    sel.innerHTML = '<option value="">— wählen —</option>' +
+      window.PREYE_REVIERE
+        .filter((r) => r.areas.length)
+        .map((r) =>
+          `<optgroup label="${escapeHtml(r.short)}">` +
+          r.areas.map((a) =>
+            `<option${a === keep ? " selected" : ""}>${escapeHtml(a)}</option>`).join("") +
+          `</optgroup>`
+        ).join("");
+  }
+  const list = $("#csv-area-list");
+  if (list) list.textContent = window.preyeAllAreas().join(" · ") || "— noch keine Teilgebiete —";
+  const ex = $("#csv-example");
+  if (ex) {
+    const first = window.preyeAllAreas()[0] || "Teilgebiet";
+    ex.textContent = `Drückjagdbock,DJB 7,${first},53.6234,12.8423`;
+  }
 }
 
 function closePostsModal() {
@@ -2146,7 +2184,7 @@ async function submitNewPost(e) {
     await postJson(body);
     // Bootstrap (which carries posts) is cached — invalidate so the next
     // load picks up the new stand for everyone.
-    invalidateCache("bootstrap");
+    invalidateCache("bootstrap-all");
     state.postsLoaded = false;
     await loadPostsIfNeeded();
     refreshPostsStats();
@@ -2192,7 +2230,7 @@ async function handlePostCsv(file) {
   }
   try {
     const r = await postJson({ action: "posts-batch-add", posts });
-    invalidateCache("bootstrap");
+    invalidateCache("bootstrap-all");
     state.postsLoaded = false;
     await loadPostsIfNeeded();
     refreshPostsStats();

@@ -29,7 +29,8 @@ export function setupProtocolFigure(fig, registry) {
   const ctx = canvas.getContext("2d");
   const circles = []; // fractional coords {xr, yr} so they survive resizing
   let dpr = 1;
-  // animals: tiny pinpoint dots (the row dropdowns say which Stück a row is).
+  // animals: tiny pinpoint dots. Jeder Wildbogen gehört genau einem Stück,
+  // die Nummer steckt also schon in der Überschrift darüber.
   // range: larger dots that carry the placement order (1, 2, …) inside them.
   const figKind = fig.dataset.fig;
   const numbered = figKind === "range";
@@ -37,8 +38,8 @@ export function setupProtocolFigure(fig, registry) {
   const dotFrac = numbered ? 0.03 : 0.005;
 
   function resize() {
-    // Read the canvas's own rect — on the animals figure the canvas is
-    // shifted right of the row selectors, so it's narrower than the figure.
+    // Read the canvas's own rect, nicht die der Figur: der Canvas kann
+    // schmaler sein als sein Kasten, und ein versteckter Block misst 0.
     const rect = canvas.getBoundingClientRect();
     if (!rect.width) return;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -82,7 +83,95 @@ export function setupProtocolFigure(fig, registry) {
     else if (!numbered || circles.length < 2) circles.push({ xr, yr });
     redraw();
   });
-  registry.push({ resize, clear: () => { circles.length = 0; redraw(); } });
+  // `el` mit in die Registry: der Wildbogen-Umschalter muss zu einer Figur
+  // im DOM die passenden Punkte finden können.
+  registry.push({ el: fig, resize, clear: () => { circles.length = 0; redraw(); } });
+}
+
+
+// ---------------------------------------------------------------- Wildbögen
+// Welcher Bogen zu welcher Wildart gehört. Rot-, Dam- und Rehwild teilen sich
+// einen: die Trefferlage liest sich an allen dreien gleich, und drei fast
+// identische Zeichnungen hätten den Jäger am Anschuss eher aufgehalten als
+// geführt. Die Schlüssel müssen wörtlich den Optionen der Wildart-Selects
+// entsprechen — steht dort eine Art, die hier fehlt, greift der Rückfall.
+export const WILD_FIGURES = {
+  Rotwild: "wild-rehwild.png",
+  Damwild: "wild-rehwild.png",
+  Schwarzwild: "wild-schwarzwild.png",
+  Mufflon: "wild-mufflon.png",
+  Rehwild: "wild-rehwild.png",
+};
+
+// Ohne gewählte Wildart steht der Rehwild-Bogen da. Irgendetwas muss antippbar
+// sein, bevor die Tabelle oben ausgefüllt ist, und Rehwild ist die häufigste
+// Wildart im Revier.
+export const WILD_FIGURE_DEFAULT = "wild-rehwild.png";
+
+// Verbindet jeden Wildbogen mit dem Wildart-Select seines Stücks: Auswahl
+// ändern heißt Bogen wechseln. `root` ist das Blatt bzw. das Modal, `figures`
+// die Registry aus setupProtocolFigure — die muss vorher gefüllt sein.
+//
+// Gibt { refresh } zurück; nach einem Zurücksetzen des Formulars aufrufen,
+// sonst bleibt der Bogen von Stück II stehen, obwohl seine Wildart weg ist.
+export function wireWildFigures(root, figures) {
+  const blocks = Array.from(root.querySelectorAll("[data-wild-for]")).map((block) => ({
+    block,
+    select: root.querySelector(`[data-proto="${block.dataset.wildFor}_wildart"]`),
+    img: block.querySelector("[data-wild-img]"),
+    art: block.querySelector("[data-wild-art]"),
+    fig: block.querySelector(".proto-figure"),
+    optional: block.hasAttribute("data-wild-optional"),
+  }));
+
+  const entryFor = (fig) => figures.find((f) => f.el === fig);
+
+  function apply(b) {
+    const art = b.select ? String(b.select.value || "").trim() : "";
+    const src = WILD_FIGURES[art] || WILD_FIGURE_DEFAULT;
+    // Punkte nur wegwerfen, wenn wirklich ein anderes Tier darunter liegt.
+    // Rotwild → Damwild zeigt denselben Bogen; dort zu löschen wäre ein
+    // Datenverlust ohne Anlass — und am Anschuss ärgerlich.
+    if (b.img && b.img.getAttribute("src") !== src) {
+      b.img.setAttribute("src", src);
+      b.img.alt = "Wildposen " + (art || "Rehwild");
+      const e = entryFor(b.fig);
+      if (e) e.clear();
+    }
+    if (b.art) b.art.textContent = art || "noch keine Wildart";
+    if (b.optional) {
+      const show = Boolean(art);
+      const wasHidden = b.block.hidden;
+      b.block.hidden = !show;
+      // Ein verstecktes Element misst 0 breit. Der Canvas muss nach dem
+      // Einblenden neu vermessen werden, sonst bleibt er auf 0 stehen und
+      // nimmt keine Anschusspunkte an.
+      if (show && wasHidden) {
+        requestAnimationFrame(() => {
+          const e = entryFor(b.fig);
+          if (e) e.resize();
+        });
+      }
+    }
+  }
+
+  blocks.forEach((b) => {
+    if (b.select) b.select.addEventListener("change", () => apply(b));
+    // Der Kasten ist so hoch wie sein Bild. Wechselt der Bogen auf eine Datei,
+    // die noch nicht im Cache liegt, hat er im Moment des Umschaltens Höhe 0
+    // — und ein Canvas, der mit 0 vermessen wurde, nimmt keine Anschusspunkte
+    // mehr an. Am Anschuss mit einem Balken Empfang ist das der Normalfall,
+    // deshalb wird nach jedem geladenen Bild neu vermessen.
+    if (b.img) {
+      b.img.addEventListener("load", () => {
+        const e = entryFor(b.fig);
+        if (e) e.resize();
+      });
+    }
+  });
+  const refresh = () => blocks.forEach(apply);
+  refresh();
+  return { refresh };
 }
 
 // html2canvas mis-positions the text inside form controls (it sat low and
@@ -121,8 +210,8 @@ export function flattenFormControlsForPdf(clonedDoc, sheetEl) {
     div.textContent = text;
     div.style.boxSizing = "border-box";
     if (abs) {
-      // e.g. the per-row Stück selectors overlaid on the animal chart — keep
-      // them where they are instead of letting them flow into the layout.
+      // Absolut positionierte Felder bleiben, wo sie sind, statt in den
+      // Textfluss zu rutschen.
       div.style.position = cs.position;
       div.style.top = cs.top; div.style.left = cs.left;
       div.style.right = cs.right; div.style.bottom = cs.bottom;
@@ -173,6 +262,9 @@ export function flattenFormControlsForPdf(clonedDoc, sheetEl) {
 // ganze Fuß — Stück I, Stück II, Diagramm und die Meldung darunter —
 // geschlossen auf der letzten Seite.
 const PDF_KEEP_TOGETHER = [
+  // .proto-wild ist Überschrift + Bogen; die Zeile "Stück I — Schwarzwild"
+  // allein am Seitenfuß wäre schlimmer als gar keine.
+  ".proto-wild",
   ".proto-figure",
   ".proto-pirsch-block",
 ].join(", ");
@@ -194,6 +286,17 @@ const PDF_KEEP_GROUPS = [
 // hört darüber auf, damit die Zeile nichts überdeckt.
 const PDF_FOOTER_H = 24;
 const PDF_WATERMARK = "preye.org - the hunting OS";
+
+// Ein Fingerbreit Inhalt, der allein auf die nächste Seite rutscht, ist beim
+// Ausdrucken eine leere Seite. Genau das passierte, seit Stück II seinen
+// eigenen Wildbogen hat und bei nur einem beschossenen Stück wegfällt: der
+// Bogen endete 11pt hinter der Seitenkante. Passt der Überhang mit einer kaum
+// sichtbaren Verkleinerung noch auf die Seite davor, wird verkleinert statt
+// umgebrochen — proportional, damit die Tierzeichnungen nicht in die Länge
+// oder Breite gezogen werden. Mehr als PDF_SQUEEZE_MAX geben wir nicht nach;
+// darunter liest sich das Blatt schlechter als mit einer Seite mehr.
+const PDF_ORPHAN_MIN = 72;   // pt — kürzere letzte Seiten gelten als Waise
+const PDF_SQUEEZE_MAX = 0.08;
 
 function drawWatermark(pdf, pageW, pageH) {
   const pages = pdf.internal.getNumberOfPages();
@@ -267,11 +370,16 @@ export async function generateProtocolPdf({ modal, sheet, figures }) {
           const r = n.getBoundingClientRect();
           return { top: r.top - sheetRect.top, bottom: r.bottom - sheetRect.top };
         };
-        keepsCss = [...root.querySelectorAll(PDF_KEEP_TOGETHER)].map(rel);
+        // Versteckte Blöcke — etwa der Wildbogen von Stück II, solange dort
+        // keine Wildart steht — messen 0 hoch und haben in der Umbruchplanung
+        // nichts zu suchen.
+        const solid = (b) => b.bottom - b.top > 1;
+        keepsCss = [...root.querySelectorAll(PDF_KEEP_TOGETHER)].map(rel).filter(solid);
         PDF_KEEP_GROUPS.forEach((selectors) => {
           const boxes = selectors
             .flatMap((sel) => [...root.querySelectorAll(sel)])
-            .map(rel);
+            .map(rel)
+            .filter(solid);
           if (!boxes.length) return;
           keepsCss.push({
             top: Math.min(...boxes.map((b) => b.top)),
@@ -297,8 +405,27 @@ export async function generateProtocolPdf({ modal, sheet, figures }) {
   const scale = sheetCssH ? imgH / sheetCssH : 1;
   const keeps = keepsCss.map((k) => ({ top: k.top * scale, bottom: k.bottom * scale }));
 
-  const pages = planPages(imgH, usableH, keeps);
-  const pxPerPt = canvas.height / imgH;
+  let pages = planPages(imgH, usableH, keeps);
+  // Waisenseite einsammeln, falls sie sich mit wenig Nachgeben vermeiden lässt.
+  let squeeze = 1;
+  let renderH = imgH;
+  const lastPage = pages[pages.length - 1];
+  if (pages.length > 1 && lastPage && lastPage.height < PDF_ORPHAN_MIN) {
+    const fit = (usableH * (pages.length - 1)) / imgH;
+    if (fit >= 1 - PDF_SQUEEZE_MAX && fit < 1) {
+      squeeze = fit;
+      renderH = imgH * squeeze;
+      const squeezed = keeps.map((k) => ({ top: k.top * squeeze, bottom: k.bottom * squeeze }));
+      const retry = planPages(renderH, usableH, squeezed);
+      // Nur übernehmen, wenn es wirklich eine Seite spart — sonst hätten wir
+      // umsonst verkleinert.
+      if (retry.length < pages.length) pages = retry;
+      else { squeeze = 1; renderH = imgH; }
+    }
+  }
+  const drawW = pageW * squeeze;
+  const offX = (pageW - drawW) / 2;
+  const pxPerPt = canvas.height / renderH;
   const slice = document.createElement("canvas");
   const sctx = slice.getContext("2d");
 
@@ -311,7 +438,7 @@ export async function generateProtocolPdf({ modal, sheet, figures }) {
     sctx.fillStyle = "#ffffff";
     sctx.fillRect(0, 0, slice.width, slice.height);
     sctx.drawImage(canvas, 0, -Math.round(page.top * pxPerPt));
-    pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, pageW, page.height);
+    pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", offX, 0, drawW, page.height);
   });
 
   drawWatermark(pdf, pageW, pageH);

@@ -166,14 +166,46 @@ function renderOpenNachsuchen(list) {
   }).join("") + `</ul>`;
 }
 
-const AREA_ORDER = ["Hauptrevier", "Nord", "Nordrand", "Ost"];
+// Die Reihenfolge der Teilgebiete kam bis August 2026 als feste Liste aus
+// Peenwerder. Jetzt aus dem Revier, das der Control Room gerade zeigt.
+// Beschriftungen, die früher fest im Markup standen und mit dem dritten
+// Revier falsch geworden wären.
+function applyRevierChrome() {
+  const list = window.PREYE_REVIERE || [];
+  const key = localStorage.getItem("preye.revier");
+  const current = (window.preyeRevierByKey && window.preyeRevierByKey(key)) || list[0];
+  const band = $("#band-revier");
+  if (band && current) band.textContent = current.name;
+  const sub = $("#tile-reviere-sub");
+  if (sub && list.length) {
+    sub.textContent = list.map((r) => r.short).join(", ") + " — Karte, Stände, Strecke";
+  }
+  const foot = $("#foot-reviere");
+  if (foot && list.length) {
+    foot.textContent = list.map((r) => r.short).join(" & ") + " · interner Zugang";
+  }
+  // Die Panel-Verweise zeigen auf die Karte des gerade gezeigten Reviers.
+  if (current) {
+    document.querySelectorAll('a[href^="karte.html"]').forEach((a) => {
+      a.setAttribute("href", "karte.html?revier=" + encodeURIComponent(current.key));
+    });
+  }
+}
+
+function areaOrder() {
+  const key = localStorage.getItem("preye.revier");
+  const revier = (window.preyeRevierByKey && window.preyeRevierByKey(key))
+    || (window.PREYE_REVIERE || [])[0];
+  return revier ? revier.areas : [];
+}
 
 function renderPosts(posts) {
   $("#d-posts").textContent = String(posts.length);
+  const order = areaOrder();
   const counts = {};
   posts.forEach((p) => { const a = p.area || "?"; counts[a] = (counts[a] || 0) + 1; });
-  const rows = AREA_ORDER.filter((a) => counts[a]).map((a) => [a, counts[a]]);
-  const rest = Object.keys(counts).filter((a) => !AREA_ORDER.includes(a))
+  const rows = order.filter((a) => counts[a]).map((a) => [a, counts[a]]);
+  const rest = Object.keys(counts).filter((a) => !order.includes(a))
     .reduce((n, a) => n + counts[a], 0);
   if (rest) rows.push(["Klettersitz & Pirsch", rest]);
   const max = Math.max(...rows.map((r) => r[1]), 1);
@@ -193,7 +225,7 @@ function renderTopStands(posts, aggregates) {
       best[area] = { name: post.name || row.post_id, count: row.total_count };
     }
   });
-  const rows = AREA_ORDER.filter((a) => best[a]);
+  const rows = areaOrder().filter((a) => best[a]);
   $("#d-top").innerHTML = rows.length
     ? rows.map((a) => `<li>
         <span class="a">${esc(a)}</span>
@@ -230,6 +262,10 @@ function renderStrecke(data) {
 
 // ---------- Start ----------
 
+// Gleich mit der Rückfallebene beschriften, damit beim ersten Bildaufbau
+// nichts Falsches dasteht; die Antwort korrigiert es gleich darauf.
+applyRevierChrome();
+
 if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
   document.querySelectorAll(".panel-body").forEach((el) => {
     el.innerHTML = `<p class="muted">Konfiguration fehlt: public/config.js</p>`;
@@ -247,6 +283,7 @@ if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
 
   Promise.all([get("bootstrap"), get("aggregates")])
     .then(([boot, agg]) => {
+      if (boot.reviere) { window.preyeApplyReviere(boot.reviere); applyRevierChrome(); }
       const posts = boot.posts || [];
       renderPosts(posts);
       renderTopStands(posts, agg);

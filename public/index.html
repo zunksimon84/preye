@@ -58,7 +58,7 @@
         <a class="tile" href="reviere.html">
           <img class="tile-icon" src="icon-reviere.png" alt="" width="320" height="320" />
           <b>Meine Reviere</b>
-          <span>Peenwerder, Müritz NPA — Karte, Stände, Strecke</span>
+          <span id="tile-reviere-sub">Karte, Stände, Strecke</span>
         </a>
         <a class="tile" href="events.html">
           <img class="tile-icon" src="icon-drueckjagd.png" alt="" width="320" height="320" />
@@ -97,13 +97,13 @@
           </div>
         </article>
         <div class="grid-band">
-          <span class="grid-band-name">Peenwerder</span>
+          <span class="grid-band-name" id="band-revier">Revier</span>
           <a class="grid-band-link" href="reviere.html">Revier wechseln</a>
         </div>
         <article class="panel" id="p-open">
           <header class="panel-head">
             <h2>Offene Nachsuchen</h2>
-            <a class="panel-link" href="peenwerder.html">auf der Karte</a>
+            <a class="panel-link" href="karte.html?revier=peenwerder">auf der Karte</a>
           </header>
           <div class="panel-body" id="open-body">
             <p class="muted">wird geladen …</p>
@@ -112,7 +112,7 @@
         <article class="panel">
           <header class="panel-head">
             <h2>Strecke dieser Saison</h2>
-            <a class="panel-link" href="peenwerder.html">Details</a>
+            <a class="panel-link" href="karte.html?revier=peenwerder">Details</a>
           </header>
           <div class="panel-body">
             <p class="big"><span id="d-total">—</span><small>Stück</small></p>
@@ -122,7 +122,7 @@
         <article class="panel">
           <header class="panel-head">
             <h2>Stände im Revier</h2>
-            <a class="panel-link" href="peenwerder.html">Karte</a>
+            <a class="panel-link" href="karte.html?revier=peenwerder">Karte</a>
           </header>
           <div class="panel-body">
             <p class="big"><span id="d-posts">—</span><small>Stände</small></p>
@@ -135,13 +135,14 @@
     </main>
 
     <footer class="foot">
-      <span>PREYE · Peenwerder &amp; NPA Müritz · interner Zugang</span>
+      <span>PREYE · <span id="foot-reviere">interner Zugang</span></span>
       <span id="foot-updated"></span>
     </footer>
 
     <script src="viewport-insets.js"></script>
 
     <script src="config.js"></script>
+    <script src="reviere-def.js"></script>
     <script src="gate.js" data-autogate></script>
     <script src="dashboard.js"></script>
     <script src="pwa.js"></script>

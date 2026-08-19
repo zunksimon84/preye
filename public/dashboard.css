@@ -635,3 +635,48 @@ a.revier-go:hover { text-decoration: underline; }
 
 /* Die Marke darf neben dem Wortzeichen etwas mehr Gewicht haben. */
 .brand-mark { height: 28px; }
+
+/* Panorama fehlt: statt des kaputten Bildsymbols der Farbverlauf mit dem
+   Namen. aspect-ratio hält den Platz frei, damit beim Austausch nichts
+   springt. */
+.revier-pano--blank {
+  position: relative;
+  aspect-ratio: 1600 / 264;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(rgba(4, 20, 28, 0.52), rgba(4, 20, 28, 0.52)), var(--ramp);
+}
+.revier-pano--blank::after {
+  content: attr(data-name);
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(1rem, 2.4vw, 1.5rem);
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* Die Kachel zum Anlegen. Gestrichelt, damit sie sich als Angebot liest und
+   nicht als Revier. */
+.revier--neu {
+  border-style: dashed;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  text-decoration: none;
+  color: var(--ink-faint);
+  transition: border-color 0.14s, color 0.14s;
+}
+.revier--neu:hover { border-color: var(--sea); color: var(--ink); }
+/* .revier setzt padding: 0 und stellt es über eine Liste von Kindklassen
+   wieder her (siehe unten). Diese Kachel hat keins davon, also hier. */
+.revier-neu-body {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: clamp(18px, 2.6vw, 26px);
+  text-align: center;
+}
+.revier-neu-plus { font-size: 30px; line-height: 1; font-weight: 300; }
+.revier-neu-body b { font-size: 1.05rem; font-weight: 750; }
+.revier-neu-body span:last-child { font-size: 13px; }

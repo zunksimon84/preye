@@ -1171,52 +1171,71 @@ a.filter-btn {
 .proto-figure canvas {
   position: absolute;
   inset: 0;
+  /* Breite und Höhe ausdrücklich setzen, nie width:auto. Ein Canvas ist ein
+     ersetztes Element: bei auto nimmt der Browser seine Eigenbreite — also
+     das width-Attribut — und ignoriert right/inset. resize() schreibt aber
+     genau dieses Attribut aus der gemessenen CSS-Breite zurück. Beides
+     zusammen rastet auf dem ersten Messwert ein; der Canvas blieb schon
+     einmal 170px breit über einem 312px breiten Bild, und rechts davon nahm
+     die Grafik keine Anschusspunkte mehr an. */
   width: 100%;
   height: 100%;
   cursor: crosshair;
   touch-action: manipulation;
 }
 
-/* The animal-pose chart is shifted right so the row selectors (left edge)
-   don't overlap the first sketches. Canvas tracks the image. */
-.proto-figure[data-fig="animals"] img {
-  margin-left: 58px;
-  width: calc(100% - 58px);
+/* Ein Wildbogen je Stück, überschrieben mit Stück-Nr. und Wildart.
+   Vorher lag ein fester Bogen mit zwei Reihen da und links zwei Dropdowns,
+   mit denen man jede Reihe einem Stück zuordnete. Seit jedes Stück seinen
+   eigenen Bogen bekommt — passend zu der Wildart, die in der Tabelle darüber
+   steht — gibt es nichts mehr zuzuordnen: die Überschrift sagt es. */
+.proto-wild {
+  margin: 0 0 10px;
 }
-.proto-figure[data-fig="animals"] canvas {
-  left: 58px;
-  /* Ausdrücklich rechnen statt width:auto. Ein Canvas ist ein ersetztes
-     Element: bei width:auto nimmt der Browser seine Eigenbreite — also das
-     width-Attribut — und ignoriert right:0. resize() schreibt aber genau
-     dieses Attribut aus der gemessenen CSS-Breite zurück. Beides zusammen
-     rastet auf dem ersten Messwert ein: der Canvas blieb 170px breit über
-     einem 312px breiten Bild, und rechts davon nahm die Grafik keine
-     Anschusspunkte mehr an. */
-  width: calc(100% - 58px);
+/* Klassenselektor, damit das hidden-Attribut von Stück II nicht überstimmt
+   wird. Eine ID-Regel hier hätte den Block dauerhaft sichtbar gemacht. */
+.proto-wild[hidden] {
+  display: none;
 }
 
-/* Per-row Stück selector overlaid on the left edge of the animal-pose chart
-   (top select → top row, bottom select → bottom row). */
-.proto-figure .proto-fig-row {
-  position: absolute;
-  left: 16px;
-  z-index: 3;
-  width: 36px;
-  height: auto;
-  font: inherit;
+.proto-wild-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 3px;
   font-size: 12px;
   font-weight: 700;
-  padding: 2px 0;
-  text-align: center;
-  border: 1px solid var(--steel-dark);
-  border-radius: 4px;
-  background: var(--steel);
-  color: #fff;
-  -webkit-appearance: none;
-  appearance: none;
+  color: var(--steel-dark);
 }
-.proto-figure .proto-fig-row1 { top: calc(50% - 27px); }
-.proto-figure .proto-fig-row2 { bottom: 4px; }
+
+.proto-wild-art {
+  font-weight: 500;
+  color: var(--muted);
+}
+.proto-wild-art::before {
+  content: "— ";
+}
+
+/* Am Handy stehen sechs Motive auf 330px — keine 55px je Stück, und darauf
+   soll der Jäger den Sitz der Kugel treffen. Der Bogen bekommt deshalb eine
+   Mindestbreite und scrollt seitlich; gezielt wird auf dem Motiv, nicht auf
+   einem Briefmarkenrand. Beim Drucken und im PDF greift das nicht: dort wird
+   das Blatt auf 800px Dokumentbreite ausgelegt. */
+@media (max-width: 560px) {
+  .proto-wild .proto-figure {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* min-width statt width:auto — siehe die Notiz an .proto-figure canvas:
+     ein Canvas mit auto rastet auf seinem width-Attribut ein. Bild und
+     Canvas brauchen denselben Wert, sonst laufen Zeichnung und Trefferpunkt
+     auseinander. */
+  .proto-wild .proto-figure > img,
+  .proto-wild .proto-figure > canvas {
+    min-width: 640px;
+  }
+}
 
 .proto-bottom {
   display: flex;
@@ -4406,6 +4425,7 @@ body.stk-blanko .stk-mine { background: var(--card); }
      der Browser den Umbruch selbst, deshalb muss es hier noch einmal stehen.
      Anders als im PDF lässt sich "Fuß am Stück" hier nicht ausdrücken — es
      verhindert aber, dass ein Kasten mittendrin aufgetrennt wird. */
+  .proto-wild,
   .proto-figure,
   .proto-pirsch-block,
   .proto-bottom,

@@ -43,7 +43,7 @@
         <span class="brand-place">Jagdplanungen</span>
       </h1>
       <nav class="filters">
-        <a href="peenwerder.html" class="filter-btn" id="back-to-map">← Karte</a>
+        <a href="karte.html?revier=peenwerder" class="filter-btn" id="back-to-map">← Karte</a>
         <a href="standkarte.html" class="filter-btn" id="standkarte-link">Standkarte</a>
         <button id="manage-posts-btn" class="filter-btn" type="button">Stände</button>
         <button id="edit-template-btn" class="filter-btn" type="button">Einladungsentwurf</button>
@@ -274,21 +274,10 @@
               </select>
             </label>
             <label>Teilgebiet
-              <select id="post-area" required>
-                <option value="">— wählen —</option>
-                <optgroup label="Peenwerder">
-                  <option>Hauptrevier</option>
-                  <option>Ost</option>
-                  <option>Nord</option>
-                  <option>Nordrand</option>
-                </optgroup>
-                <optgroup label="NPA-Müritz">
-                  <option>Babke</option>
-                  <option>Langenhagen</option>
-                  <option>Schwarzenhof</option>
-                  <option>Serrahn</option>
-                </optgroup>
-              </select>
+              <!-- Die Auswahl wird aus reviere-def.js erzeugt, beim Öffnen der
+                   Karte — nicht beim Laden der Seite. So taucht ein Revier auf,
+                   das gerade in einem anderen Tab angelegt wurde. -->
+              <select id="post-area" required></select>
             </label>
           </div>
           <label>Bezeichnung <span class="muted">(z.B. „Nr. 5 Ackerkante" oder „DJB 7")</span>
@@ -312,8 +301,8 @@
             <summary>CSV-Format</summary>
             <p>Spalten in dieser Reihenfolge: <code>type,name,area,lat,lng</code></p>
             <p><strong>type</strong>: Kanzel · Drückjagdbock · Leiter</p>
-            <p><strong>area</strong>: Hauptrevier · Ost · Nord · Nordrand · Babke · Langenhagen · Schwarzenhof · Serrahn</p>
-            <p>Beispiel: <code>Drückjagdbock,DJB 7,Babke,53.6234,12.8423</code></p>
+            <p><strong>area</strong>: <span id="csv-area-list">…</span></p>
+            <p>Beispiel: <code id="csv-example">…</code></p>
             <p class="muted">Komma, Semikolon und Tab werden automatisch erkannt. Optionale Kopfzeile wird ignoriert.</p>
           </details>
         </div>

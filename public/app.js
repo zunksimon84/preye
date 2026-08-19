@@ -1,14 +1,46 @@
-// Peenwerder Jagd-Heatmap — main client logic.
+// Jagd-Heatmap eines Reviers — main client logic.
+//
+// Die Seite hieß bis August 2026 peenwerder.html und kannte nur ein Revier.
+// Jetzt liest sie es aus der Adresse: karte.html?revier=peenwerder.
 
 // Canvas overlays and the PDF export are shared with the standalone
 // Nachsuche page (nachsuche.html), so they live in one place.
-import { setupProtocolFigure, generateProtocolPdf } from "./protokoll-lib.js";
+import { setupProtocolFigure, wireWildFigures, generateProtocolPdf } from "./protokoll-lib.js";
 
 const cfg = window.PEENWERDER_CONFIG || {};
-const MAP_CENTER = { lat: 53.6262, lng: 12.8378 };
-const MAP_ZOOM = 13;
+
+// Notausschnitt, wenn ein Revier noch keinen einzigen Stand hat: Deutschland.
+// Sonst wird der Ausschnitt aus den Ständen berechnet — ein gespeicherter wäre
+// an dem Tag falsch, an dem eine Kanzel am Rand dazukommt.
+const FALLBACK_CENTER = { lat: 51.2, lng: 10.4 };
+const FALLBACK_ZOOM = 6;
+const REVIER_STORE = "preye.revier";
+
+// Welches Revier zeigt diese Seite?
+//   ?revier=<key> bekannt   → das
+//   ?revier=<key> unbekannt → sichtbarer Fehler, KEIN Ersatz. Ein veraltetes
+//     Lesezeichen muss als falsch erkennbar sein; ersatzweise ein anderes
+//     Revier unter fremdem Namen zu zeigen wäre schlimmer, weil man den Zahlen
+//     dann glaubt.
+//   fehlt                   → zuletzt benutztes, sonst das einzige, sonst
+//     zurück zur Revierauswahl
+function resolveRevier() {
+  const wanted = new URLSearchParams(location.search).get("revier");
+  const list = window.PREYE_REVIERE || [];
+  if (wanted) {
+    const hit = list.find((r) => r.key === wanted);
+    return hit ? { revier: hit } : { unknown: wanted };
+  }
+  const last = localStorage.getItem(REVIER_STORE);
+  const remembered = last && list.find((r) => r.key === last);
+  if (remembered) return { revier: remembered };
+  if (list.length === 1) return { revier: list[0] };
+  return { redirect: true };
+}
 
 const state = {
+  revier: null,          // das Revier dieser Seite
+  fitted: false,         // Ausschnitt schon einmal berechnet?
   posts: [],
   hunters: [],
   species: [],
@@ -32,6 +64,14 @@ async function main() {
   }
   try {
     if (!(await window.PreyeGate.pass())) return; // private + wrong/missing password
+
+    const pick = resolveRevier();
+    if (pick.redirect) { location.replace("reviere.html"); return; }
+    if (pick.unknown) { showUnknownRevier(pick.unknown); return; }
+    state.revier = pick.revier;
+    localStorage.setItem(REVIER_STORE, state.revier.key);
+    applyRevierChrome();
+
     await loadMapsScript(cfg.GOOGLE_MAPS_API_KEY);
     initMap();
     await bootstrap();
@@ -55,6 +95,10 @@ function backendUrl(action, params = {}) {
   for (const [k, v] of Object.entries(params)) {
     if (v != null && v !== "") u.searchParams.set(k, v);
   }
+  // Das Revier hängt an jeder Abfrage. Ohne den Parameter würde das Backend
+  // auf das Standardrevier zurückfallen — richtig für alte, noch
+  // zwischengespeicherte Fassungen, hier aber wollen wir es genau sagen.
+  if (state.revier && !("revier" in params)) u.searchParams.set("revier", state.revier.key);
   const token = localStorage.getItem("preye.token");
   if (token) u.searchParams.set("token", token);
   return u.toString();
@@ -87,8 +131,8 @@ function loadMapsScript(apiKey) {
 
 function initMap() {
   state.map = new google.maps.Map($("#map"), {
-    center: MAP_CENTER,
-    zoom: MAP_ZOOM,
+    center: FALLBACK_CENTER,
+    zoom: FALLBACK_ZOOM,
     mapTypeId: "hybrid",
     mapTypeControl: false,
     streetViewControl: false,
@@ -108,16 +152,27 @@ function initMap() {
 const CACHE_PREFIX = "preye.cache.v1.";
 function readBootstrapCache() {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + "bootstrap");
+    const raw = localStorage.getItem(bootstrapCacheKey());
     return raw ? JSON.parse(raw).data : null;
   } catch { return null; }
 }
 function writeBootstrapCache(data) {
-  try { localStorage.setItem(CACHE_PREFIX + "bootstrap", JSON.stringify({ ts: Date.now(), data })); }
+  try { localStorage.setItem(bootstrapCacheKey(), JSON.stringify({ ts: Date.now(), data })); }
   catch {}
 }
 
+// Der Schlüssel trägt das Revier. Vorher hieß er schlicht "bootstrap", und die
+// Jagdplanungen lasen denselben Eintrag — seit die Antwort revierbezogen ist,
+// hätten sie dort die Stände eines einzelnen Reviers vorgefunden und ihre
+// Revierkarte für jede andere Jagd leer gelassen.
+function bootstrapCacheKey() {
+  return CACHE_PREFIX + "bootstrap." + ((state.revier && state.revier.key) || "default");
+}
+
 function applyBootstrapData(data) {
+  // Die Revierliste kommt mit der Antwort und überschreibt die Rückfallebene
+  // in reviere-def.js. Ein neues Revier ist damit sofort da, ohne Git-Push.
+  if (data.reviere) window.preyeApplyReviere(data.reviere);
   state.posts = data.posts || [];
   state.hunters = (data.hunters || []).slice().sort((a, b) => a.localeCompare(b, "de"));
   state.species = data.species || [];
@@ -147,8 +202,16 @@ async function bootstrap() {
     }
   }
   // Fallback: posts.json + hardcoded species, no hunters.
+  //
+  // posts.json enthält ausschließlich Peenwerder. Ungefiltert zeigte die Seite
+  // damit fremde Stände unter dem Namen eines anderen Reviers — schlimmer als
+  // gar keine anzuzeigen, weil man ihnen glaubt.
   const res = await fetch("posts.json");
-  state.posts = await res.json();
+  const all = await res.json();
+  state.posts = (window.preyePostsForRevier || ((x) => x))(all, state.revier && state.revier.key);
+  if (!state.posts.length) {
+    showToast("Keine Offline-Daten für dieses Revier", "error", 5000);
+  }
   state.hunters = [];
   state.species = ["Rotwild", "Damwild", "Schwarzwild", "Mufflon", "Rehwild",
                    "Fuchs", "Dachs", "Waschbär", "Hase", "Wolf", "Sonstiges"];
@@ -175,34 +238,35 @@ async function refreshBootstrapInBackground() {
 
 // ---------------- Rendering ----------------
 
-const AREA_COLOR = {
-  Hauptrevier: "#b5d33a", // Brenneke lime — was dark forest green
-  Ost: "#1565c0",
-  Nord: "#ef6c00",
-  Nordrand: "#6a1b9a",
-  Klettersitz: "#03a9f4", // bright blue — hunter-created mobile climber stands
-  Pirsch: "#e2dc3a",      // cooler lemon — hunter-created stalking locations
-};
-
-const FREE_AREAS = new Set(["Klettersitz", "Pirsch"]);
-
-const MARKER_SCALE = { Pirsch: 3, Klettersitz: 4 }; // default 5 for fixed Kanzeln
+// Farbe und Größe je Teilgebiet kommen aus reviere-def.js. Peenwerders sechs
+// Farben stehen dort unverändert festgeschrieben; für ein neues Revier werden
+// sie erzeugt.
+//
+// Die Aufrufe sind gegen eine alte, noch zwischengespeicherte reviere-def.js
+// abgesichert: Pages lässt Browser Skripte zehn Minuten behalten, und in dem
+// Fenster ist ein grauer Punkt viel besser als eine leere Karte.
+const areaColor = (area) =>
+  (window.preyeAreaColor || (() => "#8a8a8a"))(area);
+const markerScale = (area) =>
+  (window.preyeMarkerScale || (() => 5))(area);
+const isFreeArea = (area) =>
+  (window.PREYE_FREE_AREAS || ["Klettersitz", "Pirsch"]).indexOf(area) >= 0;
 
 function addMarkerForPost(post) {
   if (state.markers.has(post.id)) return;
   if (!Number.isFinite(post.lat) || !Number.isFinite(post.lng)) return;
-  const isFree = FREE_AREAS.has(post.area);
+  const isFree = isFreeArea(post.area);
   const marker = new google.maps.Marker({
     position: { lat: post.lat, lng: post.lng },
     map: state.map,
     title: post.name,
     icon: {
       path: google.maps.SymbolPath.CIRCLE,
-      fillColor: AREA_COLOR[post.area] || "#444",
+      fillColor: areaColor(post.area),
       fillOpacity: isFree ? 0.7 : 0.9,
       strokeColor: "#fff",
       strokeWeight: isFree ? 1 : 1.5,
-      scale: MARKER_SCALE[post.area] || 5,
+      scale: markerScale(post.area),
     },
   });
   marker.addListener("click", () => openSheet(post.id));
@@ -211,6 +275,67 @@ function addMarkerForPost(post) {
 
 function renderMarkers() {
   for (const post of state.posts) addMarkerForPost(post);
+  fitToPosts();
+}
+
+// Den Ausschnitt aus den Ständen berechnen statt ihn zu speichern: ein
+// gespeicherter Ausschnitt ist an dem Tag falsch, an dem eine Kanzel am Rand
+// dazukommt. Genau so macht es die Revierkarte der Drückjagd schon.
+//
+// Nur einmal je Seitenaufruf — refreshBootstrapInBackground() zeichnet die
+// Marker neu, wenn frische Daten eintreffen, und würde die Karte sonst mitten
+// im Benutzen zurückreißen.
+function fitToPosts() {
+  if (state.fitted || !state.map) return;
+  const pts = state.posts.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  if (!pts.length) return;   // leeres Revier: Notausschnitt bleibt stehen
+  state.fitted = true;
+
+  // Über das 5.–95. Perzentil, damit ein einzelner Ausreißer nicht das ganze
+  // Revier herauszoomt. Der liegt dann außerhalb, ist aber einen Schwenk weit
+  // weg — besser, als jeden Besuch dafür zu bestrafen.
+  const cut = (arr) => {
+    const v = arr.slice().sort((a, b) => a - b);
+    const lo = v[Math.floor(v.length * 0.05)];
+    const hi = v[Math.ceil(v.length * 0.95) - 1];
+    return [lo, hi];
+  };
+  const [s1, n1] = cut(pts.map((p) => p.lat));
+  const [w1, e1] = cut(pts.map((p) => p.lng));
+  const bounds = new google.maps.LatLngBounds(
+    { lat: s1, lng: w1 }, { lat: n1, lng: e1 }
+  );
+  state.map.fitBounds(bounds, 40);
+
+  // Ein Revier mit zwei Ständen darf nicht in Straßenansicht aufgehen, eines
+  // mit weit gestreuten nicht in der Landesübersicht.
+  google.maps.event.addListenerOnce(state.map, "idle", () => {
+    const z = state.map.getZoom();
+    if (z > 15) state.map.setZoom(15);
+    if (z < 10) state.map.setZoom(10);
+  });
+}
+
+// Titel und Beschriftung auf das Revier setzen.
+function applyRevierChrome() {
+  if (!state.revier) return;
+  document.title = "PREYE 👁 " + state.revier.name;
+  const place = $(".brand-place");
+  if (place) place.textContent = state.revier.name;
+}
+
+// Ein unbekanntes Revier in der Adresse wird gezeigt, nicht ersetzt.
+function showUnknownRevier(key) {
+  const list = (window.PREYE_REVIERE || [])
+    .map((r) => `<li><a href="karte.html?revier=${encodeURIComponent(r.key)}">${r.name}</a></li>`)
+    .join("");
+  document.body.innerHTML =
+    `<div class="revier-missing">
+       <h1>Revier „${String(key).replace(/[<&]/g, "")}" gibt es nicht</h1>
+       <p>Vielleicht ein altes Lesezeichen. Vorhanden sind:</p>
+       <ul>${list}</ul>
+       <p><a href="reviere.html">Zur Revierauswahl</a></p>
+     </div>`;
 }
 
 // Custom canvas-based heatmap overlay. For each post we draw a radial
@@ -310,7 +435,7 @@ function defineHeatmapOverlay() {
       ctx.clearRect(0, 0, w, h);
 
       // Zoom-aware radius (CSS px); bigger when zoomed in.
-      const zoom = map.getZoom() || MAP_ZOOM;
+      const zoom = map.getZoom() || 13;
       const radius = Math.max(18, Math.min(80, Math.round(zoom * 3.4 - 12)));
 
       // Pass 1: draw alpha-density blobs additively.
@@ -832,6 +957,9 @@ function wireUi() {
   $("#strecke-backdrop").addEventListener("click", closeStrecke);
 
   document.querySelectorAll(".proto-figure").forEach((fig) => setupProtocolFigure(fig, protoFigures));
+  // Erst die Figuren registrieren, dann die Bögen daran hängen — der
+  // Umschalter sucht seine Punkte über die Registry.
+  protoWild = wireWildFigures($("#protocol-modal"), protoFigures);
   fillRangeSelects();
   $("#protocol-btn").addEventListener("click", openProtocol);
   $("#protocol-close").addEventListener("click", closeProtocol);
@@ -925,11 +1053,15 @@ function wireUi() {
 
 // ---------------- Anschuss-Protokoll ----------------
 // A digital version of the German "shot protocol" form. Text fields +
-// checkboxes are plain inputs; the two figures (wild-pose strip and the
-// range diagram) get a transparent canvas overlay where tapping drops a
-// red circle (tap a circle again to remove it).
+// checkboxes are plain inputs; die Figuren — je ein Wildbogen für Stück I
+// und II plus das Ringdiagramm — bekommen ein durchsichtiges Canvas darüber,
+// auf dem ein Tipp einen roten Punkt setzt (nochmal tippen entfernt ihn).
+// Welcher Wildbogen zu sehen ist, hängt an der Wildart des jeweiligen Stücks;
+// die Zuordnung steht in WILD_FIGURES in protokoll-lib.js.
 
-const protoFigures = []; // { resize, clear }
+const protoFigures = []; // { el, resize, clear }
+// Umschalter für die Wildbögen (Stück I / II), gesetzt in wireEvents().
+let protoWild = null;
 
 // Stand picker on the protocol — same Kanzel / Klettersitz / Pirsch toggle
 // as the harvest sheet. "post" = pick an existing Kanzel from the dropdown;
@@ -978,7 +1110,15 @@ function applyProtocolDeepLink() {
   const name = params.get("name");
   if (name) $('[data-proto="name"]').value = name;
   // Drop the params so a reload doesn't reopen the modal over fresh input.
-  history.replaceState(null, "", location.pathname);
+  // Nur die Protokoll-Parameter entfernen, nicht die ganze Adresszeile. Vorher
+  // stand hier location.pathname — auf karte.html hätte das das Revier
+  // mitgenommen, und ein Neuladen danach wäre auf der Revierauswahl gelandet.
+  // Der Testfall ist genau der: Protokoll öffnen, dann neu laden.
+  const keep = new URLSearchParams(location.search);
+  keep.delete("stand");
+  keep.delete("name");
+  const qs = keep.toString();
+  history.replaceState(null, "", location.pathname + (qs ? "?" + qs : ""));
 }
 
 function closeProtocol() {
@@ -1016,6 +1156,8 @@ function resetProtocol() {
     sel.selectedIndex = 0;
   });
   protoFigures.forEach((f) => f.clear());
+  // Ohne das bliebe der Bogen von Stück II stehen, obwohl seine Wildart weg ist.
+  if (protoWild) protoWild.refresh();
   setProtoMode("post");
 }
 

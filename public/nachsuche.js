@@ -11,12 +11,15 @@
 
 import {
   setupProtocolFigure,
+  wireWildFigures,
   generateProtocolPdf,
 } from "./protokoll-lib.js";
 
 const $ = (sel) => document.querySelector(sel);
 
 const figures = [];
+// Umschalter für die Wildbögen (Stück I / II), gesetzt in wire().
+let wildFigures = null;
 
 let toastTimer = null;
 function showToast(msg, kind, ms = 2600) {
@@ -121,11 +124,16 @@ function resetSheet() {
   });
   sheet.querySelectorAll("select").forEach((sel) => { sel.selectedIndex = 0; });
   figures.forEach((f) => f.clear());
+  // Ohne das bliebe der Bogen von Stück II stehen, obwohl seine Wildart weg ist.
+  if (wildFigures) wildFigures.refresh();
   showToast("Zurückgesetzt");
 }
 
 function wire() {
   document.querySelectorAll(".proto-figure").forEach((fig) => setupProtocolFigure(fig, figures));
+  // Erst die Figuren registrieren, dann die Bögen daran hängen — der
+  // Umschalter sucht seine Punkte über die Registry.
+  wildFigures = wireWildFigures($("#protocol-sheet"), figures);
   fillRangeSelects();
   requestAnimationFrame(() => figures.forEach((f) => f.resize()));
   window.addEventListener("resize", () => figures.forEach((f) => f.resize()));

@@ -11,11 +11,16 @@
 // this can't make the rest of the site behave oddly. Hunt data doesn't live
 // here either; standkarte.js caches that in localStorage itself.
 
-const CACHE = "preye-standkarte-v1";
+const CACHE = "preye-standkarte-v2";
 
 const SHELL = [
   "standkarte.html",
   "standkarte.js",
+  // Die Standkarte holt sich hierher das Revier der Jagd (Notfall-Tierklinik).
+  // Ohne diese Zeile lädt ein Gerät im Funkloch die neue standkarte.js aus dem
+  // Speicher, findet die Abhängigkeit nicht und die Karte bleibt leer — genau
+  // die Lage, für die es diesen Dienstarbeiter überhaupt gibt.
+  "reviere-def.js",
   "style.css",
   "config.js",
   "preye-mark.png",

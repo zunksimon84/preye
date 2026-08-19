@@ -150,10 +150,11 @@ function contactLine(label, name, phone) {
     </div>`;
 }
 
-const NPA_AREAS = ["Babke", "Langenhagen", "Schwarzenhof", "Serrahn"];
-function isNpaHunt(ev) {
-  const tg = String((ev && ev.teilgebiet) || "");
-  return NPA_AREAS.some((a) => tg.includes(a));
+// Das Revier einer Jagd kommt aus reviere-def.js. Hier stand bis August 2026
+// eine dritte Kopie der Müritz-Gebietsliste, neben denen in events.js und
+// reviere-def.js.
+function huntRevier(ev) {
+  return (window.preyeEventRevier || (() => null))(ev);
 }
 
 // ---------- Freigaben ----------
@@ -436,16 +437,31 @@ function renderContacts() {
   }
   if (ev.vet_name || ev.vet_phone) {
     html += contactLine("Notfall Jagdhunde", ev.vet_name, ev.vet_phone);
-  } else if (isNpaHunt(ev)) {
-    // Standard 24-h clinic for the NPA-Müritz hunts, as on the paper card.
-    html += `<div class="stk-contact">
-      <span class="stk-contact-label">Notfall Jagdhunde</span>
-      <span class="stk-contact-name">Müritz-Tierklinik, Goethestraße 52, 17192 Waren
-        (<a href="https://www.xn--mritz-tierklinik-jzb.de/24hnotdienst" target="_blank" rel="noopener noreferrer">24 h Notdienst</a>)</span>
-      <span class="stk-contact-phone"><a href="tel:03991664626">03991 / 66 46 26</a></span>
-    </div>`;
   } else {
-    html += `<p class="stk-hint">Für diese Jagd ist keine Notfall-Tierklinik hinterlegt — im Jagdplanungstool ergänzen.</p>`;
+    // Die Klinik hängt jetzt am Revier und wird im Sheet gepflegt. Vorher stand
+    // die Müritz-Adresse hier fest im Code, samt Telefonnummer.
+    const vet = (huntRevier(ev) || {}).vet;
+    if (vet && (vet.name || vet.phone)) {
+      const name = [vet.name, vet.address].filter(Boolean).join(", ");
+      // Nur http(s) durchlassen. Der Wert kommt aus dem Sheet, ist also
+      // vertrauenswürdig — aber ein href aus einer Tabellenzelle ungeprüft in
+      // die Seite zu schreiben ist eine Angewohnheit, die man sich nicht
+      // zulegen sollte.
+      const safeUrl = /^https?:\/\//i.test(vet.url || "") ? vet.url : "";
+      const link = safeUrl
+        ? ` (<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">24 h Notdienst</a>)`
+        : "";
+      const tel = vet.phone
+        ? `<a href="tel:${escapeHtml(vet.phone.replace(/[^0-9+]/g, ""))}">${escapeHtml(vet.phone)}</a>`
+        : "";
+      html += `<div class="stk-contact">
+        <span class="stk-contact-label">Notfall Jagdhunde</span>
+        <span class="stk-contact-name">${escapeHtml(name)}${link}</span>
+        <span class="stk-contact-phone">${tel}</span>
+      </div>`;
+    } else {
+      html += `<p class="stk-hint">Für diese Jagd ist keine Notfall-Tierklinik hinterlegt — bei der Jagd oder beim Revier ergänzen.</p>`;
+    }
   }
   $("#stk-contacts").innerHTML = html;
 }
@@ -789,9 +805,14 @@ function wireUi() {
     }
     const placement = findMyPlacement(state.me);
     const params = new URLSearchParams();
+    // Die Karte braucht das Revier der Jagd, nicht das zuletzt benutzte.
+    // Fällt die Auflösung aus (alte, zwischengespeicherte reviere-def.js),
+    // lassen wir den Parameter weg — dann greift dort das gemerkte Revier.
+    const rev = (window.preyeEventRevier || (() => null))(state.detail && state.detail.event);
+    if (rev) params.set("revier", rev.key);
     if (placement && placement.pos && placement.pos.post_id) params.set("stand", placement.pos.post_id);
     if (state.me) params.set("name", state.me);
-    location.href = "peenwerder.html?" + params.toString() + "#protokoll";
+    location.href = "karte.html?" + params.toString() + "#protokoll";
   });
 
   $("#stk-send").addEventListener("click", async () => {

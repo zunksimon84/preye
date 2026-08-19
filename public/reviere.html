@@ -44,52 +44,14 @@
         <p>Wähle das Revier, in dem Du unterwegs bist.</p>
       </div>
 
-      <div class="reviere">
-        <div class="revier">
-          <a class="revier-pano" href="peenwerder.html" aria-label="Peenwerder – Karte und Strecke öffnen">
-            <img src="revier-peenwerder.jpg" alt="Peenwerder, Mecklenburg-Vorpommern"
-                 width="1600" height="264" loading="lazy" />
-            <span class="revier-state revier-state--live">eingerichtet</span>
-          </a>
-          <b class="sr-only">Peenwerder</b>
-          <p class="revier-sub">Hauptrevier, Nord, Nordrand, Ost</p>
-          <dl class="revier-stats">
-            <div><dt>Stände</dt><dd id="pw-posts">—</dd></div>
-            <div><dt>Strecke Saison</dt><dd id="pw-strecke">—</dd></div>
-            <div><dt>Drückjagden</dt><dd id="pw-hunts">—</dd></div>
-            <div><dt>Jäger</dt><dd id="pw-hunters">—</dd></div>
-          </dl>
-          <p class="revier-links">
-            <a class="revier-go" href="peenwerder.html">Karte &amp; Strecke öffnen →</a>
-            <a class="revier-go revier-go--alt" href="events.html?revier=peenwerder">Drückjagden ansehen →</a>
-          </p>
-        </div>
-
-        <div class="revier revier--soon">
-          <div class="revier-pano">
-            <img src="revier-mueritz.jpg" alt="Müritz Nationalpark, Mecklenburg-Vorpommern"
-                 width="1600" height="264" loading="lazy" />
-            <span class="revier-state">Stände fehlen noch</span>
-          </div>
-          <b class="sr-only">Müritz Nationalpark</b>
-          <p class="revier-sub">Babke, Langenhagen, Schwarzenhof, Serrahn</p>
-          <dl class="revier-stats">
-            <div><dt>Stände</dt><dd>0</dd></div>
-            <div><dt>Drückjagden</dt><dd id="npa-hunts">—</dd></div>
-            <div><dt>Karte</dt><dd>—</dd></div>
-          </dl>
-          <p class="revier-note">
-            Drückjagden für dieses Revier lassen sich schon planen — die Stände sind
-            nur noch nicht in My Maps eingezeichnet, deshalb gibt es weder Karte noch
-            Heatmap. Sobald sie drin sind, erscheint das Revier hier wie Peenwerder.
-          </p>
-          <a class="revier-go revier-go--alt" href="events.html?revier=mueritz">Drückjagden ansehen →</a>
-        </div>
-      </div>
+      <!-- Die Karten erzeugt reviere.js aus der Revierliste. Vorher standen
+           hier zwei handgetippte Blöcke, samt einer fest eingetragenen 0 bei
+           den Ständen und einem Statusmerkmal, das jemand von Hand hätte
+           umstellen müssen. -->
+      <div class="reviere" id="reviere"></div>
 
       <p class="reviere-foot">
-        Weitere Reviere kommen dazu. Ein Revier braucht seine Stände in Google My Maps —
-        den Rest zieht die App sich selbst.
+        <span id="reviere-foot-text">Weitere Reviere kommen dazu.</span>
       </p>
     </main>
 
