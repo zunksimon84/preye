@@ -334,6 +334,8 @@ function renderSummary() {
   const err = state.rows.filter((r) => r.status === "error").length;
   const konflikt = state.rows.filter((r) => r.matched).length;
   const ohne = state.rows.filter((r) => !r.area).length;
+  const keine = state.rows.filter((r) => r.kind === "kein-stand").length;
+  const unsicher = state.rows.filter((r) => r.kind === "unsicher").length;
   const skipped = state.sources.map((s) => s.note).filter(Boolean);
 
   const btn = (key, label, cls) =>
@@ -344,6 +346,8 @@ function renderSummary() {
     (konflikt ? btn("konflikt", `${konflikt} Konflikt`, "warn") : "") +
     (err ? btn("error", `${err} Fehler`, "warn") : "") +
     (ohne ? btn("ohne", `${ohne} ohne Teilgebiet`, "warn") : "") +
+    (unsicher ? btn("unsicher", `${unsicher} unsicher`, "warn") : "") +
+    (keine ? btn("keine", `${keine} kein Stand`) : "") +
     (skipped.length ? `<button disabled>${esc(skipped.join(" · "))}</button>` : "");
   $("#rn-summary").querySelectorAll("[data-filter]").forEach((b) =>
     b.addEventListener("click", () => {
@@ -359,6 +363,8 @@ function visibleRows() {
   if (f === "error") return state.rows.filter((r) => r.status === "error");
   if (f === "konflikt") return state.rows.filter((r) => r.matched);
   if (f === "ohne") return state.rows.filter((r) => !r.area);
+  if (f === "unsicher") return state.rows.filter((r) => r.kind === "unsicher");
+  if (f === "keine") return state.rows.filter((r) => r.kind === "kein-stand");
   return state.rows;
 }
 

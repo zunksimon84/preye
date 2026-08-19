@@ -312,7 +312,93 @@ export function normaliseStand(point) {
   } else {
     name = label;
   }
-  return { ...point, nr, type, name: name.slice(0, 60), sourceLabel: label };
+  // Die Einschätzung hängt mit dran, damit der Assistent nur die Sitze
+  // vorauswählt und bei allem anderen sagt, warum es abgewählt ist.
+  const klasse = classifyPoint(point);
+  return {
+    ...point, nr, type, name: name.slice(0, 60), sourceLabel: label,
+    kind: klasse.kind, kindReason: klasse.reason,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Ist das überhaupt ein Stand?
+// ---------------------------------------------------------------------------
+//
+// Manche Geodaten-Apps sind das Notizbuch fürs ganze Revier: neben den Sitzen
+// stehen Suhlen, Brunftplätze, Wechsel, befahrbare Wege und Obstbäume darin.
+// Aus 102 Wegpunkten zweier solcher Dateien waren 34 Stände.
+//
+// Drei Töpfe, nicht zwei. „Kanzel aufstellen“ und „Leiter aufstellen Tanne“
+// sind Vorhaben, keine vorhandenen Sitze — sie als Stand zu übernehmen wäre
+// genauso falsch wie sie wegzuwerfen. Sie landen in „unsicher“, werden
+// angezeigt und sind vorab abgewählt.
+
+// Was einen Sitz benennt.
+export const SITZ_WORDS = [
+  "kanzel", "djbock", "dj bock", "djb", "drückjagdbock", "drueckjagdbock",
+  "bock", "leiter", "klettersitz", "baumansitz", "hochsitz", "ansitz", "sitz",
+];
+
+// Was ein Geländemerkmal oder eine Beobachtung benennt. Wirkt nur, wenn kein
+// Sitzwort vorn steht — „Leiter Senke Suhle Lichtleitung“ ist eine Leiter,
+// die zufällig an einer Suhle steht.
+export const NON_STAND_WORDS = [
+  "suhle", "einstand", "brunft", "wechsel", "mahlbaum", "mast", "kessel",
+  "sollloch", "solloch", "kuhle", "gatter", "nest", "kobel", "bergung",
+  "zuwegung", "parkplatz", "pegel", "brücke", "bruecke", "lichtleitung",
+  "saat", "zaun", "einfahrt", "pirsch", "fährte", "faehrte", "losung",
+  "schweiß", "schweiss", "trittsiegel", "kirrung", "wildacker", "schneise",
+];
+
+// Was ein Vorhaben statt eines Bestands anzeigt.
+export const PLANNED_WORDS = ["aufstellen", "eventuell", "evtl", "geplant", "vielleicht", "anlegen"];
+
+// Symbole, die manche Apps vergeben. In den geprüften GaiaGPS-Dateien war
+// purple-pin bei 25 von 25 ein Sitz und green-pin bei 18 von 18 keiner;
+// red-pin-down war gemischt und trägt deshalb nichts bei.
+export const SYM_STAND = ["tree-stand", "purple-pin", "hochsitz", "stand"];
+export const SYM_NOT_STAND = ["green-pin", "trailhead", "campground", "water"];
+
+function words(label) {
+  return String(label || "").toLowerCase().split(/[\s\/,.\-_()]+/).filter(Boolean);
+}
+
+// Gibt { kind: "stand" | "kein-stand" | "unsicher", reason } zurück.
+export function classifyPoint(point) {
+  const label = String(point.label || "");
+  const low = label.toLowerCase();
+  const w = words(label);
+  const sym = String(point.sym || "").toLowerCase();
+
+  const symSagtStand = SYM_STAND.some((x) => sym.includes(x));
+  const symSagtNein = SYM_NOT_STAND.some((x) => sym.includes(x));
+
+  // Wo steht das Sitzwort? Ganz vorn heißt „das IST ein Sitz“, weit hinten
+  // heißt oft „… 100m weiter steht eine Leiter“ — eine Wegbeschreibung.
+  let posIdx = -1;
+  for (let i = 0; i < w.length; i++) {
+    if (SITZ_WORDS.some((k) => w[i].includes(k.replace(/\s/g, "")))) { posIdx = i; break; }
+  }
+  const hatSitzwort = posIdx >= 0 || SITZ_WORDS.some((k) => k.includes(" ") && low.includes(k));
+  const vornDran = posIdx >= 0 && posIdx <= 2;
+
+  const geplant = PLANNED_WORDS.some((k) => low.includes(k)) || /\?\s*$|\?\s/.test(label);
+  const negWort = NON_STAND_WORDS.some((k) => low.includes(k));
+
+  if (!hatSitzwort && !symSagtStand) {
+    return { kind: "kein-stand", reason: symSagtNein ? "Beobachtung (Symbol)" : "kein Sitz im Namen" };
+  }
+  if (geplant) {
+    return { kind: "unsicher", reason: "klingt nach Vorhaben, nicht nach vorhandenem Sitz" };
+  }
+  if (hatSitzwort && !vornDran && negWort) {
+    return { kind: "unsicher", reason: "Sitzwort steht hinten — eher eine Wegbeschreibung" };
+  }
+  if (symSagtNein && !vornDran) {
+    return { kind: "unsicher", reason: "Symbol spricht für eine Beobachtung" };
+  }
+  return { kind: "stand", reason: symSagtStand ? "Sitzwort und Symbol" : "Sitzwort im Namen" };
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +459,9 @@ export function validateBatch(rows, existingPosts, opts = {}) {
     }
     if (!r.nr) add("warn", "keine Nummer im Namen");
     if (!r.area) add("error", "kein Teilgebiet zugeordnet");
+    // Kein Fehler — eine Einschätzung. Der Mensch entscheidet.
+    if (r.kind === "kein-stand") add("warn", "kein Stand: " + (r.kindReason || ""));
+    else if (r.kind === "unsicher") add("warn", r.kindReason || "unsicher");
 
     const key = r.name.toLowerCase();
     if (seenName[key]) add("warn", "Name kommt in der Datei mehrfach vor");
@@ -398,7 +487,10 @@ export function validateBatch(rows, existingPosts, opts = {}) {
       matched: match,
       // Zeilen mit Fehler und Doppelgänger sind vorab abgewählt: nichts wird
       // geschrieben, was der Mensch nicht ausdrücklich bestätigt hat.
-      take: status !== "error" && !match,
+      // Nur was klar ein Sitz ist, kommt vorausgewählt. Suhlen, Wechsel und
+      // Vorhaben stehen in der Liste, aber abgehakt — sichtbar statt still
+      // weggeworfen.
+      take: status !== "error" && !match && r.kind !== "kein-stand" && r.kind !== "unsicher",
     };
   });
 }
