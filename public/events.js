@@ -2352,6 +2352,9 @@ async function sendInfomails() {
   const oldText = btn.textContent;
   btn.textContent = "Lade …";
   try {
+    // Frisch geöffnet: keine gemerkte Auswahl, Vorschau nimmt die erste
+    // Ansteller-Runde.
+    infomailAuswahl = null;
     const preview = await postJson({
       action: "event-infomails-preview",
       event_id: state.currentEvent.event.id,
@@ -2368,6 +2371,11 @@ async function sendInfomails() {
 
 // Persisted across openings so re-opening the modal keeps your choice.
 let infomailIncludeSchuetzen = true;
+// Welche Gruppe die Vorschau gerade zeigt, und welche Haken gesetzt sind.
+// Beides muss ein Nachladen überleben: das Umschalten der Vorschau baut das
+// Fenster neu auf, und eine abgehakte Gruppe darf dabei nicht zurückspringen.
+let infomailAuswahl = null;   // Set von squad-ids, null = noch nichts angefasst
+let infomailVorschauLaeuft = false;
 // Active object URL for the PDF preview, revoked on close to free memory.
 let infomailPdfBlobUrl = null;
 
@@ -2514,16 +2522,36 @@ function openInfomailPreviewModal(preview) {
         const wann = g.infomail_sent_at
           ? `zuletzt ${formatDateTimeShort(g.infomail_sent_at)}${g.infomail_count > 1 ? ` · ${g.infomail_count}×` : ""}`
           : "noch nicht verschickt";
-        return `<label class="infomail-gruppe${g.recipients ? "" : " infomail-gruppe--leer"}">
-          <input type="checkbox" class="infomail-gruppe-cb" value="${escapeHtml(g.id)}"
-                 ${g.recipients ? "checked" : "disabled"} data-n="${g.recipients}" />
-          <span class="infomail-gruppe-name">${escapeHtml(g.name)}</span>
+        // Angehakt: die gemerkte Auswahl, sonst alles mit Empfängern.
+        const an = infomailAuswahl ? infomailAuswahl.has(g.id) : !!g.recipients;
+        // Die Zeile ist ein div und kein label mehr: ein Knopf in einem
+        // label schaltet beim Klick das Kästchen mit um.
+        const cbId = `infomail-cb-${escapeHtml(g.id)}`;
+        const gezeigt = String(g.id) === String(preview.sample_squad_id || "");
+        return `<div class="infomail-gruppe${g.recipients ? "" : " infomail-gruppe--leer"}${gezeigt ? " infomail-gruppe--gezeigt" : ""}">
+          <input type="checkbox" id="${cbId}" class="infomail-gruppe-cb" value="${escapeHtml(g.id)}"
+                 ${an ? "checked" : ""} ${g.recipients ? "" : "disabled"} data-n="${g.recipients}" />
+          <label class="infomail-gruppe-name" for="${cbId}">${escapeHtml(g.name)}</label>
           <span class="infomail-gruppe-typ">${g.type === "treiber" ? "Treibergruppe" : "Ansteller-Runde"}</span>
           <span class="infomail-gruppe-n">${g.recipients} Empfänger</span>
           <span class="infomail-gruppe-sent${g.infomail_sent_at ? " is-sent" : ""}">${escapeHtml(wann)}</span>
-        </label>`;
+          ${g.recipients
+            ? `<button type="button" class="infomail-gruppe-vorschau${gezeigt ? " is-gezeigt" : ""}"
+                       data-squad="${escapeHtml(g.id)}"${gezeigt ? " disabled" : ""}>${gezeigt ? "wird gezeigt" : "Vorschau"}</button>`
+            : `<span class="infomail-gruppe-vorschau infomail-gruppe-vorschau--aus">—</span>`}
+        </div>`;
       }).join("")}
     </div>` : "";
+
+  // Der Betreff-Block nennt die Gruppe, die gerade gezeigt wird. Ohne das
+  // liest man den Text einer Runde und hält ihn für den aller.
+  // sample_squad_id kennt erst die Fassung ab 19.08.2026. Fehlt der
+  // Schlüssel ganz, ist das Backend alt — das ist etwas anderes als ein
+  // leerer Wert, und beides ist etwas anderes als "es gibt keine Vorschau".
+  const kenntSquadId = Object.prototype.hasOwnProperty.call(preview, "sample_squad_id");
+  const gezeigteGruppe = kenntSquadId
+    ? gruppen.find((g) => String(g.id) === String(preview.sample_squad_id || ""))
+    : null;
 
   const summary = gruppenHtml + `
     <div class="infomail-section infomail-options-section">
@@ -2542,6 +2570,19 @@ function openInfomailPreviewModal(preview) {
       <div class="infomail-meta-row">
         <span class="infomail-meta-label">Betreff</span>
         <span class="infomail-meta-value">${escapeHtml(preview.sample_subject || "")}</span>
+      </div>
+      <div class="infomail-meta-row">
+        <span class="infomail-meta-label">Vorschau zeigt</span>
+        <span class="infomail-meta-value">${gezeigteGruppe
+          ? `<strong>${escapeHtml(gezeigteGruppe.name)}</strong> — an ${escapeHtml(preview.sample_recipient || "")}.
+             Jede Gruppe bekommt ein eigenes PDF mit ihrer eigenen Karte und ihrem eigenen Roster;
+             der Mailtext wird je Empfänger mit dessen Stand gebaut.`
+          : !preview.sample_recipient
+            ? "—"
+            : `an ${escapeHtml(preview.sample_recipient)}.
+               <em>${kenntSquadId
+                 ? "Zu welcher Gruppe dieser Empfänger gehört, meldet das Backend gerade nicht."
+                 : "Welche Gruppe das ist, sagt erst die neue Backend-Fassung — bis dahin zeigen alle Vorschau-Knöpfe dasselbe Blatt."}</em>`}</span>
       </div>
     </div>
   `;
@@ -2632,11 +2673,60 @@ function openInfomailPreviewModal(preview) {
   } else {
     body.innerHTML = warnsHtml + summary + '<p class="muted">Keine zustellbaren Empfänger — bitte erst Zusagen einsammeln.</p>';
   }
+  // Die Haken merken, damit ein Umschalten der Vorschau sie nicht zurücksetzt.
+  const merkeAuswahl = () => {
+    infomailAuswahl = new Set($$(".infomail-gruppe-cb").filter((c) => c.checked).map((c) => c.value));
+  };
   $("#infomail-include-schuetzen").addEventListener("change", updateRecipientLine);
-  $$(".infomail-gruppe-cb").forEach((c) => c.addEventListener("change", updateRecipientLine));
+  $$(".infomail-gruppe-cb").forEach((c) => c.addEventListener("change", () => {
+    merkeAuswahl();
+    updateRecipientLine();
+  }));
+  $$(".infomail-gruppe-vorschau").forEach((b) => {
+    if (b.tagName !== "BUTTON") return;
+    b.addEventListener("click", () => {
+      merkeAuswahl();
+      ladeInfomailVorschau(b.dataset.squad, b);
+    });
+  });
   updateRecipientLine();
   $("#infomail-backdrop").hidden = false;
   $("#infomail-modal").hidden = false;
+}
+
+// Vorschau auf eine andere Gruppe umschalten. Holt Mailtext und PDF für
+// genau diese Gruppe und baut das Fenster neu auf — die gemerkten Haken und
+// die Schützen-Option überleben das.
+async function ladeInfomailVorschau(squadId, btn) {
+  if (!state.currentEvent || !squadId || infomailVorschauLaeuft) return;
+  infomailVorschauLaeuft = true;
+  const altText = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Lade …"; }
+  try {
+    const preview = await postJson({
+      action: "event-infomails-preview",
+      event_id: state.currentEvent.event.id,
+      squad_id: squadId,
+    });
+    if (preview.error) throw new Error(preview.error);
+    // Ältere Bereitstellungen kennen squad_id nicht und liefern stur die
+    // erste Ansteller-Runde. Das stumm zu übergehen hieße, eine falsche
+    // Gruppe als die angeklickte auszugeben. Drei Fälle, drei Sätze — ein
+    // Hinweis, der etwas Falsches behauptet, ist schlimmer als keiner.
+    if (!Object.prototype.hasOwnProperty.call(preview, "sample_squad_id")) {
+      showToast("Das Backend ist noch die alte Fassung — alle Knöpfe zeigen dasselbe Blatt. Code.gs bereitstellen.", "error", 7000);
+    } else if (!preview.sample_squad_id) {
+      showToast("Für diese Gruppe gibt es niemanden, dem man schreiben kann.", "error", 6000);
+    } else if (String(preview.sample_squad_id) !== String(squadId)) {
+      showToast("Diese Gruppe hat keinen erreichbaren Empfänger — gezeigt wird eine andere.", "error", 6000);
+    }
+    openInfomailPreviewModal(preview);
+  } catch (err) {
+    showToast(err.message || "Vorschau fehlgeschlagen", "error");
+    if (btn) { btn.disabled = false; btn.textContent = altText; }
+  } finally {
+    infomailVorschauLaeuft = false;
+  }
 }
 
 function closeInfomailPreviewModal() {

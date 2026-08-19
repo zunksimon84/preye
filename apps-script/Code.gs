@@ -4239,7 +4239,13 @@ function eventInfomailsPreview_(body) {
   let anstellerRecipients = 0; // count if Schützen are excluded from the send
   const noEmail = [];
   const notAccepted = [];
-  let sample = null; // first eligible recipient — used for the preview render
+  // Welche Gruppe soll die Vorschau zeigen? Ohne Angabe die erste
+  // Ansteller-Runde — das ist das Blatt, das die meisten bekommen. Die
+  // Oberfläche fragt gezielt nach, weil jede Runde ein eigenes PDF mit
+  // eigener Karte und eigenem Roster bekommt und man das sehen will,
+  // bevor 20 Mails rausgehen.
+  const wunschGruppe = String(body.squad_id || "").trim();
+  let sample = null; // der Empfänger, dessen Mail die Vorschau rendert
   // Je Gruppe eine Zeile für die Auswahlliste: wie viele bekämen eine, und
   // wann ging zuletzt eine raus.
   const gruppen = [];
@@ -4257,9 +4263,12 @@ function eventInfomailsPreview_(body) {
       recipients++;
       inGruppe++;
       if (isAnsteller) anstellerRecipients++;
-      // Die Vorschau soll das Blatt zeigen, das die meisten bekommen — also
-      // eines aus einer Ansteller-Runde, wenn es die gibt.
-      if (!sample && !istTreiber) sample = { squad: squad, positions: positions, pos: pos, hunter: h };
+      // Ist eine Gruppe ausdrücklich angefragt, gilt nur die. Sonst die
+      // erste Ansteller-Runde.
+      if (!sample) {
+        const passt = wunschGruppe ? String(squad.id) === wunschGruppe : !istTreiber;
+        if (passt) sample = { squad: squad, positions: positions, pos: pos, hunter: h };
+      }
     }
     gruppen.push({
       id: squad.id,
@@ -4271,7 +4280,11 @@ function eventInfomailsPreview_(body) {
     });
   }
   if (!sample) {
-    // Nur Treibergruppen — dann eben eine davon.
+    // Nur Treibergruppen — dann eben eine davon. Auch der Weg, wenn die
+    // angefragte Gruppe niemanden hat, dem man schreiben kann. Welche
+    // Gruppe es am Ende wurde, steht in sample_squad_id; die Oberfläche
+    // hebt genau die Zeile hervor. Eine Vorschau, die eine andere Gruppe
+    // zeigt als die angeklickte, wäre schlimmer als gar keine.
     for (const squad of alleGruppen) {
       const positions = (squad.positions || []).filter(function (p) { return p && p.hunter; });
       for (const pos of positions) {
@@ -4303,7 +4316,12 @@ function eventInfomailsPreview_(body) {
   if (sample) {
     sampleHtml = buildInfoMailBodyHtml_(ev, sample.squad, sample.pos);
     sampleRecipient = sample.hunter.hunter + " <" + sample.hunter.email + ">";
-    sampleSubject = "Info zur Drückjagd: " + ev.name + " — " + displayRundeNameServer_(sample.squad.name);
+    // Denselben Betreff bauen wie eventInfomailsSend_ — eine Treibergruppe
+    // trägt ihren eigenen Namen, nicht "Ansteller Runde".
+    const sampleIstTreiber = String(sample.squad.type || "").toLowerCase() === "treiber";
+    sampleSubject = "Info zur Drückjagd: " + ev.name + " — " +
+                    (sampleIstTreiber ? (sample.squad.name || "Treibergruppe")
+                                      : displayRundeNameServer_(sample.squad.name));
     if (hasMapKey) {
       try {
         // Match the send path: one PDF per Runde, no recipient-specific
@@ -4338,6 +4356,9 @@ function eventInfomailsPreview_(body) {
     map_provider: hasMapboxToken ? "mapbox" :
                    hasGeoapifyKey ? "geoapify" :
                    hasGoogleKey ? "google" : "none",
+    // Welche Gruppe die Vorschau tatsächlich zeigt — nicht welche angefragt
+    // war. Beides kann auseinandergehen, siehe Rückfall oben.
+    sample_squad_id: sample ? String(sample.squad.id) : "",
     sample_recipient: sampleRecipient,
     sample_subject: sampleSubject,
     sample_html: sampleHtml,

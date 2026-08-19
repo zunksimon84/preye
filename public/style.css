@@ -4532,11 +4532,45 @@ body.stk-blanko .stk-mine { background: var(--card); }
 }
 .infomail-gruppe:last-child { border-bottom: 0; }
 .infomail-gruppe--leer { opacity: 0.5; cursor: default; }
-.infomail-gruppe-name { font-weight: 700; }
+.infomail-gruppe-name { font-weight: 700; cursor: pointer; }
+
+/* Welche Gruppe die Vorschau unten gerade zeigt. Jede Runde bekommt ein
+   eigenes PDF mit eigener Karte und eigenem Roster — ohne diese Markierung
+   liest man den Text einer Runde und hält ihn für den aller. */
+.infomail-gruppe--gezeigt {
+  background: var(--ctl-tint);
+  box-shadow: inset 3px 0 0 var(--ctl-edge);
+  padding-left: 9px;
+  margin-left: -7px;
+  border-radius: 4px 0 0 4px;
+}
+.infomail-gruppe-vorschau {
+  grid-column: 4;
+  grid-row: 2;
+  justify-self: end;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ctl-ink);
+  cursor: pointer;
+}
+.infomail-gruppe-vorschau:hover:not(:disabled) { border-color: var(--ctl-edge); }
+.infomail-gruppe-vorschau:disabled,
+.infomail-gruppe-vorschau--aus {
+  cursor: default;
+  color: var(--muted);
+  border-color: transparent;
+  background: none;
+}
 .infomail-gruppe-typ { font-size: 12px; color: var(--muted); }
 .infomail-gruppe-n { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .infomail-gruppe-sent {
-  grid-column: 2 / -1;
+  grid-column: 2 / 4;
+  grid-row: 2;
   font-size: 12px; color: var(--muted);
 }
 /* Schon verschickt: der Nachweis soll ins Auge fallen, wenn man zum zweiten
@@ -4545,4 +4579,8 @@ body.stk-blanko .stk-mine { background: var(--card); }
 @media (max-width: 560px) {
   .infomail-gruppe { grid-template-columns: auto 1fr; }
   .infomail-gruppe-typ, .infomail-gruppe-n { grid-column: 2; }
+  /* Vier Spalten gibt es hier nicht mehr; ohne diese beiden Regeln landen
+     Nachweis und Knopf in einer Spalte, die es nicht gibt. */
+  .infomail-gruppe-sent { grid-column: 2; grid-row: auto; }
+  .infomail-gruppe-vorschau { grid-column: 2; grid-row: auto; justify-self: start; }
 }
