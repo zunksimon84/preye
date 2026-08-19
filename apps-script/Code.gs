@@ -3631,19 +3631,70 @@ function inviteEmailBodyTemplate_(ev) {
 // **bold** markers turn into real <b> emphasis. Plain-text fallback strips
 // the markers so subscribers without HTML still see clean text. The light
 // sans-serif inline style mirrors how the preview textarea looks in the UI.
+// Absätze wiederherstellen, wenn im Text keine drin sind.
+//
+// Die im Sheet gespeicherte eigene Vorlage hat keinen einzigen Zeilenumbruch —
+// nachgemessen am 19.08.2026 über ?action=invite-template-get. Sie ging als
+// eine Wurst von "Hallo {forename}," bis "Viele Grüße" raus. Wo die Umbrüche
+// verloren gingen, ließ sich nicht mehr feststellen; deshalb wird hier
+// repariert statt gesucht: eine Vorlage, die schon Absätze hat, fasst diese
+// Funktion nicht an, und eine ohne bekommt sie.
+//
+// Getrennt wird nach Satzende — Punkt, Ausrufe- oder Fragezeichen, gefolgt von
+// Leerzeichen und einem Großbuchstaben. Abkürzungen wie "Nr." oder "ca." sind
+// ausgenommen, sonst risse "Nr. 14" mitten entzwei. Der Anmeldelink bekommt in
+// jedem Fall einen eigenen Absatz: er ist das, was der Empfänger sucht.
+var INVITE_ABBREVS = ["nr", "ca", "z", "b", "u", "a", "bzw", "evtl", "ggf", "inkl", "vgl", "usw", "dr", "st", "bspw"];
+
+function inviteAddParagraphs_(text) {
+  var t = String(text || "").replace(/\r\n/g, "\n");
+  // Zwei oder mehr Umbrüche heißt: da hat jemand bewusst gegliedert.
+  if ((t.match(/\n/g) || []).length >= 2) return t;
+
+  t = t.replace(/([.!?])[ \t]*(?=[A-ZÄÖÜ])/g, function (m, punct, off, whole) {
+    var vor = whole.slice(0, off);
+    // Ziffern vor dem Punkt: das ist eine Ordnungszahl, kein Satzende.
+    // "am 14. Dezember 2026" hat den Absatz sonst mitten im Datum.
+    if (/\d$/.test(vor)) return m;
+    var wort = (vor.match(/([A-Za-zÄÖÜäöüß]+)$/) || ["", ""])[1].toLowerCase();
+    if (INVITE_ABBREVS.indexOf(wort) >= 0) return m;
+    return punct + "\n\n";
+  });
+  // Anrede und Gruß stehen für sich, obwohl kein Satzzeichen sie beendet.
+  t = t.replace(/^(Hallo[^\n,]*,|Hi[^\n,]*,)\s*/, "$1\n\n");
+  t = t.replace(/\s*(Viele Grüße|Dein|Deine|Yours,|Best regards)\s*(\*\*\{organizer\}\*\*)/, "\n\n$1 $2");
+  // Der Link auf eine eigene Zeile, mit Luft davor und dahinter.
+  t = t.replace(/\s*\{link\}\s*/g, "\n\n{link}\n\n");
+  return t.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Render the editable plain-text body into HTML for the actual email so the
+// **bold** markers turn into real <b> emphasis. Plain-text fallback strips
+// the markers so subscribers without HTML still see clean text. The light
+// sans-serif inline style mirrors how the preview textarea looks in the UI.
+//
+// Absätze werden zu <p> mit Abstand, nicht zu <br><br>: Outlook schluckt
+// aufeinanderfolgende <br> gern und wirft dann genau die Leerzeile weg, um
+// die es hier geht.
 function inviteBodyToHtml_(text, linkUrl) {
-  let html = String(text || "")
+  var raw = inviteAddParagraphs_(text);
+  var html = String(raw)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
   html = html.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
-  const safeUrl = String(linkUrl || "").replace(/"/g, "&quot;");
-  const anchor = '<a href="' + safeUrl + '" style="color:#1a5f1a;">' + safeUrl + '</a>';
+  var safeUrl = String(linkUrl || "").replace(/"/g, "&quot;");
+  var anchor = '<a href="' + safeUrl + '" style="color:#1a5f1a;">' + safeUrl + '</a>';
   html = html.split("{link}").join(anchor);
-  html = html.split("\n").join("<br>\n");
+
+  var absaetze = html.split(/\n\s*\n/).map(function (block) {
+    var inner = block.replace(/\n/g, "<br>");
+    return '<p style="margin:0 0 14px 0;">' + inner + "</p>";
+  }).join("\n");
+
   return '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Helvetica Neue\',\'Segoe UI\',sans-serif;' +
          'font-weight:400;line-height:1.55;color:#232323;font-size:15px;max-width:640px;">' +
-         html + '</div>';
+         absaetze + '</div>';
 }
 
 // First whitespace-separated word of the hunter's name. "Klaus Müller"
@@ -3654,7 +3705,9 @@ function forenameFor_(name) {
 }
 
 function inviteBodyToPlain_(text, linkUrl) {
-  return String(text || "")
+  // Dieselbe Gliederung wie im HTML — sonst liest der Nur-Text-Empfänger
+  // weiter die Wurst.
+  return inviteAddParagraphs_(text)
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .split("{link}").join(String(linkUrl || ""));
 }
@@ -3706,7 +3759,9 @@ function inviteTemplateGetEndpoint_(params) {
   return {
     language: lang,
     subject: tpl.subject,
-    body: tpl.body,
+    // Gegliedert ausliefern — speichert Simon aus dem Editor, ist die
+    // umbruchlose Vorlage im Sheet damit dauerhaft ersetzt.
+    body: inviteAddParagraphs_(tpl.body),
     using_default_subject: tpl.using_default_subject,
     using_default_body: tpl.using_default_body,
     // Also expose the placeholder reference so the UI doesn't have to
@@ -3751,10 +3806,12 @@ function invitePreview_(params) {
     .find(function (e) { return String(e.id) === id; });
   if (!raw) return { error: "event not found" };
   const ev = normalizeEventDates_(raw);
+  // Absätze auch im Vorschaufeld: Simon soll im Textfeld das sehen, was
+  // ankommt. Speichert er von dort, ist die kaputte Vorlage nebenbei repariert.
   if (lang === "en") {
-    return { subject: inviteSubjectEn_(ev), body: inviteEmailBodyTemplateEn_(ev) };
+    return { subject: inviteSubjectEn_(ev), body: inviteAddParagraphs_(inviteEmailBodyTemplateEn_(ev)) };
   }
-  return { subject: inviteSubject_(ev), body: inviteEmailBodyTemplate_(ev) };
+  return { subject: inviteSubject_(ev), body: inviteAddParagraphs_(inviteEmailBodyTemplate_(ev)) };
 }
 
 // Strip Google Sheets' Date typing on the four date/time columns so anything
