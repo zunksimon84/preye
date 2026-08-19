@@ -76,9 +76,9 @@ const REVIER_CACHE_KEY = "revier_registry_v1";
 // the UI maps Drückjagdbock → "DJB" for compact display.
 const POST_TYPES = ["Kanzel", "Drückjagdbock", "Leiter"];
 const HUNTER_HEADER = ["name"];
-const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
-const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
-const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer", "freigaben", "art"];
+const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class", "revier"];
+const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient", "revier"];
+const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treffpunkt_lat", "treffpunkt_lng", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer", "freigaben", "art", "revier"];
 
 // Jagdart. Bis August 2026 gab es nur Drückjagden, deshalb ist die Spalte bei
 // allen Altbeständen leer — leer wird als "drueckjagd" gelesen.
@@ -773,6 +773,9 @@ function readPosts_() {
       id: String(r.id),
       name: String(r.name),
       area: String(r.area),
+      // Leer bei allem, was vor der Umstellung entstanden ist, und bei Zeilen,
+      // die eine noch nicht neu bereitgestellte Fassung geschrieben hat.
+      revier: String(r.revier || "").trim(),
       lat: Number(r.lat),
       lng: Number(r.lng),
       type: type,
@@ -829,6 +832,52 @@ function postsBatchAdd_(body) {
     else added++;
   }
   return { ok: true, added: added, errors: errors };
+}
+
+// ---------- Revierbezogenes Lesen ----------
+
+// Erlegungen eines Reviers. revierKey === null heißt: alle.
+//
+// Der Wert kommt aus der Spalte, und wenn die leer ist (Altbestand), über den
+// Stand. Beide Wege, nicht einer: die Spalte allein wäre bei Altdaten leer, der
+// Stand allein trägt nicht — menu_reclassifyPosts benennt Stände um und löscht
+// Zeilen, und menu_listLostFreePosts existiert nur, weil es verwaiste
+// Erlegungen längst gibt. Was keinem Revier zuzuordnen ist, zählt zum
+// Standardrevier; sonst fiele es aus jeder Auswertung heraus.
+function readHarvestsScoped_(revierKey) {
+  const rows = readHarvests_();
+  if (!revierKey) return rows;
+  const byPost = postRevierMap_();
+  const fallback = defaultRevier_();
+  return rows.filter(function (r) {
+    const key = String(r.revier || "").trim() || byPost[String(r.post_id).trim()] || fallback;
+    return key === revierKey;
+  });
+}
+
+// post_id → Revier, einmal aufgebaut.
+function postRevierMap_() {
+  const posts = readPosts_();
+  const reg = revierRegistry_();
+  const out = {};
+  for (let i = 0; i < posts.length; i++) {
+    const p = posts[i];
+    out[p.id] = String(p.revier || "").trim() || reg.areaToRevier[p.area] || "";
+  }
+  return out;
+}
+
+// Stände eines Reviers. Klettersitz und Pirsch gehören keinem Teilgebiet an —
+// sie hängen über die revier-Spalte am Stand, nicht über den Namen des Gebiets.
+function readPostsScoped_(revierKey) {
+  const posts = readPosts_();
+  if (!revierKey) return posts;
+  const reg = revierRegistry_();
+  const fallback = defaultRevier_();
+  return posts.filter(function (p) {
+    const key = String(p.revier || "").trim() || reg.areaToRevier[p.area] || fallback;
+    return key === revierKey;
+  });
 }
 
 function readHunters_() {
@@ -1245,24 +1294,52 @@ function backfillWeather() {
 // `harvests` tab. The daily trigger installed by setup() runs this every
 // night, so on Apr 1 (and any day after) the rollover happens automatically.
 
+// Läuft nachts um 01:00.
+//
+// Hier lagen drei Fehler beieinander, die alle dasselbe Muster haben: gelesen
+// wurde mit getDataRange() (volle Breite), geschrieben mit
+// HARVEST_HEADER.length (feste Breite). ensureSheet_ garantiert nur, dass das
+// Blatt mindestens so breit ist, nie dass es genau so breit ist. Sobald
+// harvests eine Spalte dazubekommt — und `revier` ist genau das —, wirft
+// setValues, der nächtliche Lauf schlägt unbemerkt im Ausführungsprotokoll fehl,
+// und die Saison rollt nie um.
+//
+// Behoben: Breite aus den Daten, Zeitstempel über den Spaltennamen statt über
+// Position 0, und die Zuordnung ins Archiv nach Spaltennamen. Der letzte Punkt
+// ist der heimtückischste: ein Archivblatt aus der letzten Saison hat noch die
+// alte Spaltenfolge, und positionsweise kopiert landen alle Felder um eins
+// verschoben in einem Blatt, das erst im März wieder jemand ansieht.
 function archivePastSeasons() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return { moved: 0 };
 
-  const header = values[0];
-  const currentStart = seasonStartUtc_(new Date());
+  const header = values[0].map(function (h) { return String(h).trim(); });
+  const width = header.length;
+  const tsCol = header.indexOf("timestamp");
+  const revierCol = header.indexOf("revier");
+  const postIdCol = header.indexOf("post_id");
+  if (tsCol < 0) throw new Error("harvests: Spalte 'timestamp' fehlt");
 
-  const keep = [header];
+  const currentStart = seasonStartUtc_(new Date());
+  const byPost = revierCol >= 0 ? postRevierMap_() : {};
+  const fallbackRevier = revierCol >= 0 ? defaultRevier_() : "";
+
+  const keep = [values[0]];
   const buckets = {}; // seasonLabel → [rows]
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    const ts = new Date(row[0]);
+    const ts = new Date(row[tsCol]);
     if (isNaN(ts) || ts >= currentStart) {
       keep.push(row);
       continue;
+    }
+    // Ein leeres Revier hier stehen zu lassen hieße: für immer leer. Nach dem
+    // Umzug ins Archiv sieht diese Zeile nie wieder ein Nachtrag.
+    if (revierCol >= 0 && !String(row[revierCol] || "").trim()) {
+      row[revierCol] = byPost[String(row[postIdCol]).trim()] || fallbackRevier;
     }
     const label = seasonLabel_(ts);
     (buckets[label] = buckets[label] || []).push(row);
@@ -1271,15 +1348,24 @@ function archivePastSeasons() {
   let moved = 0;
   for (const label in buckets) {
     const archive = ensureSheet_(ss, SHEETS.harvests + "_" + label, HARVEST_HEADER);
-    const rows = buckets[label];
-    archive.getRange(archive.getLastRow() + 1, 1, rows.length, HARVEST_HEADER.length).setValues(rows);
+    const archiveHeader = sheetHeader_(archive);
+    const rows = buckets[label].map(function (row) {
+      // Nach Namen umsortieren, nicht nach Position.
+      const out = new Array(archiveHeader.length).fill("");
+      for (let c = 0; c < header.length; c++) {
+        const target = archiveHeader.indexOf(header[c]);
+        if (target >= 0) out[target] = row[c];
+      }
+      return out;
+    });
+    archive.getRange(archive.getLastRow() + 1, 1, rows.length, archiveHeader.length).setValues(rows);
     moved += rows.length;
   }
 
   if (moved > 0) {
     sheet.clear();
-    sheet.getRange(1, 1, keep.length, HARVEST_HEADER.length).setValues(keep);
-    sheet.getRange(1, 1, 1, HARVEST_HEADER.length).setFontWeight("bold");
+    sheet.getRange(1, 1, keep.length, width).setValues(keep);
+    sheet.getRange(1, 1, 1, width).setFontWeight("bold");
     sheet.setFrozenRows(1);
   }
 
