@@ -511,7 +511,10 @@ function logHarvest_(body) {
     const niceLabel = rawLabel || (cfg.area + " " + lat.toFixed(4) + ", " + lng.toFixed(4));
     post_id = cfg.prefix + Date.now().toString(36).toUpperCase();
     const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
-    sheet.appendRow([post_id, niceLabel, cfg.area, lat, lng]);
+    sheet.appendRow(postRow_(
+      { id: post_id, name: niceLabel, area: cfg.area, lat: lat, lng: lng },
+      sheetHeader_(sheet)
+    ));
     createdPost = { id: post_id, name: niceLabel, area: cfg.area, lat: lat, lng: lng };
   }
 
@@ -737,6 +740,39 @@ function classifyByCoords_(lat, lng) {
   return null;
 }
 
+// Baut eine posts-Zeile aus der TATSÄCHLICHEN Kopfzeile des Blattes, nicht aus
+// einer festen Liste.
+//
+// Vorher stand hier `[id, name, area, lat, lng]` — fünf Werte, geschrieben in
+// einen Bereich der Breite POST_HEADER.length. Als im Mai die Spalte `type`
+// dazukam, wurde daraus fünf gegen sechs, und `setValues` wirft in dem Moment,
+// in dem es etwas zu schreiben gibt. Die stündliche Synchronisierung lief
+// seitdem nur durch, solange sich in My Maps nichts geändert hatte, und
+// `setup()` gar nicht mehr. Mit diesem Helfer kann die nächste neue Spalte das
+// nicht wiederholen.
+function postRow_(p, header) {
+  const row = new Array(header.length).fill("");
+  function put(key, value) {
+    const i = header.indexOf(key);
+    if (i >= 0) row[i] = value;
+  }
+  put("id", p.id);
+  put("name", p.name);
+  put("area", p.area);
+  put("lat", p.lat);
+  put("lng", p.lng);
+  put("type", p.type || "Kanzel");
+  return row;
+}
+
+// Die Kopfzeile eines Blattes als Liste von Namen.
+function sheetHeader_(sheet) {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+  return sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function (h) { return String(h).trim(); });
+}
+
 function syncPostsFromKml() {
   const res = UrlFetchApp.fetch(KML_URL, { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) {
@@ -746,39 +782,56 @@ function syncPostsFromKml() {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+  const header = sheetHeader_(sheet);
+  const col = {
+    id: header.indexOf("id"),
+    name: header.indexOf("name"),
+    area: header.indexOf("area"),
+    lat: header.indexOf("lat"),
+    lng: header.indexOf("lng"),
+  };
   const lastRow = sheet.getLastRow();
   const existingValues = lastRow > 1
-    ? sheet.getRange(2, 1, lastRow - 1, POST_HEADER.length).getValues()
+    ? sheet.getRange(2, 1, lastRow - 1, header.length).getValues()
     : [];
 
   const idToRowIdx = {};
   for (let i = 0; i < existingValues.length; i++) {
-    idToRowIdx[String(existingValues[i][0])] = i;
+    idToRowIdx[String(existingValues[i][col.id])] = i;
   }
 
   let added = 0, updated = 0;
   const newRows = [];
   for (let i = 0; i < fromKml.length; i++) {
     const p = fromKml[i];
-    const newRow = [p.id, p.name, p.area, p.lat, p.lng];
     if (idToRowIdx[p.id] !== undefined) {
       const cur = existingValues[idToRowIdx[p.id]];
       const changed =
-        String(cur[1]) !== p.name ||
-        String(cur[2]) !== p.area ||
-        Math.abs(Number(cur[3]) - p.lat) > 1e-7 ||
-        Math.abs(Number(cur[4]) - p.lng) > 1e-7;
+        String(cur[col.name]) !== p.name ||
+        String(cur[col.area]) !== p.area ||
+        Math.abs(Number(cur[col.lat]) - p.lat) > 1e-7 ||
+        Math.abs(Number(cur[col.lng]) - p.lng) > 1e-7;
       if (changed) {
-        sheet.getRange(idToRowIdx[p.id] + 2, 1, 1, POST_HEADER.length).setValues([newRow]);
+        // Auf der vorhandenen Zeile aufsetzen und nur überschreiben, was das
+        // KML wirklich weiß. Sonst würde ein von Hand gesetztes `type`
+        // ("Drückjagdbock") bei der nächsten Synchronisierung stumm auf
+        // "Kanzel" zurückfallen — und dasselbe gilt für jede Spalte, die
+        // später dazukommt.
+        const row = cur.slice();
+        row[col.name] = p.name;
+        row[col.area] = p.area;
+        row[col.lat] = p.lat;
+        row[col.lng] = p.lng;
+        sheet.getRange(idToRowIdx[p.id] + 2, 1, 1, header.length).setValues([row]);
         updated++;
       }
     } else {
-      newRows.push(newRow);
+      newRows.push(postRow_(p, header));
       added++;
     }
   }
   if (newRows.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, POST_HEADER.length).setValues(newRows);
+    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, header.length).setValues(newRows);
   }
   return { added: added, updated: updated, total: fromKml.length };
 }
@@ -1252,7 +1305,11 @@ function nachsucheCreate_(body) {
       const cfg = KIND[String(free.kind || "klettersitz").toLowerCase()] || KIND.klettersitz;
       const niceLabel = (labelOk && rawLabel) || (cfg.area + " " + lat.toFixed(4) + ", " + lng.toFixed(4));
       postId = cfg.prefix + Date.now().toString(36).toUpperCase();
-      ensureSheet_(ss, SHEETS.posts, POST_HEADER).appendRow([postId, niceLabel, cfg.area, lat, lng]);
+      const postsSheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+      postsSheet.appendRow(postRow_(
+        { id: postId, name: niceLabel, area: cfg.area, lat: lat, lng: lng },
+        sheetHeader_(postsSheet)
+      ));
       post = { id: postId, name: niceLabel, area: cfg.area, lat: lat, lng: lng };
     }
   }
@@ -5397,27 +5454,39 @@ function setup() {
   // Critically, this *preserves* user-created KS- / P- / FREE- prefixed
   // rows (Klettersitz / Pirsch). Earlier setup() wiped the whole posts
   // sheet and silently nuked those entries.
+  const header = sheetHeader_(postsSheet);
+  const idCol = header.indexOf("id");
   const lastRow = postsSheet.getLastRow();
   const idToRow = {};
+  const rowByIdx = {};
   if (lastRow > 1) {
-    const existing = postsSheet.getRange(2, 1, lastRow - 1, POST_HEADER.length).getValues();
+    const existing = postsSheet.getRange(2, 1, lastRow - 1, header.length).getValues();
     for (let i = 0; i < existing.length; i++) {
-      idToRow[String(existing[i][0]).trim()] = i + 2;
+      const id = String(existing[i][idCol]).trim();
+      idToRow[id] = i + 2;
+      rowByIdx[id] = existing[i];
     }
   }
   const appended = [];
   for (let i = 0; i < INLINED_POSTS.length; i++) {
     const p = INLINED_POSTS[i];
-    const row = [p.id, p.name, p.area, p.lat, p.lng];
     const rowIdx = idToRow[p.id];
     if (rowIdx) {
-      postsSheet.getRange(rowIdx, 1, 1, POST_HEADER.length).setValues([row]);
+      // Wie bei der Synchronisierung: auf der vorhandenen Zeile aufsetzen,
+      // damit `type` und alles später Dazugekommene erhalten bleibt.
+      const row = rowByIdx[p.id].slice();
+      const put = function (key, value) {
+        const c = header.indexOf(key);
+        if (c >= 0) row[c] = value;
+      };
+      put("name", p.name); put("area", p.area); put("lat", p.lat); put("lng", p.lng);
+      postsSheet.getRange(rowIdx, 1, 1, header.length).setValues([row]);
     } else {
-      appended.push(row);
+      appended.push(postRow_(p, header));
     }
   }
   if (appended.length > 0) {
-    postsSheet.getRange(postsSheet.getLastRow() + 1, 1, appended.length, POST_HEADER.length).setValues(appended);
+    postsSheet.getRange(postsSheet.getLastRow() + 1, 1, appended.length, header.length).setValues(appended);
   }
   const rows = INLINED_POSTS;
   ensureSheet_(ss, SHEETS.hunters, HUNTER_HEADER);
