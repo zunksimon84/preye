@@ -3660,6 +3660,11 @@ function inviteAddParagraphs_(text) {
     if (INVITE_ABBREVS.indexOf(wort) >= 0) return m;
     return punct + "\n\n";
   });
+  // Ein Platzhalter, der einen Satz beendet, hat kein Satzzeichen hinter sich:
+  // "...einladen.{teilgebiete_satz}Ich bitte Dich" bleibt sonst als einziger
+  // Absatz zusammengeklebt. Eine geschweifte Klammer direkt vor einem
+  // Großbuchstaben ist immer eine verlorene Leerzeile.
+  t = t.replace(/\}(?=[A-ZÄÖÜ])/g, "}\n\n");
   // Anrede und Gruß stehen für sich, obwohl kein Satzzeichen sie beendet.
   t = t.replace(/^(Hallo[^\n,]*,|Hi[^\n,]*,)\s*/, "$1\n\n");
   t = t.replace(/\s*(Viele Grüße|Dein|Deine|Yours,|Best regards)\s*(\*\*\{organizer\}\*\*)/, "\n\n$1 $2");
