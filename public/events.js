@@ -547,9 +547,19 @@ function renderHuntersList(hunters) {
       invited: "Eingeladen ⋯",
       pending: "Offen",
     }[h.status] || h.status;
+    const gesetzt = !!h.set_manually;
     const statusLabel = h.status === "accepted" && h.role
-      ? h.role + " ✓"
+      ? h.role + (gesetzt ? " · gesetzt" : " ✓")
       : baseLabel;
+    // Bei einer Zusage über den Link liegen Jagdschein- und VSG-Bestätigung
+    // vor. Bei einem gesetzten Eintrag nicht — und das ist bei Schützen und
+    // Hundeführern ein Unterschied, den man vor der Jagd sehen will. Ein
+    // Treiber führt keine Waffe, dort steht nichts.
+    const brauchtPapiere = h.status === "accepted" &&
+      (h.role === "Schütze/Standschnaller" || h.role === "Hundeführer");
+    const fehlt = brauchtPapiere
+      ? [!h.confirmed_jagdschein ? "Jagdschein" : "", !h.confirmed_vsg44 ? "VSG 4.4" : ""].filter(Boolean)
+      : [];
     const dogsText = (h.status === "accepted" && Array.isArray(h.dogs) && h.dogs.length)
       ? "Hunde: " + h.dogs.map((d) => d.count + "× " + d.breed).join(", ")
       : "";
@@ -562,7 +572,11 @@ function renderHuntersList(hunters) {
           <span class="hunter-email">${escapeHtml(h.email || "—")}</span>
           ${dogsText ? `<span class="hunter-dogs">${escapeHtml(dogsText)}</span>` : ""}
         </div>
-        <span class="hunter-status">${escapeHtml(statusLabel)}</span>
+        <span class="hunter-status${gesetzt ? " hunter-status--gesetzt" : ""}">${escapeHtml(statusLabel)}</span>
+        ${fehlt.length ? `<span class="hunter-missing" title="Beim Setzen von Hand liegt keine Bestätigung vor">ohne ${escapeHtml(fehlt.join(" + "))}</span>` : ""}
+        <button class="link-btn hunter-set" data-hid="${escapeHtml(h.id)}"
+                data-gesetzt="${gesetzt ? "1" : ""}"
+                title="${gesetzt ? "Setzen zurücknehmen" : "Ohne Einladung als zugesagt setzen"}">${gesetzt ? "↺" : "✓"}</button>
         <button class="link-btn hunter-remove" data-hid="${escapeHtml(h.id)}" title="Entfernen">×</button>
       </div>
     `;
@@ -596,12 +610,16 @@ async function addHunter(e) {
     return;
   }
   try {
+    const rolle = $("#add-hunter-mode").value;
     await postJson({
       action: "event-hunter-add",
       event_id: state.currentEvent.event.id,
       hunter: name,
       email: email,
       language: language,
+      // Eine gewählte Rolle heißt: der hat schon zugesagt, keine Einladung.
+      role: rolle,
+      set: !!rolle,
     });
     invalidateCache("event-detail", { id: state.currentEvent.event.id });
     invalidateCache("events-list");
@@ -609,6 +627,8 @@ async function addHunter(e) {
     $("#add-hunter-name").value = "";
     $("#add-hunter-email").value = "";
     $("#add-hunter-lang").value = "de";
+    // Die Auswahl NICHT zurücksetzen: wer eine Treibergruppe einträgt, trägt
+    // meist mehrere hintereinander ein.
     // Reflect locally so the datalist updates without a refetch.
     const i = state.addressBook.findIndex((c) => c.name.toLowerCase() === name.toLowerCase());
     if (i >= 0) state.addressBook[i] = { name, email, language };
@@ -618,6 +638,67 @@ async function addHunter(e) {
     $("#add-hunter-name").focus();
   } catch (err) {
     showToast(err.message, "error");
+  }
+}
+
+// Jemanden nachträglich als zugesagt setzen — oder das zurücknehmen.
+//
+// Der zweite Fall des mündlichen Zusagens: er steht schon auf der Liste,
+// vielleicht ist die Einladung sogar raus, aber er ruft an statt zu klicken.
+//
+// Die Rolle wird angeklickt, nicht getippt. Ein Eingabefenster mit
+// abzuschreibendem „Schütze/Standschnaller" wäre eine Tippfehlerfalle, und der
+// Fehler fiele erst nach dem Absenden auf.
+const SET_ROLES = ["Schütze/Standschnaller", "Treiber", "Hundeführer"];
+
+function openSetPicker(row, id, hunterName) {
+  if (row.querySelector(".hunter-setpick")) return;
+  const box = document.createElement("div");
+  box.className = "hunter-setpick";
+  box.innerHTML =
+    `<span>${escapeHtml(hunterName)} setzen als</span>` +
+    SET_ROLES.map((r) => `<button type="button" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`).join("") +
+    `<button type="button" data-cancel="1" class="hunter-setpick-x">Abbrechen</button>`;
+  row.appendChild(box);
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.cancel) { box.remove(); return; }
+    box.remove();
+    applySet(id, b.dataset.role, false, hunterName);
+  });
+}
+
+async function setHunter(id, gesetzt) {
+  if (!state.currentEvent) return;
+  const h = (state.currentEvent.hunters || []).find((x) => x.id === id);
+  if (!h) return;
+  if (!gesetzt) {
+    const row = document.querySelector(`.hunter-set[data-hid="${CSS.escape(id)}"]`)?.closest(".hunter-row");
+    if (row) openSetPicker(row, id, h.hunter);
+    return;
+  }
+  if (!confirm(`Das Setzen für „${h.hunter}" zurücknehmen?`)) return;
+  applySet(id, "", true, h.hunter);
+}
+
+async function applySet(id, role, undo, hunterName) {
+  try {
+    const r = await postJson({ action: "event-hunter-set", id: id, role: role, undo: undo });
+    if (r.error) { showToast(r.error, "error", 7000); return; }
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("events-list");
+    await loadEventDetail(state.currentEvent.event.id);
+    if (r.needsPapers) {
+      showToast(
+        `${hunterName} ist gesetzt. Jagdschein und VSG 4.4 sind damit nicht ` +
+        "bestätigt — das steht so in der Liste.", "", 7000
+      );
+    } else {
+      showToast(undo ? "Setzen zurückgenommen" : `${hunterName} ist gesetzt.`);
+    }
+  } catch (err) {
+    showToast("Fehler: " + err.message, "error", 6000);
   }
 }
 
@@ -2817,6 +2898,13 @@ function wireUi() {
   $("#new-event-cancel").addEventListener("click", () => { location.hash = "#/"; });
   $("#back-to-list").addEventListener("click", () => { location.hash = "#/"; });
   $("#add-hunter-form").addEventListener("submit", addHunter);
+  $("#add-hunter-mode").addEventListener("change", (e) => {
+    // Der Knopf soll benennen, was gleich passiert — sonst merkt niemand, dass
+    // die Auswahl daneben den Ablauf ändert.
+    $("#add-hunter-btn").textContent = e.target.value
+      ? "+ Gesetzt hinzufügen"
+      : "+ Hinzufügen";
+  });
   $("#add-hunter-name").addEventListener("change", onHunterNamePick);
 
   // CSV import — wire the hidden file input via a visible toolbar button.
@@ -2852,7 +2940,9 @@ function wireUi() {
   $("#ev-nsf-add").addEventListener("click", () => addNsfRow());
   $("#hunters-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".hunter-remove");
-    if (btn) removeHunter(btn.dataset.hid);
+    if (btn) { removeHunter(btn.dataset.hid); return; }
+    const setBtn = e.target.closest(".hunter-set");
+    if (setBtn) setHunter(setBtn.dataset.hid, !!setBtn.dataset.gesetzt);
   });
   $("#events-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".event-delete-btn");

@@ -158,7 +158,18 @@
               <option value="de" selected>🇩🇪 DE</option>
               <option value="en">🇬🇧 EN</option>
             </select>
-            <button type="submit" class="primary-btn small">+ Hinzufügen</button>
+            <!-- Ein Steuerelement für beides. Wer eine Rolle wählt, trägt
+                 jemanden ein, der schon zugesagt hat — mündlich, oder weil er
+                 als Mitarbeiter ohnehin eingeteilt ist. Der bekommt dann keine
+                 Einladung mehr. -->
+            <select id="add-hunter-mode" aria-label="Einladen oder direkt setzen">
+              <option value="">Einladung senden</option>
+              <option disabled>── ohne Einladung setzen als ──</option>
+              <option value="Schütze/Standschnaller">Schütze/Standschnaller</option>
+              <option value="Treiber">Treiber</option>
+              <option value="Hundeführer">Hundeführer</option>
+            </select>
+            <button type="submit" class="primary-btn small" id="add-hunter-btn">+ Hinzufügen</button>
           </form>
           <datalist id="address-book-options"></datalist>
           <div id="hunters-list"></div>

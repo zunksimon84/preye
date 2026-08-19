@@ -195,7 +195,7 @@ function freigabenAllKeys_() {
   }
   return out;
 }
-const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "language", "token", "status", "role", "dogs", "invited_at", "responded_at", "confirmed_jagdschein", "confirmed_vsg44"];
+const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "language", "token", "status", "role", "dogs", "invited_at", "responded_at", "confirmed_jagdschein", "confirmed_vsg44", "set_manually"];
 
 // JGHV-anerkannte Jagdhundrassen — single source of truth, baked here so
 // the backend can validate what the RSVP page submits. "Sonstige" lets a
@@ -488,6 +488,10 @@ function doPost(e) {
     }
     if (action === "event-hunters-batch-add") {
       const r = eventHuntersBatchAdd_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-hunter-set") {
+      const r = eventHunterSet_(body);
       return json_(r, r.error ? 400 : 200);
     }
     if (action === "event-hunter-remove") {
@@ -2997,6 +3001,12 @@ function eventDetail_(params) {
         dogs: Array.isArray(dogs) ? dogs : [],
         invited_at: String(h.invited_at || ""),
         responded_at: String(h.responded_at || ""),
+        // Ohne das kann die Liste nicht unterscheiden, ob jemand selbst
+        // zugesagt hat oder eingetragen wurde — und die Bestätigungen wurden
+        // bisher zwar erfasst, aber nirgends angezeigt.
+        set_manually: String(h.set_manually || ""),
+        confirmed_jagdschein: !!String(h.confirmed_jagdschein || "").trim(),
+        confirmed_vsg44: !!String(h.confirmed_vsg44 || "").trim(),
       };
     });
   const squads = readSheet_(SHEETS.event_squads, EVENT_SQUAD_HEADER)
@@ -3172,6 +3182,31 @@ function eventUpdate_(body) {
   return { ok: true, id: id };
 }
 
+// Rollen. Ältere Schreibweisen ("Schütze", "Schütze/Standschneller") werden
+// weiter angenommen und vereinheitlicht, damit bestehende Zusagen gültig
+// bleiben. Stand bis August 2026 nur in rsvpRespond_ — jetzt braucht es die
+// Prüfung auch beim Setzen von Hand, und zwei Fassungen driften.
+const VALID_ROLES = {
+  "Schütze/Standschnaller": 1,
+  "Schütze/Standschneller": 1,
+  "Schütze": 1,
+  "Treiber": 1,
+  "Hundeführer": 1,
+};
+
+function normalizeRole_(raw) {
+  let role = String(raw || "").trim();
+  if (role && !VALID_ROLES[role]) return "";
+  if (role === "Schütze" || role === "Schütze/Standschneller") role = "Schütze/Standschnaller";
+  return role;
+}
+
+// Nur diese beiden brauchen einen Jagdschein und die VSG-4.4-Bestätigung.
+// Ein Treiber führt keine Waffe.
+function roleNeedsPapers_(role) {
+  return role === "Schütze/Standschnaller" || role === "Hundeführer";
+}
+
 function eventHunterAdd_(body) {
   const eventId = String(body.event_id || "").trim();
   const hunter = String(body.hunter || "").trim();
@@ -3191,6 +3226,19 @@ function eventHunterAdd_(body) {
              String(h.hunter).toLowerCase() === hunter.toLowerCase();
     });
   if (existing) return { error: hunter + " ist bereits auf der Liste" };
+  // Direkt setzen statt einladen.
+  //
+  // Der Fall: jemand sagt mündlich zu, oder ein Nationalpark-Mitarbeiter ist
+  // schlicht eingeteilt, weil es für ihn Arbeitszeit ist. Auf eine Antwort zu
+  // warten, die nie kommt, hält die ganze Planung auf — besonders bei den
+  // Treibern.
+  //
+  // Wer gesetzt wird, braucht eine Rolle: ohne sie ließe er sich weder in eine
+  // Ansteller-Runde noch in eine Treibergruppe stellen.
+  const role = normalizeRole_(body.role);
+  const gesetzt = truthy_(body.set) && !!role;
+  const now = new Date().toISOString();
+
   const id = "EH-" + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1000);
   appendByName_(sheet, {
     id: id,
@@ -3199,13 +3247,87 @@ function eventHunterAdd_(body) {
     email: email,
     language: language,
     token: randomToken_(),
-    status: "pending",
+    status: gesetzt ? "accepted" : "pending",
+    role: gesetzt ? role : "",
     invited_at: "",
-    responded_at: "",
+    responded_at: gesetzt ? now : "",
+    // Trennt „hat selbst zugesagt“ von „wurde eingetragen“. Das ist kein
+    // Schönheitsmerkmal: bei einer Zusage über den Link liegen Jagdschein- und
+    // VSG-Bestätigung vor, hier nicht. Die Liste muss das zeigen können.
+    set_manually: gesetzt ? now : "",
   });
   // Upsert into the address book so future events can pick it from a list.
   addressBookUpsert_(hunter, email, language);
-  return { ok: true, id: id };
+  return { ok: true, id: id, status: gesetzt ? "accepted" : "pending", role: gesetzt ? role : "" };
+}
+
+// Einen bereits eingetragenen Jäger von Hand setzen — oder das Setzen wieder
+// zurücknehmen.
+//
+// Der zweite Fall des mündlichen Zusagens: jemand steht schon auf der Liste,
+// hat vielleicht sogar eine Einladung bekommen, ruft aber an statt zu klicken.
+//
+// Eine SELBST abgegebene Zusage wird hier nicht angefasst. Sie trägt die
+// Bestätigungen zu Jagdschein und VSG 4.4; die von Hand zu überschreiben hieße,
+// einen Nachweis wegzuwerfen, den nur die Person selbst geben kann.
+function eventHunterSet_(body) {
+  const id = String(body.id || "").trim();
+  if (!id) return { error: "id required" };
+  const zuruecknehmen = truthy_(body.undo);
+  const role = normalizeRole_(body.role);
+  if (!zuruecknehmen && !role) return { error: "Bitte eine Rolle wählen." };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { error: "not found" };
+  const header = sheetHeader_(sheet);
+  const col = {};
+  ["id", "status", "role", "responded_at", "set_manually",
+   "confirmed_jagdschein", "confirmed_vsg44"].forEach(function (k) { col[k] = header.indexOf(k); });
+  if (col.set_manually < 0) {
+    return { error: "Alte Sheet-Fassung — bitte einmal „Reviere prüfen“ ausführen." };
+  }
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, header.length).getValues();
+  let idx = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][col.id]).trim() === id) { idx = i; break; }
+  }
+  if (idx < 0) return { error: "not found" };
+  const row = rows[idx];
+
+  const warSelbst = String(row[col.status] || "").toLowerCase() === "accepted" &&
+                    !String(row[col.set_manually] || "").trim();
+  if (warSelbst) {
+    return { error: "Diese Zusage kam über den Anmeldelink und enthält die " +
+                    "Bestätigungen. Sie wird nicht überschrieben." };
+  }
+
+  const now = new Date().toISOString();
+  const next = row.slice();
+  if (zuruecknehmen) {
+    // Zurück auf den Zustand vor dem Setzen: eingeladen, wenn schon eine
+    // Einladung raus ist, sonst offen.
+    const invitedAt = header.indexOf("invited_at") >= 0
+      ? String(row[header.indexOf("invited_at")] || "").trim() : "";
+    next[col.status] = invitedAt ? "invited" : "pending";
+    next[col.role] = "";
+    next[col.responded_at] = "";
+    next[col.set_manually] = "";
+  } else {
+    next[col.status] = "accepted";
+    next[col.role] = role;
+    next[col.responded_at] = now;
+    next[col.set_manually] = now;
+  }
+  sheet.getRange(idx + 2, 1, 1, header.length).setValues([next]);
+  return {
+    ok: true, id: id,
+    status: next[col.status], role: next[col.role],
+    set_manually: next[col.set_manually],
+    needsPapers: !zuruecknehmen && roleNeedsPapers_(role),
+  };
 }
 
 // Batch-add several hunters (from a CSV import or address-book selection)
@@ -3222,6 +3344,8 @@ function eventHuntersBatchAdd_(body) {
     const result = eventHunterAdd_({
       event_id: eventId,
       hunter: r.name || r.hunter || "",
+      role: r.role || body.role || "",
+      set: r.set != null ? r.set : body.set,
       email: r.email || "",
       language: r.language || "de",
     });
@@ -3291,6 +3415,7 @@ function eventInvitesSend_(body) {
   const colStatus = headers.indexOf("status");
   const colLanguage = headers.indexOf("language");
   const colInvitedAt = headers.indexOf("invited_at");
+  const colSetManually = headers.indexOf("set_manually");
 
   let sent = 0, skipped = 0;
   const errors = [];
@@ -3300,6 +3425,13 @@ function eventInvitesSend_(body) {
     if (!email) { skipped++; continue; }
     const invitedAt = String(rows[i][colInvitedAt] || "").trim();
     if (onlyUnsent && invitedAt) { skipped++; continue; }
+    // Wer von Hand gesetzt wurde, hat schon zugesagt. Ihm eine Einladung mit
+    // der Bitte um Rueckmeldung zu schicken, waere genau das, was das Setzen
+    // ersparen soll. Die Infomail zur Jagd bekommt er trotzdem — die geht
+    // einen anderen Weg und an alle Zugesagten.
+    if (colSetManually >= 0 && String(rows[i][colSetManually] || "").trim()) {
+      skipped++; continue;
+    }
     const hunter = String(rows[i][colHunter] || "");
     const hunterLang = colLanguage >= 0
       ? String(rows[i][colLanguage] || "").trim().toLowerCase()
@@ -3836,16 +3968,7 @@ function rsvpRespond_(body) {
   // fill with free-form junk. Older spellings ("Schütze", "Schütze/
   // Standschneller") are still accepted and normalised so any existing
   // RSVPs aren't invalidated.
-  const VALID_ROLES = {
-    "Schütze/Standschnaller": 1,
-    "Schütze/Standschneller": 1,
-    "Schütze": 1,
-    "Treiber": 1,
-    "Hundeführer": 1,
-  };
-  let role = String(body.role || "").trim();
-  if (role && !VALID_ROLES[role]) role = "";
-  if (role === "Schütze" || role === "Schütze/Standschneller") role = "Schütze/Standschnaller";
+  let role = normalizeRole_(body.role);
   if (choice === "declined") role = "";
 
   // Dogs are optional and only valid for the two roles that can bring them.
