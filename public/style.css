@@ -1,21 +1,33 @@
 :root {
   --green-dark: #1f3a1f;
   --green-mid: #4a6a3a;
-  /* Das Grün der Bedienelemente — Flächen, Kacheln, Zierlinien.
-     Bis 19.08.2026 war das derselbe Wert wie --lime, also exakt das warme
-     Ende des Markenverlaufs. Genau deshalb verschwamm es: der unverdunkelte
-     6-px-Streifen unter der Leiste läuft rechts ins Lime aus, und direkt
-     darunter saßen Kacheln in derselben Farbe. Jetzt um 26° kühler bei
-     gleicher Helligkeit, damit die Kante wieder steht. Der Verlauf selbst
-     bleibt unangetastet — er ist die Marke, siehe --lime weiter unten. */
-  --green-bright: #7fdc87;
-  --green-bright-edge: #5ebb6f;
-  --green-bright-hover: #6ac873;
-  --green-bright-soft: #99ea9e;  /* hellerer Partner für Verläufe auf Flächen */
-  --green-tint: #e7f9e8;         /* Füllung hinterlegter Zeilen */
-  /* Als Schrift auf Weiß taugt --green-bright-edge nicht (2,4:1). Dafür
-     dieser Wert: 5,5:1 auf Weiß, 5,0:1 auf --green-tint. */
-  --green-ink: #1d783c;
+  /* Die Farbe der Bedienelemente — Flächen, Kacheln, Knöpfe, Zierlinien.
+     Zwei Anläufe in Grün, beide gescheitert: bis 19.08.2026 war es exakt
+     --lime, also das warme Ende des Markenverlaufs, und verschwamm mit dem
+     unverdunkelten 6-px-Streifen unter der Leiste. Ein kühleres Grün löste
+     das Verschwimmen, sah aber billig aus. Seit 19.08.2026 ein Verlauf von
+     kühlem Grau nach hellem Blau.
+
+     Warum das nicht in dieselbe Falle läuft wie das Lime, obwohl der
+     Markenverlauf links blau anfängt: --pool-blue-deep hat Luminanz 0,09,
+     das Blau hier 0,44. Fünf Blendstufen Abstand — die Kante steht, auch
+     direkt unter dem Streifen.
+
+     --ctl-fill ist ein Verlauf und gehört deshalb ausschließlich hinter
+     `background:`. Für Ränder, Schrift und alles, was eine einzelne Farbe
+     braucht, gibt es --ctl / --ctl-edge / --ctl-ink. */
+  --ctl-grey: #d1d7dc;   /* Anfang des Verlaufs */
+  --ctl-blue: #81b1e0;   /* Ende des Verlaufs */
+  --ctl-fill: linear-gradient(135deg, var(--ctl-grey) 0%, var(--ctl-blue) 100%);
+  /* Die Mitte des Verlaufs als einzelne Farbe. Für kleine Flächen, die einen
+     eigenen Verlauf nicht tragen — Tabellenköpfe (jede Zelle finge ihn neu
+     an), Zählpillen, Zierkanten. */
+  --ctl: #a7c3df;
+  --ctl-edge: #5d96cb;
+  --ctl-tint: #eaf3fb;   /* Füllung hinterlegter Zeilen */
+  /* Als Schrift auf Weiß taugt --ctl-edge nicht (3,1:1). Dafür dieser Wert:
+     6,3:1 auf Weiß, 5,9:1 auf --ctl-tint. */
+  --ctl-ink: #266397;
   /* Brand gradient — the Lunge Evo Run colourway: pool blue at the heel,
      through green, into the yellow-green at the toe. The warm end is the
      existing brand lime, so every lime button on the site still ties back
@@ -295,7 +307,7 @@ a.filter-btn {
   border-radius: 50%;
   border: none;
   background: #1a1a1a;
-  color: var(--green-bright);
+  color: var(--ctl);
   font-size: 34px;
   line-height: 60px;
   font-weight: 500;
@@ -465,7 +477,7 @@ a.filter-btn {
 }
 
 .mode-btn.active {
-  background: var(--green-bright);
+  background: var(--ctl-fill);
   color: #111;
 }
 
@@ -628,9 +640,9 @@ a.filter-btn {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.3px;
-  background: var(--green-bright);
+  background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--green-bright-edge);
+  border: 1px solid var(--ctl-edge);
   border-radius: 10px;
   cursor: pointer;
 }
@@ -747,7 +759,7 @@ a.filter-btn {
   border-radius: 16px;
   /* Lime accent strip across the top edge — same Brenneke green used
      in the topbar, ties the modal to the brand. */
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   padding: 0 20px calc(20px + var(--safe-bottom));
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
   left: 12px;
@@ -883,8 +895,8 @@ a.filter-btn {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #111;
-  background: var(--green-bright);
-  border: 1px solid var(--green-bright-edge);
+  background: var(--ctl);
+  border: 1px solid var(--ctl-edge);
   border-radius: 999px;
   padding: 2px 12px;
   min-width: 36px;
@@ -948,7 +960,7 @@ a.filter-btn {
   position: fixed;
   z-index: 41;
   background: var(--card);
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   border-radius: 14px;
   left: 8px;
   right: 8px;
@@ -1001,8 +1013,8 @@ a.filter-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--green-bright);
-  border: 1px solid var(--green-bright-edge);
+  background: var(--ctl-fill);
+  border: 1px solid var(--ctl-edge);
   border-radius: 6px;
   padding: 8px 12px;
   margin-bottom: 10px;
@@ -1041,7 +1053,7 @@ a.filter-btn {
   cursor: pointer;
 }
 
-.proto-mode-btn.active { background: var(--green-bright); color: #111; }
+.proto-mode-btn.active { background: var(--ctl-fill); color: #111; }
 .proto-mode-btn.active[data-pmode="klettersitz"] { background: #03a9f4; color: #fff; }
 .proto-mode-btn.active[data-pmode="pirsch"] { background: #e2dc3a; color: #1f1f1f; }
 
@@ -1124,7 +1136,7 @@ a.filter-btn {
 }
 
 .proto-table th {
-  background: var(--green-bright);
+  background: var(--ctl);
   font-weight: 700;
   font-size: 10px;
   color: #111;
@@ -1260,7 +1272,7 @@ a.filter-btn {
 }
 
 .proto-pirsch-head {
-  background: var(--green-bright);
+  background: var(--ctl);
   font-weight: 700;
   font-size: 12px;
   padding: 5px 8px;
@@ -1361,9 +1373,9 @@ a.filter-btn {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.3px;
-  background: var(--green-bright);
+  background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--green-bright-edge);
+  border: 1px solid var(--ctl-edge);
   border-radius: 10px;
   cursor: pointer;
 }
@@ -1405,9 +1417,9 @@ a.filter-btn {
 .ns-popup .ns-close-btn {
   margin-top: 8px;
   padding: 7px 12px;
-  background: var(--green-bright);
+  background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--green-bright-edge);
+  border: 1px solid var(--ctl-edge);
   border-radius: 7px;
   font-weight: 700;
   font-size: 13px;
@@ -1463,7 +1475,7 @@ a.filter-btn {
   }
   .proto-table td.proto-row-head {
     display: block;
-    background: var(--green-bright);
+    background: var(--ctl);
     color: #111;
     font-weight: 700;
     text-align: center;
@@ -1547,7 +1559,7 @@ a.filter-btn {
   left: 50%;
   bottom: calc(80px + var(--safe-bottom) + var(--vv-bottom));
   transform: translateX(-50%);
-  background: var(--green-bright);
+  background: var(--ctl-fill);
   color: #111;
   padding: 10px 16px;
   border-radius: 999px;
@@ -1692,7 +1704,7 @@ body.rsvp-page #rsvp-topbar {
   background: var(--border);
 }
 .year-divider span {
-  background: var(--green-bright);
+  background: var(--ctl);
   color: #111;
   padding: 3px 12px;
   border-radius: 999px;
@@ -1714,7 +1726,7 @@ body.rsvp-page #rsvp-topbar {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   transition: border-color 0.12s, transform 0.08s;
 }
-.event-card:hover { border-color: var(--green-bright-edge); }
+.event-card:hover { border-color: var(--ctl-edge); }
 .event-card:active { transform: scale(0.99); }
 
 .event-card-icon {
@@ -1978,7 +1990,7 @@ body.rsvp-page #rsvp-topbar {
 .ev-contacts {
   background: var(--card);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--green-bright);
+  border-left: 3px solid var(--ctl);
   border-radius: 7px;
   padding: 10px 14px;
   margin: 6px 0 14px;
@@ -1991,9 +2003,9 @@ body.rsvp-page #rsvp-topbar {
 .ev-nsf-list li { margin: 1px 0; }
 
 .primary-btn {
-  background: var(--green-bright);
+  background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--green-bright-edge);
+  border: 1px solid var(--ctl-edge);
   border-radius: 6px;
   padding: 10px 16px;
   font: inherit;
@@ -2034,8 +2046,8 @@ body.rsvp-page #rsvp-topbar {
 
 /* "Landing page" hero for the event detail view. */
 .ev-hero {
-  background: linear-gradient(135deg, var(--green-bright) 0%, var(--green-bright-soft) 100%);
-  border: 1px solid var(--green-bright-edge);
+  background: var(--ctl-fill);
+  border: 1px solid var(--ctl-edge);
   border-radius: 12px;
   padding: 18px 18px 16px;
   color: #111;
@@ -2095,7 +2107,7 @@ body.rsvp-page #rsvp-topbar {
   text-decoration: none;
   font-weight: 500;
 }
-.ev-map-link:hover { background: var(--card); border-color: var(--green-bright-edge); color: #111; }
+.ev-map-link:hover { background: var(--card); border-color: var(--ctl-edge); color: #111; }
 
 .treffpunkt-coords-row { gap: 8px; }
 .treffpunkt-here-btn { align-self: end; padding: 7px 10px; flex: 0 0 auto; }
@@ -2135,7 +2147,7 @@ body.rsvp-page #rsvp-topbar {
   margin: 10px 0 0;
   padding: 8px 12px;
   background: var(--bg);
-  border-left: 3px solid var(--green-bright);
+  border-left: 3px solid var(--ctl);
   border-radius: 4px;
   white-space: pre-wrap;
   font-size: 13px;
@@ -2169,7 +2181,7 @@ body.rsvp-page #rsvp-topbar {
 .ev-tab.active {
   color: #111;
   font-weight: 600;
-  border-bottom-color: var(--green-bright);
+  border-bottom-color: var(--ctl);
 }
 
 .ev-section {
@@ -2183,7 +2195,7 @@ body.rsvp-page #rsvp-topbar {
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
 }
-.ev-section--squads .ev-section-title { border-bottom-color: var(--green-bright); }
+.ev-section--squads .ev-section-title { border-bottom-color: var(--ctl); }
 
 .ev-placeholder { color: var(--muted); font-size: 14px; padding: 12px 0; }
 
@@ -2283,8 +2295,8 @@ body.rsvp-page #rsvp-topbar {
 @media (max-width: 480px) { .squads-grid { grid-template-columns: 1fr; } }
 
 .squad-tile {
-  background: var(--green-bright);
-  border: 1px solid var(--green-bright-edge);
+  background: var(--ctl-fill);
+  border: 1px solid var(--ctl-edge);
   border-radius: 12px;
   padding: 14px 14px 12px;
   text-align: left;
@@ -2666,7 +2678,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -2700,7 +2712,7 @@ body.rsvp-page #rsvp-topbar {
   margin: 0 0 12px;
   padding: 8px 12px;
   background: var(--bg);
-  border-left: 3px solid var(--green-bright);
+  border-left: 3px solid var(--ctl);
   border-radius: 4px;
   font-size: 13px;
   color: var(--steel-dark);
@@ -2718,11 +2730,11 @@ body.rsvp-page #rsvp-topbar {
 }
 
 .schuetze-row--ansteller {
-  border-color: var(--green-bright-edge);
-  background: var(--green-tint);
+  border-color: var(--ctl-edge);
+  background: var(--ctl-tint);
 }
 .schuetze-row--ansteller .sr-num {
-  color: var(--green-ink);
+  color: var(--ctl-ink);
   font-weight: 700;
   flex: 0 0 auto;
   padding-right: 6px;
@@ -2875,7 +2887,7 @@ body.rsvp-page #rsvp-topbar {
   color: var(--steel-dark);
   cursor: pointer;
 }
-.ghost-btn:hover { background: var(--card); border-color: var(--green-bright-edge); color: #111; }
+.ghost-btn:hover { background: var(--card); border-color: var(--ctl-edge); color: #111; }
 
 .add-hunter-form {
   display: flex;
@@ -2927,7 +2939,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -2996,7 +3008,7 @@ body.rsvp-page #rsvp-topbar {
 .invite-lang-tab.active {
   color: #111;
   font-weight: 600;
-  border-bottom-color: var(--green-bright);
+  border-bottom-color: var(--ctl);
 }
 
 /* Hunter list -------------------------------------------------------------- */
@@ -3085,7 +3097,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -3212,7 +3224,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -3260,7 +3272,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -3303,7 +3315,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--green-bright);
+  border-top: 4px solid var(--ctl);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -3423,7 +3435,7 @@ body.events-page #toast {
   bottom: 24px;
   transform: translateX(-50%);
   background: #111;
-  color: var(--green-bright);
+  color: var(--ctl);
   padding: 10px 16px;
   border-radius: 999px;
   font-size: 13px;
@@ -3528,7 +3540,7 @@ body.rsvp-page {
   margin: 12px 0;
   padding: 10px 12px;
   background: var(--bg);
-  border-left: 3px solid var(--green-bright);
+  border-left: 3px solid var(--ctl);
   border-radius: 4px;
   font-size: 13px;
   white-space: pre-wrap;
@@ -3552,9 +3564,9 @@ body.rsvp-page {
 }
 .rsvp-accept {
   flex: 1;
-  background: var(--green-bright);
+  background: var(--ctl-fill);
   color: #111;
-  border: 1px solid var(--green-bright-edge);
+  border: 1px solid var(--ctl-edge);
   border-radius: 7px;
   padding: 12px;
   font: inherit;
@@ -3586,7 +3598,7 @@ body.rsvp-page {
 }
 .role-btn {
   background: var(--card);
-  border: 1px solid var(--green-bright-edge);
+  border: 1px solid var(--ctl-edge);
   border-radius: 7px;
   padding: 12px;
   font: inherit;
@@ -3638,9 +3650,9 @@ body.rsvp-page {
   height: 20px;
   margin-top: 2px;
   cursor: pointer;
-  accent-color: var(--green-bright-edge);
+  accent-color: var(--ctl-edge);
 }
-.rsvp-confirm a { color: var(--green-ink); font-weight: 600; }
+.rsvp-confirm a { color: var(--ctl-ink); font-weight: 600; }
 .rsvp-confirm a:hover { text-decoration: underline; }
 .rsvp-role-back {
   margin-top: 10px;
@@ -3700,14 +3712,14 @@ body.rsvp-page {
 .dog-row .dog-remove:hover { background: var(--card); color: var(--accent-text); }
 .dog-add-btn {
   background: var(--card);
-  border: 1px dashed var(--green-bright-edge);
+  border: 1px dashed var(--ctl-edge);
   border-radius: 7px;
   padding: 10px;
   width: 100%;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: var(--green-ink);
+  color: var(--ctl-ink);
   cursor: pointer;
   margin-bottom: 12px;
 }
@@ -3811,7 +3823,7 @@ body.stk-page {
   font: inherit;
   cursor: pointer;
 }
-.stk-event-btn:hover { border-color: var(--green-bright-edge); }
+.stk-event-btn:hover { border-color: var(--ctl-edge); }
 .stk-event-date { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
 .stk-event-name { font-size: 16px; font-weight: 700; }
 .stk-event-area { font-size: 12px; color: var(--steel-dark); align-self: center; }
@@ -3826,7 +3838,7 @@ body.stk-page {
   font-size: 14px;
   cursor: pointer;
 }
-.stk-hunter-btn:hover { border-color: var(--green-bright-edge); }
+.stk-hunter-btn:hover { border-color: var(--ctl-edge); }
 .stk-hunter-free {
   display: block;
   font-size: 13px;
@@ -3894,9 +3906,11 @@ body.stk-page {
 
 /* Mein Stand — the one thing a hunter opens the card for on the way out. */
 .stk-mine {
-  border: 2px solid var(--green-bright-edge);
+  border: 2px solid var(--ctl-edge);
   border-radius: 10px;
-  background: #f7fbe9;
+  /* Blasses Blau statt des alten Limetons — der Rahmen darum ist seit dem
+     Farbwechsel blau, und die beiden lagen sichtbar auseinander. */
+  background: var(--ctl-tint);
   padding: 10px 12px;
   margin-bottom: 16px;
 }
@@ -4029,7 +4043,7 @@ body.stk-page {
   vertical-align: middle;
 }
 .stk-table th {
-  background: var(--green-bright);
+  background: var(--ctl);
   color: #111;
   font-size: 10.5px;
   font-weight: 700;
