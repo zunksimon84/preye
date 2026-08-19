@@ -591,6 +591,11 @@ async function writeAll() {
       const r = await postJson({
         action: "posts-batch-upsert",
         posts: slice.map((x) => ({
+          // Hakt jemand eine als Dublette erkannte Zeile trotzdem an, ist das
+          // ein „aktualisieren", kein „noch einmal anlegen". Ohne die ID würde
+          // das Backend einen zweiten Stand daneben setzen — und an der alten
+          // ID hängen Erlegungen und die Sitzverteilung alter Jagden.
+          id: x.matched ? x.matched.post.id : undefined,
           name: x.name, area: x.area, revier: state.revier,
           lat: x.lat, lng: x.lng, type: x.type, nr: x.nr,
         })),

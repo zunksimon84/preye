@@ -384,7 +384,11 @@ export function validateBatch(rows, existingPosts, opts = {}) {
       if (d <= nearMetres) { match = { post: p, distance: d }; break; }
     }
     if (match) {
-      add("warn", `${match.distance} m neben „${match.post.name}"`);
+      // Kein Fehler, sondern eine Entscheidung: anhaken bedeutet
+      // aktualisieren, nicht ein zweites Mal anlegen.
+      add("warn", match.distance === 0
+        ? `steht schon da („${match.post.name}") — anhaken aktualisiert ihn`
+        : `${match.distance} m neben „${match.post.name}" — anhaken aktualisiert ihn`);
     }
 
     return {
