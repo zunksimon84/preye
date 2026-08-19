@@ -1918,16 +1918,30 @@ function menu_backupSheet() {
 
 // Einmalig: Registratur anlegen, die beiden bekannten Reviere eintragen, die
 // revier-Spalten füllen. Beliebig oft wiederholbar.
+// Aus dem MENÜ der Tabelle. Zeigt das Ergebnis als Fenster.
 function menu_migrateReviere() {
-  const ui = SpreadsheetApp.getUi();
+  const log = migrateReviere();
+  SpreadsheetApp.getUi().alert("Migration abgeschlossen\n\n" + log.join("\n"));
+}
+
+// Aus dem SKRIPTEDITOR. Schreibt ins Ausführungsprotokoll statt in ein Fenster.
+//
+// Der Unterschied ist nicht kosmetisch: ui.alert() erscheint immer im Tab der
+// gebundenen Tabelle, nie im Editor. Wer die Funktion über den Run-Knopf
+// startet, sieht dort nur den Kringel, während der Lauf unsichtbar auf einen
+// Klick wartet, den er nicht sehen kann — bis nach sechs Minuten abgebrochen
+// wird. Dieselbe Stelle ist bei menu_authorizeInfomailPdf schon einmal
+// aufgefallen und dort im Kommentar festgehalten.
+function migrateReviere() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Ohne diese Prüfung liefe die Migration unter einer Code-Fassung, die die
   // neuen Spalten nicht kennt — und der nächtliche Archivlauf würde danach
   // stumm scheitern (Bereich 2x10, Daten 2x11).
   if (HARVEST_HEADER.indexOf("revier") < 0 || POST_HEADER.indexOf("revier") < 0) {
-    ui.alert("Alte Code-Fassung. Bitte zuerst den neuen Code.gs einfügen und speichern.");
-    return;
+    const m = "Alte Code-Fassung. Bitte zuerst den neuen Code.gs einfügen und speichern.";
+    console.log(m);
+    return [m];
   }
 
   const log = [];
@@ -1944,9 +1958,10 @@ function menu_migrateReviere() {
     } catch (err) {
       // Nicht weitermachen ohne Sicherung — das ist der einzige Schritt, der
       // nicht nachholbar ist, wenn danach etwas schiefgeht.
-      ui.alert("Die Sicherungskopie ließ sich nicht anlegen:\n\n" + err.message +
-               "\n\nAbgebrochen. Bitte von Hand eine Kopie der Tabelle anlegen.");
-      return;
+      const m = "Die Sicherungskopie ließ sich nicht anlegen: " + err.message +
+                " — abgebrochen. Bitte von Hand eine Kopie der Tabelle anlegen.";
+      console.log(m);
+      return [m];
     }
   } else {
     log.push("Registratur besteht schon — Wiederholungslauf, keine neue Sicherung.");
@@ -2066,7 +2081,8 @@ function menu_migrateReviere() {
   log.push("Wenn oben nichts unter „Zu prüfen“ steht und das Archiv");
   log.push("durchläuft: Bereitstellen → Neue Version.");
 
-  ui.alert("Migration abgeschlossen\n\n" + log.join("\n"));
+  log.forEach(function (z) { console.log(z); });
+  return log;
 }
 
 function menu_backfillRevier() {
@@ -2261,6 +2277,13 @@ function checkReviereReport_() {
 // von der Migration benutzt — sonst gäbe es zwei Fassungen derselben Prüfung.
 function menu_checkReviere() {
   SpreadsheetApp.getUi().alert(checkReviereReport_().join("\n"));
+}
+
+// Aus dem Skripteditor — schreibt ins Protokoll statt in ein Fenster.
+function checkReviere() {
+  const out = checkReviereReport_();
+  out.forEach(function (z) { console.log(z); });
+  return out;
 }
 
 // Ein Formular, kein Abfragereigen. Zehn ui.prompt() hintereinander hinterlassen
