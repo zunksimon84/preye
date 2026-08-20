@@ -2555,7 +2555,45 @@ body.rsvp-page #rsvp-topbar {
   letter-spacing: 0.3px;
 }
 .squad-tile-ansteller { font-size: 13px; }
-.squad-tile-count { font-size: 12px; color: #2d3a05; opacity: 0.8; margin-top: auto; }
+/* War bis 20.08.2026 tot im Blatt (null Treffer in HTML und JS) und trug noch
+   den Olivton aus der Lime-Zeit. Jetzt zeigt die Kachel damit "6 Schützen ·
+   2 ohne Stand" — die Zahl, auf die man bei 60 Jägern schaut. */
+.squad-tile-count {
+  font-size: 12px;
+  color: #1b3a55;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.squad-tile-count.has-offen { color: var(--accent-text); opacity: 1; font-weight: 650; }
+
+.tile-member-stand {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: #1b3a55;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.treiber-tile .tile-member-stand { color: #1e2a36; }
+/* "ohne Stand" ist die eigentliche Information der Kachel, keine Leerstelle. */
+.tile-member-stand--offen {
+  color: var(--accent-text);
+  opacity: 1;
+  font-weight: 700;
+}
+/* Doppelbelegung wird angezeigt, nicht verhindert — es kann Gründe geben, und
+   ein Werkzeug, das die Planung blockiert, wird umgangen. */
+.tile-member-warn {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--accent-text);
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .squad-tile-ansteller .muted { color: #4a4d52; }
 
 /* Member roster inside each tile — every name visible at a glance. */
@@ -2566,11 +2604,14 @@ body.rsvp-page #rsvp-topbar {
   margin-top: 6px;
   font-size: 13px;
 }
+/* Name + Rolle nebeneinander, Stand darunter. Nebeneinander bricht
+   "Klaus Meier" + "Nr. 5 Ackerkante" schon bei 440 px, und die rechte Spalte
+   des Jagdtags ist bei 1600 px Seitenbreite genau so schmal. */
 .tile-member {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 8px;
-  justify-content: space-between;
+  gap: 1px 8px;
 }
 .tile-member-name { font-weight: 500; }
 .tile-member--leader .tile-member-name { font-weight: 700; }

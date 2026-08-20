@@ -1393,10 +1393,10 @@ function renderSquads() {
     empty.hidden = false;
   } else {
     empty.hidden = true;
-    wrap.innerHTML = squads.map(renderSquadTile).join("");
-    wrap.querySelectorAll(".squad-tile").forEach((tile) => {
-      tile.addEventListener("click", () => openSquadEditor(tile.dataset.sid));
-    });
+    const ctx = squadRenderContext();
+    wrap.innerHTML = squads.map((sq) => renderSquadTile(sq, ctx)).join("");
+    // Kein Listener je Kachel mehr — die Weiterleitung sitzt in wireRunden auf
+    // dem Container, der statisch im Markup steht.
   }
   // Note if no Kanzeln are available (NPA-Müritz or no Teilgebiet picked).
   const kanzeln = getKanzelnForEvent();
@@ -1423,10 +1423,8 @@ function renderTreibergruppen() {
     empty.hidden = false;
   } else {
     empty.hidden = true;
-    wrap.innerHTML = groups.map(renderTreiberTile).join("");
-    wrap.querySelectorAll(".treiber-tile").forEach((tile) => {
-      tile.addEventListener("click", () => openSquadEditor(tile.dataset.sid));
-    });
+    const ctx = squadRenderContext();
+    wrap.innerHTML = groups.map((sq) => renderTreiberTile(sq, ctx)).join("");
   }
   const candidates = getTreibergruppeCandidates();
   if (!candidates.length) {
@@ -1443,7 +1441,71 @@ function displayTreiberName(name) {
   return s || "Treibergruppe";
 }
 
-function renderTreiberTile(squad) {
+// Einmal je Render gebaut, statt bei 20 Kacheln × 60 Positionen einzeln
+// nachzuschlagen. Denselben Index braucht später die Spalte "Einteilung".
+function squadRenderContext() {
+  const postsById = new Map((state.posts || []).map((p) => [p.id, p]));
+  const einsatz = new Map();   // Name (klein) -> [Gruppenname, …]
+  for (const sq of (state.currentEvent?.squads || [])) {
+    const gruppe = sq.type === "treiber" ? displayTreiberName(sq.name) : displayRundeName(sq.name);
+    for (const p of (sq.positions || [])) {
+      if (!p || !p.hunter) continue;
+      const k = p.hunter.toLowerCase();
+      if (!einsatz.has(k)) einsatz.set(k, []);
+      einsatz.get(k).push(gruppe);
+    }
+  }
+  return { postsById, einsatz, belegt: assignedPostInfo() };
+}
+
+// Anzeigename eines Standes. Erst der aktuelle Name aus der Standliste — eine
+// umbenannte Kanzel soll neu heißen —, dann der beim Speichern
+// mitgeschriebene. Die Reihenfolge gilt NUR fürs Anzeigen: collectPositions
+// schreibt weiter post_name mit, weil standkarte.js darauf ohne Rückfall
+// zugreift.
+function standLabel(pos, postsById) {
+  if (!pos) return "";
+  if (pos.type === "klettersitz") {
+    const ohneKoord = pos.lat === "" || pos.lng === "" || !Number.isFinite(Number(pos.lat));
+    return (pos.label || "Klettersitz") + (ohneKoord ? " (ohne Koordinaten)" : "");
+  }
+  if (pos.post_id) {
+    const p = postsById.get(pos.post_id);
+    if (p && p.name) return p.name;
+  }
+  return pos.post_name || "";
+}
+
+// Was an einer Position auffällt, ohne sie zu verhindern: derselbe Jäger in
+// zwei Gruppen, oder zwei Schützen auf derselben Kanzel. Weder Frontend noch
+// Backend schließen das aus, und das soll auch so bleiben — es kann Gründe
+// geben. Aber sichtbar muss es sein.
+function positionsWarnung(pos, ctx, eigeneGruppe) {
+  const kurz = [];
+  const lang = [];
+  // Ohne Set stünde jede Gruppe so oft da, wie der Jäger in ihr Positionen
+  // hat — in der Test Jagd las sich das als "Demo Süd, Demo Süd, Demo Mitte,
+  // Demo Mitte, …" und war unlesbar.
+  const andere = [...new Set(ctx.einsatz.get((pos.hunter || "").toLowerCase()) || [])]
+    .filter((g) => g !== eigeneGruppe);
+  if (andere.length) {
+    kurz.push(andere.length <= 2
+      ? "auch in " + andere.join(" und ")
+      : `auch in ${andere.length} weiteren Gruppen`);
+    lang.push("Steht außerdem in: " + andere.join(", "));
+  }
+  if (pos.type === "kanzel" && pos.post_id) {
+    const drauf = [...new Set((ctx.belegt.get(pos.post_id) || [])
+      .filter((e) => e.hunter !== pos.hunter).map((e) => e.hunter))];
+    if (drauf.length) {
+      kurz.push("Stand doppelt belegt");
+      lang.push("Auf demselben Stand: " + drauf.join(", "));
+    }
+  }
+  return { kurz: kurz.join(" · "), lang: lang.join(" — ") };
+}
+
+function renderTreiberTile(squad, ctx) {
   const positions = (squad.positions || []).filter((p) => p && p.hunter);
   // Look up each member's role from the accepted-hunters list so the
   // tile can show "Klaus (Treiber)" vs "Bernd (Hundeführer)".
@@ -1452,9 +1514,16 @@ function renderTreiberTile(squad) {
     const h = accepted.find((x) => x.hunter === name);
     return h ? (h.role || "") : "";
   };
-  const members = positions.map((p, i) =>
-    renderTileMember(p.hunter, i === 0 ? "Treiberführer" : roleOf(p.hunter), i === 0)
-  ).join("");
+  const gruppe = displayTreiberName(squad.name);
+  // Treiber laufen hinter dem Hundeführer her und stehen nicht auf
+  // nummerierten Kanzeln — dort steht kein Stand und auch kein "ohne Stand".
+  const members = positions.map((p, i) => renderTileMember({
+    name: p.hunter,
+    roleLabel: i === 0 ? "Treiberführer" : roleOf(p.hunter),
+    isLeader: i === 0,
+    stand: null,
+    warn: positionsWarnung(p, ctx, gruppe),
+  })).join("");
   const sp = squad.start_pos;
   let startLine = "";
   if (sp) {
@@ -1477,12 +1546,26 @@ function renderTreiberTile(squad) {
 
 // Compact tile in the grid. Click → openSquadEditor. Lists every member
 // by name (leader bolded) so the overview reads like a roster at a glance.
-function renderSquadTile(squad) {
+function renderSquadTile(squad, ctx) {
   const positions = (squad.positions || []).filter((p) => p && p.hunter);
-  const members = positions.map((p, i) => renderTileMember(p.hunter, i === 0 ? "Ansteller" : "", i === 0)).join("");
+  const gruppe = displayRundeName(squad.name);
+  const members = positions.map((p, i) => renderTileMember({
+    name: p.hunter,
+    roleLabel: i === 0 ? "Ansteller" : "",
+    isLeader: i === 0,
+    stand: standLabel(p, ctx.postsById),
+    warn: positionsWarnung(p, ctx, gruppe),
+  })).join("");
+  const ohneStand = positions.filter((p) => !standLabel(p, ctx.postsById)).length;
+  // Die Zahl, auf die man bei 60 Jägern schaut.
+  const kopf = positions.length
+    ? `${positions.length} ${positions.length === 1 ? "Schütze" : "Schützen"}` +
+      (ohneStand ? ` · ${ohneStand} ohne Stand` : "")
+    : "";
   return `
     <button type="button" class="squad-tile" data-sid="${escapeHtml(squad.id)}">
-      <span class="squad-tile-name">${escapeHtml(displayRundeName(squad.name))}</span>
+      <span class="squad-tile-name">${escapeHtml(gruppe)}</span>
+      ${kopf ? `<span class="squad-tile-count${ohneStand ? " has-offen" : ""}">${escapeHtml(kopf)}</span>` : ""}
       ${positions.length
         ? `<div class="tile-members">${members}</div>`
         : '<span class="squad-tile-ansteller muted">Noch leer — Schützen hinzufügen</span>'}
@@ -1490,10 +1573,21 @@ function renderSquadTile(squad) {
   `;
 }
 
-function renderTileMember(name, roleLabel, isLeader) {
+// stand: null heißt "hat keinen und braucht keinen" (Treiber). Ein leerer
+// String heißt "sollte einen haben, hat aber keinen" — und das ist die
+// wichtigste Angabe der Kachel, nicht eine Leerstelle.
+function renderTileMember({ name, roleLabel, isLeader, stand, warn }) {
+  const standZeile = stand === null ? ""
+    : (stand
+        ? `<span class="tile-member-stand">${escapeHtml(stand)}</span>`
+        : '<span class="tile-member-stand tile-member-stand--offen">ohne Stand</span>');
   return `<div class="tile-member${isLeader ? " tile-member--leader" : ""}">` +
          `<span class="tile-member-name">${escapeHtml(name)}</span>` +
          (roleLabel ? `<span class="tile-member-role">${escapeHtml(roleLabel)}</span>` : "") +
+         standZeile +
+         (warn && warn.kurz
+            ? `<span class="tile-member-warn" title="${escapeHtml(warn.lang)}">${escapeHtml(warn.kurz)}</span>`
+            : "") +
          `</div>`;
 }
 
@@ -3360,6 +3454,15 @@ function wireRoster() {
 }
 
 function wireRunden() {
+  // Die Kacheln entstehen bei jedem Render neu; beide Container stehen
+  // statisch im Markup, also einmal delegiert statt je Kachel verdrahtet.
+  const aufKachel = (e) => {
+    const tile = e.target.closest(".squad-tile");
+    if (tile) openSquadEditor(tile.dataset.sid);
+  };
+  on("#squads-list", "click", aufKachel);
+  on("#treiber-list", "click", aufKachel);
+
   on("#new-squad-btn", "click", addSquad);
   on("#new-treiber-btn", "click", addTreibergruppe);
   on("#squad-edit-close", "click", closeSquadEditor);
