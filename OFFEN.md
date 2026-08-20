@@ -40,12 +40,28 @@ der Seite ist unberührt.
 3. **Rolle ändern** an einem echten gesetzten Jäger.
 4. Frische Browsersitzung, die alte `.css` hängt bis zu 10 Minuten.
 
-## Als Nächstes
+## Farbsystem — umgesetzt
 
-- **Farbkonzept** aus Simons Google Doc umsetzen: alles Anklickbare in einer
-  einheitlichen Farbe (der Grau-Blau-Verlauf), Überschriften in einem anderen
-  Ton, damit der Unterschied zwischen Bedienelement und Grafik klar ist.
-  https://docs.google.com/document/d/1_R1BqfrMoJjL7C9gDi8oauBQJNM1B8FFdr0P-mI4hNY
+„Forest / Sage / Teal" nach Simons Konzept
+(https://docs.google.com/document/d/1_R1BqfrMoJjL7C9gDi8oauBQJNM1B8FFdr0P-mI4hNY).
+
+Die Trennung, auf die es ankommt:
+
+| | wofür | Werte |
+|---|---|---|
+| `--act-*` | was man anklicken kann | `#198754`, Hover `#126b45`, Schrift weiß |
+| `--surface-*` | was nur Fläche ist | `#e5f0ea`, Hero `#d8eae1` |
+| `--info-*` | Auskunft, Navigation | `#087f7a` / `#e8f1f0` / `#1f6663` |
+| `--accent` | Aufmerksamkeit | `#e58b3a`, Schrift darauf `#2a0d04` |
+
+Der Markenverlauf ist unangetastet. `--muted`, das Orange-Ink und zwei
+Status-Pillen weichen vom Dokument ab — die Doc-Werte lagen unter 4,5:1,
+die Begründungen stehen im Token-Block.
+
+**Einziger Rest des alten Grüns:** `.infomail-opt` („Schützen einbeziehen"),
+weil am 19.08.2026 ausdrücklich so entschieden. Es ist jetzt der einzige
+Kasten mit `#16a34a` statt `#198754` — eine Nuance daneben. Auf Zuruf
+angleichbar.
 
 ## Bewusst nicht gemacht
 
