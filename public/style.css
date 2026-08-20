@@ -2257,13 +2257,97 @@ body.rsvp-page #rsvp-topbar {
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
 }
-.ev-section--squads .ev-section-title { border-bottom-color: var(--ctl); }
 
 .ev-placeholder { color: var(--muted); font-size: 14px; padding: 12px 0; }
 
-/* Revierkarte (plan map) ---------------------------------------------------- */
+/* Blockrahmen der Detailseite ------------------------------------------------
+   Drei Blöcke: Die Jagd · Jägerinnen einladen · Der Jagdtag. Bis 20.08.2026
+   standen dort acht gleichrangige Abschnitte hintereinander, drei davon ohne
+   Überschrift.
 
-.ev-section--map .ev-section-title { border-bottom-color: #e8650e; }
+   Kein Kasten um den Block. Die Blöcke enthalten schon Karten (.ev-contacts,
+   .ev-time, .squad-tile, .ev-freigaben) — ein Rahmen darum wäre Karte in
+   Karte. Stattdessen ein Bandkopf mit Nummer und 3-px-Kante links in der
+   Blockfarbe: dieselbe Formsprache, die .ev-contacts und die Unterlinien der
+   .ev-section-title schon tragen.
+
+   Die Farben sind nicht neu erfunden:
+     Block 1  --ctl-edge  die Bedienfarbe, die Hero und Info-Liste tragen
+     Block 2  #16a34a     das Grün, das auf dieser Seite "erledigt" heißt
+                          (.infomail-btn, .freigabe-ak--on)
+     Block 3  #e8650e     das Orange, das die Revierkarte schon hatte
+   -------------------------------------------------------------------------- */
+
+.ev-block { margin-top: 34px; }
+.ev-block:first-of-type { margin-top: 4px; }
+
+.ev-block-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+  padding: 14px 0 10px 13px;
+  border-top: 1px solid var(--border);
+  border-left: 3px solid var(--ev-block-hue, var(--border));
+}
+.ev-block:first-of-type .ev-block-head { border-top: none; padding-top: 4px; }
+
+.ev-block-num {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ev-block-hue, var(--ctl));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  align-self: center;
+  flex: none;
+}
+
+.ev-block-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1.15;
+}
+
+.ev-block-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Rechts im Kopf stehen die Werkzeuge, die den ganzen Block betreffen —
+   heute der Infomail-Knopf im Jagdtag. */
+.ev-block-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ev-block--jagd     { --ev-block-hue: var(--ctl-edge); }
+.ev-block--einladen { --ev-block-hue: #16a34a; }
+.ev-block--jagdtag  { --ev-block-hue: #e8650e; }
+
+/* Die Abschnittstitel folgen der Blockfarbe, statt jeder für sich eine zu
+   setzen. Ersetzt die drei Einzelregeln für --squads, --map und --treiber. */
+.ev-block .ev-section-title { border-bottom-color: var(--ev-block-hue, var(--border)); }
+.ev-block .ev-block-body > .ev-section:first-child,
+.ev-block .ev-block-body > * > .ev-section:first-child { margin-top: 0; }
+
+@media (max-width: 600px) {
+  .ev-block { margin-top: 24px; }
+  .ev-block-title { font-size: 20px; }
+  .ev-block-head { padding-left: 10px; }
+}
+
+/* Revierkarte (plan map) ---------------------------------------------------- */
 
 .plan-map-wrap {
   position: relative;
@@ -2439,7 +2523,6 @@ body.rsvp-page #rsvp-topbar {
   padding: 0 6px;
 }
 
-.ev-section--treiber .ev-section-title { border-bottom-color: #93a7b9; }
 
 /* Bright blue for the Treibergruppe create button so the action visibly
    belongs to the (calmer slate-blue) Treibergruppen section. */

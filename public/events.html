@@ -124,88 +124,125 @@
           <button class="back-btn" id="back-to-list">← Übersicht</button>
           <button id="edit-event-btn" class="ghost-btn" type="button">Bearbeiten</button>
         </div>
-        <div id="event-header"></div>
 
-        <section class="ev-section ev-section--map" id="event-map-section" hidden>
-          <h3 class="ev-section-title">Revierkarte</h3>
-          <p id="plan-map-placeholder" class="plan-map-placeholder" hidden></p>
-          <div class="plan-map-wrap" id="plan-map-wrap">
-            <div id="plan-map" role="application" aria-label="Revierkarte mit Ständen"></div>
-            <button type="button" id="plan-locate-btn" class="plan-locate-btn"
-                    aria-label="Mein Standort" title="Mein Standort">
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19a7 7 0 110-14 7 7 0 010 14z" />
-              </svg>
-            </button>
-          </div>
-          <div class="plan-map-legend" id="plan-map-legend"></div>
-        </section>
-
-        <div id="event-contacts" class="ev-contacts" hidden></div>
-        <div id="event-freigaben" class="ev-freigaben" hidden></div>
-        <section class="ev-section">
-          <h3 class="ev-section-title">Einladungen</h3>
-          <div class="invites-toolbar">
-            <button type="button" id="open-address-book" class="ghost-btn">Aus Hunterbase wählen</button>
-            <button type="button" id="open-csv-upload" class="ghost-btn">CSV importieren</button>
-            <input type="file" id="csv-input" accept=".csv,text/csv,text/plain" hidden />
-          </div>
-          <form id="add-hunter-form" class="add-hunter-form">
-            <input type="text" id="add-hunter-name" list="address-book-options"
-                   placeholder="Name" autocomplete="off" required />
-            <input type="email" id="add-hunter-email" placeholder="E-Mail" autocomplete="off" required />
-            <select id="add-hunter-lang" class="lang-picker" aria-label="Sprache der Einladung">
-              <option value="de" selected>🇩🇪 DE</option>
-              <option value="en">🇬🇧 EN</option>
-            </select>
-            <!-- Ein Steuerelement für beides. Wer eine Rolle wählt, trägt
-                 jemanden ein, der schon zugesagt hat — mündlich, oder weil er
-                 als Mitarbeiter ohnehin eingeteilt ist. Der bekommt dann keine
-                 Einladung mehr. -->
-            <select id="add-hunter-mode" aria-label="Einladen oder direkt setzen">
-              <option value="">Einladung senden</option>
-              <option disabled>── ohne Einladung setzen als ──</option>
-              <option value="Schütze/Standschnaller">Schütze/Standschnaller</option>
-              <option value="Treiber">Treiber</option>
-              <option value="Hundeführer">Hundeführer</option>
-            </select>
-            <button type="submit" class="primary-btn small" id="add-hunter-btn">+ Hinzufügen</button>
-          </form>
-          <datalist id="address-book-options"></datalist>
-          <div id="hunters-list"></div>
-          <div class="invite-actions">
-            <button id="open-invite-preview" type="button" class="primary-btn">Einladung erstellen</button>
-            <span id="invite-status" class="invite-status"></span>
+        <!-- ① Alles, was beim Anlegen der Jagd gesetzt wurde. -->
+        <section class="ev-block ev-block--jagd">
+          <header class="ev-block-head">
+            <span class="ev-block-num" aria-hidden="true">1</span>
+            <h2 class="ev-block-title">Die Jagd</h2>
+            <p class="ev-block-sub">Stammdaten, Zeiten, Kontakte</p>
+          </header>
+          <div class="ev-block-body ev-jagd-grid">
+            <div id="event-header"></div>
+            <div id="event-contacts" class="ev-contacts" hidden></div>
           </div>
         </section>
 
-        <section class="ev-section ev-section--squads">
-          <h3 class="ev-section-title">Ansteller Runden</h3>
-          <div class="squads-toolbar">
-            <button id="new-squad-btn" type="button" class="primary-btn small">+ Neue Ansteller Runde</button>
-            <button id="send-infomails-btn" type="button" class="primary-btn small infomail-btn">Infomail erstellen</button>
-            <span id="squads-hint" class="muted"></span>
+        <!-- ② Wer kommt mit. -->
+        <section class="ev-block ev-block--einladen" id="section-einladen">
+          <header class="ev-block-head">
+            <span class="ev-block-num" aria-hidden="true">2</span>
+            <h2 class="ev-block-title">Jägerinnen einladen</h2>
+            <p class="ev-block-sub">Hinzufügen, einladen, Zusagen verfolgen</p>
+          </header>
+          <div class="ev-block-body ev-invite-split">
+            <div class="invites-toolbar">
+              <button type="button" id="open-address-book" class="ghost-btn">Aus Hunterbase wählen</button>
+              <button type="button" id="open-csv-upload" class="ghost-btn">CSV importieren</button>
+              <input type="file" id="csv-input" accept=".csv,text/csv,text/plain" hidden />
+            </div>
+            <form id="add-hunter-form" class="add-hunter-form">
+              <input type="text" id="add-hunter-name" list="address-book-options"
+                     placeholder="Name" autocomplete="off" required />
+              <input type="email" id="add-hunter-email" placeholder="E-Mail" autocomplete="off" required />
+              <select id="add-hunter-lang" class="lang-picker" aria-label="Sprache der Einladung">
+                <option value="de" selected>🇩🇪 DE</option>
+                <option value="en">🇬🇧 EN</option>
+              </select>
+              <!-- Ein Steuerelement für beides. Wer eine Rolle wählt, trägt
+                   jemanden ein, der schon zugesagt hat — mündlich, oder weil er
+                   als Mitarbeiter ohnehin eingeteilt ist. Der bekommt dann keine
+                   Einladung mehr. -->
+              <select id="add-hunter-mode" aria-label="Einladen oder direkt setzen">
+                <option value="">Einladung senden</option>
+                <option disabled>── ohne Einladung setzen als ──</option>
+                <option value="Schütze/Standschnaller">Schütze/Standschnaller</option>
+                <option value="Treiber">Treiber</option>
+                <option value="Hundeführer">Hundeführer</option>
+              </select>
+              <button type="submit" class="primary-btn small" id="add-hunter-btn">+ Hinzufügen</button>
+            </form>
+            <datalist id="address-book-options"></datalist>
+            <div id="hunters-list"></div>
+            <div class="invite-actions">
+              <button id="open-invite-preview" type="button" class="primary-btn">Einladung erstellen</button>
+              <span id="invite-status" class="invite-status"></span>
+            </div>
           </div>
-          <div id="squads-list" class="squads-grid"></div>
-          <p id="squads-empty" class="empty-msg" hidden>
-            Noch keine Ansteller Runde angelegt — oben anlegen, um Schützen
-            ihre Kanzeln zuzuweisen.
-          </p>
         </section>
 
-        <section class="ev-section ev-section--treiber">
-          <h3 class="ev-section-title">Treibergruppen</h3>
-          <div class="squads-toolbar">
-            <button id="new-treiber-btn" type="button" class="primary-btn small">+ Neue Treibergruppe</button>
-            <span id="treiber-hint" class="muted"></span>
+        <!-- ③ Die Einteilung des Jagdtages. Der Infomail-Knopf steht im
+             Blockkopf, weil er den ganzen Block betrifft und nicht nur die
+             Ansteller Runden. -->
+        <section class="ev-block ev-block--jagdtag">
+          <header class="ev-block-head">
+            <span class="ev-block-num" aria-hidden="true">3</span>
+            <h2 class="ev-block-title">Der Jagdtag</h2>
+            <p class="ev-block-sub">Karte, Runden, Treibergruppen, Freigaben</p>
+            <div class="ev-block-tools">
+              <button id="send-infomails-btn" type="button" class="primary-btn small infomail-btn">Infomail erstellen</button>
+            </div>
+          </header>
+          <div class="ev-block-body jt-split">
+            <div class="jt-mapcol">
+              <section class="ev-section ev-section--map" id="event-map-section" hidden>
+                <h3 class="ev-section-title">Revierkarte</h3>
+                <p id="plan-map-placeholder" class="plan-map-placeholder" hidden></p>
+                <div class="plan-map-wrap" id="plan-map-wrap">
+                  <div id="plan-map" role="application" aria-label="Revierkarte mit Ständen"></div>
+                  <button type="button" id="plan-locate-btn" class="plan-locate-btn"
+                          aria-label="Mein Standort" title="Mein Standort">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19a7 7 0 110-14 7 7 0 010 14z" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="plan-map-legend" id="plan-map-legend"></div>
+              </section>
+            </div>
+            <div class="jt-workcol">
+              <section class="ev-section ev-section--squads">
+                <h3 class="ev-section-title">Ansteller Runden</h3>
+                <div class="squads-toolbar">
+                  <button id="new-squad-btn" type="button" class="primary-btn small">+ Neue Ansteller Runde</button>
+                  <span id="squads-hint" class="muted"></span>
+                </div>
+                <div id="squads-list" class="squads-grid"></div>
+                <p id="squads-empty" class="empty-msg" hidden>
+                  Noch keine Ansteller Runde angelegt — oben anlegen, um Schützen
+                  ihre Kanzeln zuzuweisen.
+                </p>
+              </section>
+
+              <section class="ev-section ev-section--treiber">
+                <h3 class="ev-section-title">Treibergruppen</h3>
+                <div class="squads-toolbar">
+                  <button id="new-treiber-btn" type="button" class="primary-btn small">+ Neue Treibergruppe</button>
+                  <span id="treiber-hint" class="muted"></span>
+                </div>
+                <div id="treiber-list" class="squads-grid"></div>
+                <p id="treiber-empty" class="empty-msg" hidden>
+                  Noch keine Treibergruppe angelegt — oben anlegen, um einen
+                  Treiberführer mit seinen Treibern und Hundeführern zusammenzustellen.
+                </p>
+              </section>
+
+              <div id="event-freigaben" class="ev-freigaben" hidden></div>
+            </div>
           </div>
-          <div id="treiber-list" class="squads-grid"></div>
-          <p id="treiber-empty" class="empty-msg" hidden>
-            Noch keine Treibergruppe angelegt — oben anlegen, um einen
-            Treiberführer mit seinen Treibern und Hundeführern zusammenzustellen.
-          </p>
         </section>
       </section>
+
     </main>
 
     <div id="address-book-backdrop" hidden></div>
