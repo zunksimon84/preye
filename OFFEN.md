@@ -1,42 +1,62 @@
-# Offen — Stand 19.08.2026, abends
+# Offen — Stand 20.08.2026
 
 ## Muss bereitgestellt werden
 
-`apps-script/Code.gs` → Apps Script → Bereitstellen → Bereitstellungen
-verwalten → ✏ → Version **Neue Version** → Bereitstellen.
+Nichts. Der Umbau der Jagd-Detailseite kommt ohne Änderung an
+`apps-script/Code.gs` aus.
 
-Zwei Sachen hängen daran:
+## Fertig und live
 
-1. **Infomail-Vorschau je Gruppe** (`6fad91f`). Ohne Bereitstellung zeigen
-   alle Vorschau-Knöpfe dasselbe Blatt, und das Fenster sagt es auch — der
-   Hinweis „Das Backend ist noch die alte Fassung" ist genau dieser Fall.
-2. Die Naht hinter einem Platzhalter im Einladungstext (`545d952`). Reine
-   Kosmetik im Vorlagen-Editor, kann warten.
+**Jagd-Detailseite in drei Blöcken** — neun Schritte, ein Commit je Schritt
+(`aa27162` bis `a17bc27`).
 
-## Fertig und live (nur Pages, ohne Bereitstellung)
+1. `wireUi()` abgesichert: 57 rohe `addEventListener` gegen `on()` getauscht,
+   in neun Gruppen mit je eigenem `try`. Eine fehlende ID kostet jetzt eine
+   Warnung statt der halben Seite.
+2. Breite: `#view-detail` auf 1600 px, Liste und Neue-Jagd-Formular bleiben
+   bei 720.
+3. Drei Blöcke mit Bandkopf: **Die Jagd · Jägerinnen einladen · Der Jagdtag**.
+4. Block 1 dreispaltig über `display: contents` — ohne `events.js` anzufassen.
+5. Jagdtag: Revierkarte klebt links, Runden und Freigaben rechts.
+6. **Jägerregister**: Tabelle statt Kartenliste, mit Reitern
+   (Alle / Zugesagt / Offen / Abgesagt), Suche und Sortierung.
+7. Rolle nachträglich änderbar — nur bei **gesetzten** Jägern. Bei einer
+   Zusage über den Link verweigert das Backend, zu Recht.
+8. Alle sieben Fenster auf sinnvolle Breiten begrenzt, das Runden-Fenster
+   zweispaltig.
+9. Runden-Kacheln zeigen den **Stand je Schütze**, dazu „N ohne Stand" und
+   ein Hinweis bei Doppelbelegung.
+10. **Hunterbase** steht dauerhaft links, das Vollbild-Fenster ist weg.
+    Ein Klick lädt ein oder entfernt, sofort.
 
-- **Bedienfarbe Grau→Blau**. Verlauf `#cdd7e1 → #4f99dc` auf Knöpfen,
-  Kacheln, Hero, Toast; `#84b5e3` flach auf Tabellenköpfen. Der Rand der
-  gefüllten Flächen ist eine getönte Haarlinie plus Schatten
-  (`--ctl-hairline` / `--ctl-lift`) statt einer vollen Randfarbe. Token
-  heißen `--ctl-*`, nicht mehr `--green-*`.
-- Vorschau-Knöpfe je Runde und Treibergruppe im Infomail-Fenster
-  (Oberfläche steht, wirkt erst nach der Bereitstellung).
+## Simon wollte prüfen
 
-## Simon wollte noch prüfen
+1. Die Seite bei sich am Rechner ansehen — vor allem mit einer **echten Jagd
+   mit vielen Jägern**. Geprüft wurde mit 60 Jägern und 200 Kontakten, aber
+   nur im Browserspeicher.
+2. **Rolle ändern** an einem echten gesetzten Jäger. Der Schreibvorgang selbst
+   ist ungeprüft — dafür hätte ich der Test Jagd Daten unterschieben müssen.
+3. Der Browser hält die alte `style.css` bis zu 10 Minuten. Frische Sitzung
+   nehmen, nicht neu laden.
 
-1. **Nach der Bereitstellung**: Infomail-Fenster öffnen, bei jeder Runde auf
-   „Vorschau" — Karte, Roster und Betreff müssen je Gruppe andere sein.
-2. **Einladung erstellen** — Absätze im Textfeld. Einmal im Vorlagen-Editor
-   speichern ersetzt die umbruchlose Vorlage in den ScriptProperties dauerhaft.
-3. Die neue Bedienfarbe im Betrieb ansehen. Der Browser hält .css bis zu
-   10 Minuten — frische Sitzung, nicht die laufende neu laden.
+## Bewusst nicht gemacht
 
-## Noch grün, bewusst nicht angefasst
+- **Kontakte in der Hunterbase bearbeiten oder löschen.** Es gibt nur
+  `?action=address-book` zum Lesen; die Stammliste wächst implizit bei jedem
+  `eventHunterAdd_`. Pflege wäre eine eigene Aufgabe **mit** Backend-Änderung.
+- **Mehrere Kontakte auf einmal übernehmen.** Der Plan sah dafür einen
+  Sammelknopf vor; für „40 Leute auf einmal" ist der CSV-Import der bessere
+  Weg und war schon da. Wenn es fehlt, ist es nachrüstbar.
+- **`renderEventDetail` zerlegen.** Für das Layout nicht nötig, Schritt 4 kam
+  mit `display: contents` aus. Sauberer wäre es trotzdem.
+- **Doppelbelegung verhindern.** Sie wird angezeigt, nicht unterbunden — es
+  kann Gründe geben, und ein Werkzeug, das die Planung blockiert, wird
+  umgangen.
 
-- `.infomail-opt` („Schützen einbeziehen") — fest eingetragenes `#16a34a`
-  mit eigenem Aus-Zustand. **Bleibt so, ausdrücklich entschieden am
-  19.08.2026.** Ein/Aus-Anzeige, keine Bedienfarbe.
+## Noch grün, ausdrücklich entschieden
+
+- `.infomail-opt` („Schützen einbeziehen") — fest eingetragenes `#16a34a` mit
+  eigenem Aus-Zustand. **Bleibt so, entschieden am 19.08.2026.**
 - `--green-dark` / `--green-mid`: dunkle Waldtöne für Schrift und die
   Standkarten-Leiste.
 - Zusagen/Absagen, Fehler-Toasts, Löschknöpfe, die Punkte im
