@@ -1089,55 +1089,36 @@ function parseCsv(text) {
   return lines.map((line) => parseCsvLine(line, delim));
 }
 
-async function importHuntersFromCsv(file) {
-  if (!file || !state.currentEvent) return;
-  const text = await file.text();
-  const rows = parseCsv(text);
-  if (!rows.length) {
-    showToast("CSV-Datei ist leer.", "error");
-    return;
-  }
-  // First-row header detection: any of "name" / "mail" / "email" in cells.
+// Aus einer CSV Kontakte machen. Erkennt eine Kopfzeile an "name" / "mail"
+// im ersten Datensatz und ordnet die Spalten danach zu; ohne Kopfzeile gilt
+// Name, E-Mail, Sprache in dieser Reihenfolge.
+//
+// Reine Funktion, kein DOM und kein Netz — deshalb ohne Browser prüfbar,
+// wie geo-import.js.
+function csvZuKontakten(rows) {
+  if (!rows.length) return [];
   const first = rows[0].map((c) => c.toLowerCase().trim());
   const hasHeader = first.some((c) => c.includes("name") || c.includes("mail"));
   const dataRows = hasHeader ? rows.slice(1) : rows;
-  let nameIdx = 0, emailIdx = 1, langIdx = 2;
+  let nameIdx = 0, emailIdx = 1, langIdx = 2, telIdx = -1, notizIdx = -1;
   if (hasHeader) {
     first.forEach((h, i) => {
       if (h.includes("name") && !h.includes("user")) nameIdx = i;
       else if (h.includes("mail")) emailIdx = i;
       else if (/sprache|language|^lang$/.test(h)) langIdx = i;
+      else if (/telefon|phone|handy|mobil/.test(h)) telIdx = i;
+      else if (/notiz|note|bemerkung/.test(h)) notizIdx = i;
     });
   }
-  const hunters = dataRows
+  return dataRows
     .map((row) => ({
       name: (row[nameIdx] || "").trim(),
       email: (row[emailIdx] || "").trim(),
       language: ((row[langIdx] || "de").trim().toLowerCase() === "en" ? "en" : "de"),
+      phone: telIdx >= 0 ? (row[telIdx] || "").trim() : "",
+      note: notizIdx >= 0 ? (row[notizIdx] || "").trim() : "",
     }))
     .filter((h) => h.name && h.email);
-  if (!hunters.length) {
-    showToast("Keine gültigen Zeilen gefunden — erwartet: Name, E-Mail, (Sprache).", "error", 5000);
-    return;
-  }
-  try {
-    const r = await postJson({
-      action: "event-hunters-batch-add",
-      event_id: state.currentEvent.event.id,
-      hunters,
-    });
-    invalidateCache("event-detail", { id: state.currentEvent.event.id });
-    invalidateCache("events-list");
-    invalidateCache("address-book");
-    const parts = [`${r.added} hinzugefügt`];
-    if (r.skipped && r.skipped.length) parts.push(`${r.skipped.length} bereits vorhanden`);
-    if (r.errors && r.errors.length) parts.push(`${r.errors.length} Fehler`);
-    showToast(parts.join(" · "), r.errors && r.errors.length ? "error" : null, 5000);
-    await loadEventDetail(state.currentEvent.event.id);
-    await loadAddressBook();
-  } catch (err) {
-    showToast(err.message || "CSV-Import fehlgeschlagen", "error");
-  }
 }
 
 // ---------- Address book picker ----------
@@ -1287,6 +1268,7 @@ async function loadAddressBook() {
     state.addressBook = cached;
     refreshAddressBookList();
     renderHunterbase();
+    renderHunterbaseModal();
   }
   try {
     const fresh = await fetchJson("address-book");
@@ -1294,6 +1276,7 @@ async function loadAddressBook() {
     writeCache("address-book", null, fresh);
     refreshAddressBookList();
     renderHunterbase();
+    renderHunterbaseModal();
   } catch (err) {
     if (!cached) state.addressBook = [];
   }
@@ -1610,6 +1593,7 @@ function renderSquadTile(squad, ctx) {
     roleLabel: i === 0 ? "Ansteller" : "",
     isLeader: i === 0,
     stand: standLabel(p, ctx.postsById),
+    hund: p.dog ? (p.dog_label || "Hund dabei") : "",
     warn: positionsWarnung(p, ctx, gruppe),
   })).join("");
   const ohneStand = positions.filter((p) => !standLabel(p, ctx.postsById)).length;
@@ -1632,7 +1616,7 @@ function renderSquadTile(squad, ctx) {
 // stand: null heißt "hat keinen und braucht keinen" (Treiber). Ein leerer
 // String heißt "sollte einen haben, hat aber keinen" — und das ist die
 // wichtigste Angabe der Kachel, nicht eine Leerstelle.
-function renderTileMember({ name, roleLabel, isLeader, stand, warn }) {
+function renderTileMember({ name, roleLabel, isLeader, stand, hund, warn }) {
   const standZeile = stand === null ? ""
     : (stand
         ? `<span class="tile-member-stand">${escapeHtml(stand)}</span>`
@@ -1641,6 +1625,7 @@ function renderTileMember({ name, roleLabel, isLeader, stand, warn }) {
          `<span class="tile-member-name">${escapeHtml(name)}</span>` +
          (roleLabel ? `<span class="tile-member-role">${escapeHtml(roleLabel)}</span>` : "") +
          standZeile +
+         (hund ? `<span class="tile-member-hund">🐕 ${escapeHtml(hund)}</span>` : "") +
          (warn && warn.kurz
             ? `<span class="tile-member-warn" title="${escapeHtml(warn.lang)}">${escapeHtml(warn.kurz)}</span>`
             : "") +
@@ -1926,6 +1911,37 @@ function positionSelectHtml(currentPosition) {
   `;
 }
 
+// Der Hund hängt am Menschen, nicht an der Jagd: erst die Zusage FÜR DIESE
+// Jagd (die ist die aktuellste Auskunft), sonst der Eintrag in der
+// Hunterbase, der aus einer früheren Zusage stammt. Ob er wirklich mitkommt,
+// entscheidet das Häkchen an der Position.
+function hundFuer(name) {
+  const k = String(name || "").trim().toLowerCase();
+  if (!k) return "";
+  const beschriften = (dogs) => (Array.isArray(dogs) && dogs.length)
+    ? dogs.map((d) => d.count + "× " + d.breed).join(", ")
+    : "";
+  const h = (state.currentEvent?.hunters || []).find((x) => (x.hunter || "").toLowerCase() === k);
+  const ausZusage = beschriften(h && h.dogs);
+  if (ausZusage) return ausZusage;
+  const c = (state.addressBook || []).find((x) => (x.name || "").toLowerCase() === k);
+  return beschriften(c && c.dogs);
+}
+
+// an: true/false aus einer gespeicherten Position, undefined bei einer neuen
+// oder einer aus der Zeit vor dem Feld. Vorbelegt ist DABEI — wer einen Hund
+// gemeldet hat, bringt ihn im Regelfall mit; das Häkchen ist zum Abwählen da,
+// nicht zum Anwählen. Ein ausdrückliches false bleibt false.
+function hundZeileHtml(name, an) {
+  const label = hundFuer(name);
+  if (!label) {
+    return '<span class="sr-hund sr-hund--keiner">kein Hund hinterlegt</span>';
+  }
+  const gesetzt = (an === undefined || an === null) ? true : !!an;
+  return '<label class="sr-hund"><input type="checkbox" class="sr-dog"' + (gesetzt ? " checked" : "") +
+         ' /><span>Hund dabei</span><span class="sr-hund-rasse">' + escapeHtml(label) + "</span></label>";
+}
+
 function renderSchuetzeRow(pos, idx, accepted) {
   const isKlettersitz = pos && pos.type === "klettersitz";
   const lat = pos && pos.lat !== undefined && pos.lat !== "" ? Number(pos.lat).toFixed(6) : "";
@@ -1946,6 +1962,7 @@ function renderSchuetzeRow(pos, idx, accepted) {
       <div class="sr-line sr-position-line">
         <select class="sr-position">${positionSelectHtml(pos)}</select>
       </div>
+      <div class="sr-line sr-hund-line">${hundZeileHtml(pos && pos.hunter, pos ? pos.dog : undefined)}</div>
       <div class="sr-coords" ${isKlettersitz ? "" : "hidden"}>
         <div class="sr-coords-grid">
           <input type="number" class="sr-lat" step="0.000001" inputmode="decimal" value="${lat}" placeholder="Breitengrad" />
@@ -1970,6 +1987,14 @@ function wireSchuetzeRow(row) {
   posSel.addEventListener("change", () => {
     coords.hidden = posSel.value !== "klettersitz";
   });
+  // Wechselt der Jäger, wechselt auch sein Hund — oder es gibt keinen.
+  const hunterSel = row.querySelector(".sr-hunter");
+  const hundLine = row.querySelector(".sr-hund-line");
+  if (hunterSel && hundLine) {
+    hunterSel.addEventListener("change", () => {
+      hundLine.innerHTML = hundZeileHtml(hunterSel.value, undefined);
+    });
+  }
   const here = row.querySelector(".sr-here");
   if (here) {
     here.addEventListener("click", () => {
@@ -1990,6 +2015,12 @@ function collectPositions(card) {
   rows.forEach((row) => {
     const hunter = row.querySelector(".sr-hunter").value.trim();
     if (!hunter) return; // skip empty rows
+    const dogBox = row.querySelector(".sr-dog");
+    const dog = !!(dogBox && dogBox.checked);
+    // Die Rasse wird MITGESCHRIEBEN, nicht nachgeschlagen: standkarte.js und
+    // das Infomail-PDF lesen die Position ohne Zugriff auf die Hunterbase.
+    // Dasselbe Muster wie post_name.
+    const dog_label = dog ? hundFuer(hunter) : "";
     const posVal = row.querySelector(".sr-position").value;
     if (posVal === "klettersitz") {
       const lat = row.querySelector(".sr-lat").value.trim();
@@ -2001,6 +2032,7 @@ function collectPositions(card) {
         lat: lat ? Number(lat) : "",
         lng: lng ? Number(lng) : "",
         label,
+        dog, dog_label,
       });
     } else if (posVal && posVal.startsWith("kanzel:")) {
       const post_id = posVal.slice("kanzel:".length);
@@ -2010,10 +2042,11 @@ function collectPositions(card) {
         type: "kanzel",
         post_id,
         post_name: post ? post.name : "",
+        dog, dog_label,
       });
     } else {
       // No position picked yet — keep the hunter so the row is preserved.
-      positions.push({ hunter, type: "kanzel", post_id: "", post_name: "" });
+      positions.push({ hunter, type: "kanzel", post_id: "", post_name: "", dog, dog_label });
     }
   });
   return positions;
@@ -3565,6 +3598,258 @@ async function jgrKontaktAufnehmen(kontakt, rolle) {
   }
 }
 
+// ---------- Hunterbase-Fenster (hbm-) ----------
+// Die Stammliste als Bestand: anlegen, ändern, löschen, CSV. Die einzelne
+// Jagd wird in der Spalte links bestückt, nicht hier.
+
+const hbmView = { q: "", bearbeitet: null };   // null | "neu" | Kontakt-ID
+
+// Die alte Backend-Fassung liefert nur name, email, language — ohne id.
+// Ohne id gibt es keinen Schlüssel zum Ändern oder Löschen, und "Jagden: 0"
+// wäre eine Behauptung über etwas, das das Backend gar nicht kennt.
+// "nicht mitgeliefert" ist nicht dasselbe wie "null".
+function hbmBackendKanntStammliste() {
+  const alle = state.addressBook || [];
+  if (!alle.length) return true;   // leere Liste sagt nichts — nicht bevormunden
+  return alle.some((c) => c.id);
+}
+
+function openHunterbaseModal() {
+  hbmView.q = "";
+  hbmView.bearbeitet = null;
+  const feld = $("#hbm-search");
+  if (feld) feld.value = "";
+  renderHunterbaseModal();
+  const bg = $("#hunterbase-backdrop"); if (bg) bg.hidden = false;
+  const m = $("#hunterbase-modal"); if (m) m.hidden = false;
+}
+
+function closeHunterbaseModal() {
+  const m = $("#hunterbase-modal"); if (m) m.hidden = true;
+  const bg = $("#hunterbase-backdrop"); if (bg) bg.hidden = true;
+  hbmView.bearbeitet = null;
+}
+
+function hbmDogsText(dogs) {
+  return (Array.isArray(dogs) && dogs.length)
+    ? dogs.map((d) => d.count + "× " + d.breed).join(", ")
+    : "";
+}
+
+// "1× Teckel, 2× Bracke" zurück in [{breed, count}]. Was das Backend nicht
+// kennt, wirft es beim Speichern raus — DOG_BREEDS ist dort die Instanz.
+function hbmDogsParsen(text) {
+  return String(text || "").split(",").map((t) => t.trim()).filter(Boolean).map((t) => {
+    const m = /^(\d+)\s*[x×]\s*(.+)$/i.exec(t);
+    return m ? { count: parseInt(m[1], 10), breed: m[2].trim() } : { count: 1, breed: t };
+  });
+}
+
+function hbmZeile(c) {
+  const bearbeitet = hbmView.bearbeitet === c.id;
+  if (bearbeitet) return hbmFormZeile(c);
+  return `
+    <tr class="hbm-row" data-id="${escapeHtml(c.id)}">
+      <td data-label="Name"><strong>${escapeHtml(c.name)}</strong></td>
+      <td data-label="E-Mail" class="hbm-mail">${escapeHtml(c.email)}</td>
+      <td data-label="Sprache" class="hbm-lang">${c.language === "en" ? "🇬🇧" : "🇩🇪"}</td>
+      <td data-label="Telefon" class="hbm-tel">${c.phone
+        ? `<a href="tel:${escapeHtml(c.phone.replace(/[^+\d]/g, ""))}">${escapeHtml(c.phone)}</a>`
+        : '<span class="muted">—</span>'}</td>
+      <td data-label="Standardrolle">${c.default_role ? escapeHtml(c.default_role) : '<span class="muted">—</span>'}</td>
+      <td data-label="Hund">${hbmDogsText(c.dogs) ? escapeHtml(hbmDogsText(c.dogs)) : '<span class="muted">—</span>'}</td>
+      <td data-label="Notiz" class="hbm-notiz">${escapeHtml(c.note || "")}</td>
+      <td data-label="Jagden" class="hbm-jagden">${c.jagden === undefined
+        ? '<span class="muted" title="Diese Zahl kennt erst die neue Backend-Fassung">—</span>'
+        : c.jagden}</td>
+      <td class="hbm-akt">${hbmBackendKanntStammliste() ? `
+        <button type="button" class="link-btn hbm-edit" data-id="${escapeHtml(c.id)}" title="Ändern">✎</button>
+        <button type="button" class="link-btn hbm-del" data-id="${escapeHtml(c.id)}" title="Löschen">🗑</button>` : ""}</td>
+    </tr>`;
+}
+
+function hbmFormZeile(c) {
+  const rollen = ['<option value="">— keine —</option>'].concat(
+    SET_ROLES.map((r) => `<option value="${escapeHtml(r)}"${c.default_role === r ? " selected" : ""}>${escapeHtml(r)}</option>`)
+  ).join("");
+  return `
+    <tr class="hbm-row hbm-row--form" data-id="${escapeHtml(c.id || "")}">
+      <td data-label="Name"><input type="text" class="hbm-f-name" value="${escapeHtml(c.name || "")}" placeholder="Name" /></td>
+      <td data-label="E-Mail"><input type="email" class="hbm-f-mail" value="${escapeHtml(c.email || "")}" placeholder="E-Mail" /></td>
+      <td data-label="Sprache"><select class="hbm-f-lang">
+        <option value="de"${c.language !== "en" ? " selected" : ""}>🇩🇪 DE</option>
+        <option value="en"${c.language === "en" ? " selected" : ""}>🇬🇧 EN</option>
+      </select></td>
+      <td data-label="Telefon"><input type="tel" class="hbm-f-tel" value="${escapeHtml(c.phone || "")}" placeholder="Telefon" /></td>
+      <td data-label="Standardrolle"><select class="hbm-f-rolle">${rollen}</select></td>
+      <td data-label="Hund"><input type="text" class="hbm-f-hund" value="${escapeHtml(hbmDogsText(c.dogs))}" placeholder="1× Teckel" /></td>
+      <td data-label="Notiz"><input type="text" class="hbm-f-notiz" value="${escapeHtml(c.note || "")}" placeholder="Notiz" /></td>
+      <td class="hbm-jagden">${c.jagden === undefined ? "" : c.jagden}</td>
+      <td class="hbm-akt">
+        <button type="button" class="primary-btn small hbm-save">Speichern</button>
+        <button type="button" class="link-btn hbm-cancel">Abbrechen</button>
+      </td>
+    </tr>`;
+}
+
+function renderHunterbaseModal() {
+  const body = $("#hunterbase-body");
+  if (!body) return;
+  const alle = (state.addressBook || []).slice()
+    .sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" }));
+  const sichtbar = hbmView.q
+    ? alle.filter((c) => (c.name + " " + c.email + " " + (c.note || "")).toLowerCase().includes(hbmView.q))
+    : alle;
+
+  const zaehler = $("#hbm-count");
+  if (zaehler) zaehler.textContent = hbmView.q
+    ? `${sichtbar.length} von ${alle.length}`
+    : `${alle.length} ${alle.length === 1 ? "Kontakt" : "Kontakte"}`;
+
+  const kannPflegen = hbmBackendKanntStammliste();
+  const banner = kannPflegen ? "" : `
+    <div class="warning-banner">
+      Das Backend ist noch die alte Fassung — Anlegen, Ändern, Löschen und der
+      CSV-Import gehen erst nach dem Bereitstellen von Code.gs. Ansehen und
+      Suchen geht schon.
+    </div>`;
+  ["#hbm-neu", "#open-csv-upload"].forEach((sel) => {
+    const b = $(sel);
+    if (b) b.disabled = !kannPflegen;
+  });
+
+  const neueZeile = hbmView.bearbeitet === "neu"
+    ? hbmFormZeile({ id: "", name: "", email: "", language: "de", dogs: [] }) : "";
+
+  if (!alle.length && !neueZeile) {
+    body.innerHTML = banner + '<p class="empty-msg">Noch keine Kontakte. Oben einen anlegen oder eine CSV hochladen.</p>';
+    return;
+  }
+
+  body.innerHTML = banner + `
+    <table class="hbm-table">
+      <thead><tr>
+        <th>Name</th><th>E-Mail</th><th>Spr.</th><th>Telefon</th>
+        <th>Standardrolle</th><th>Hund</th><th>Notiz</th><th title="Auf wie vielen Jagden">Jagden</th><th></th>
+      </tr></thead>
+      <tbody>${neueZeile}${sichtbar.map(hbmZeile).join("")}</tbody>
+    </table>
+    ${!sichtbar.length && alle.length ? '<p class="empty-msg">Kein Treffer.</p>' : ""}`;
+}
+
+function hbmStatus(text, fehler) {
+  const el = $("#hbm-status");
+  if (!el) return;
+  el.textContent = text || "";
+  el.classList.toggle("is-fehler", !!fehler);
+}
+
+async function hbmSpeichern(tr) {
+  const id = tr.dataset.id || "";
+  const wert = (sel) => { const e = tr.querySelector(sel); return e ? e.value.trim() : ""; };
+  const daten = {
+    action: "address-book-save",
+    id,
+    name: wert(".hbm-f-name"),
+    email: wert(".hbm-f-mail"),
+    language: wert(".hbm-f-lang") || "de",
+    phone: wert(".hbm-f-tel"),
+    note: wert(".hbm-f-notiz"),
+    default_role: wert(".hbm-f-rolle"),
+    dogs: hbmDogsParsen(wert(".hbm-f-hund")),
+  };
+  hbmStatus("Speichere …");
+  try {
+    await postJson(daten);
+    invalidateCache("address-book");
+    hbmView.bearbeitet = null;
+    await loadAddressBook();
+    renderHunterbaseModal();
+    hbmStatus(daten.name + " gespeichert");
+  } catch (err) {
+    hbmStatus(err.message || "Fehler", true);
+  }
+}
+
+async function hbmLoeschen(id) {
+  const c = (state.addressBook || []).find((x) => x.id === id);
+  if (!c) return;
+  const aufJagden = c.jagden
+    ? `\n\n${c.name} steht auf ${c.jagden} Jagd${c.jagden === 1 ? "" : "en"}. Dort bleibt der Eintrag — gelöscht wird nur die Stammliste.`
+    : "";
+  if (!confirm(`${c.name} aus der Hunterbase löschen?${aufJagden}`)) return;
+  hbmStatus("Lösche …");
+  try {
+    await postJson({ action: "address-book-delete", id });
+    invalidateCache("address-book");
+    await loadAddressBook();
+    renderHunterbaseModal();
+    hbmStatus(c.name + " gelöscht");
+  } catch (err) {
+    hbmStatus(err.message || "Fehler", true);
+  }
+}
+
+// CSV in den Pool. Der bestehende Leser bleibt, nur das Ziel ist ein anderes:
+// die Stammliste statt der laufenden Jagd.
+async function importContactsFromCsv(file) {
+  hbmStatus("Lese Datei …");
+  try {
+    const text = await file.text();
+    const zeilen = parseCsv(text);
+    if (!zeilen.length) { hbmStatus("Datei ist leer", true); return; }
+    const kontakte = csvZuKontakten(zeilen);
+    if (!kontakte.length) {
+      hbmStatus("Keine Zeile mit Name und E-Mail gefunden — erwartet: Name, E-Mail, (Sprache, Telefon, Notiz)", true);
+      return;
+    }
+    hbmStatus(`Importiere ${kontakte.length} …`);
+    const r = await postJson({ action: "address-book-batch-add", contacts: kontakte });
+    invalidateCache("address-book");
+    await loadAddressBook();
+    renderHunterbaseModal();
+    const teile = [`${r.added || 0} angelegt`];
+    if (r.skipped && r.skipped.length) teile.push(`${r.skipped.length} schon vorhanden`);
+    if (r.errors && r.errors.length) teile.push(`${r.errors.length} Fehler`);
+    hbmStatus(teile.join(" · "), !!(r.errors && r.errors.length));
+  } catch (err) {
+    hbmStatus(err.message || "Import fehlgeschlagen", true);
+  }
+}
+
+function wireHunterbaseModal() {
+  on("#open-hunterbase", "click", openHunterbaseModal);
+  on("#hunterbase-close", "click", closeHunterbaseModal);
+  on("#hunterbase-fertig", "click", closeHunterbaseModal);
+  on("#hunterbase-backdrop", "click", closeHunterbaseModal);
+  on("#hbm-search", "input", (e) => {
+    hbmView.q = e.target.value.trim().toLowerCase();
+    renderHunterbaseModal();
+  });
+  on("#hbm-neu", "click", () => {
+    hbmView.bearbeitet = "neu";
+    renderHunterbaseModal();
+    const f = $("#hunterbase-body .hbm-f-name");
+    if (f) f.focus();
+  });
+  on("#open-csv-upload", "click", () => { const i = $("#csv-input"); if (i) i.click(); });
+  on("#csv-input", "change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";   // dieselbe Datei soll erneut wählbar sein
+    if (file) await importContactsFromCsv(file);
+  });
+  on("#hunterbase-body", "click", (e) => {
+    const edit = e.target.closest(".hbm-edit");
+    if (edit) { hbmView.bearbeitet = edit.dataset.id; renderHunterbaseModal(); return; }
+    const del = e.target.closest(".hbm-del");
+    if (del) { hbmLoeschen(del.dataset.id); return; }
+    const save = e.target.closest(".hbm-save");
+    if (save) { hbmSpeichern(save.closest("tr")); return; }
+    const cancel = e.target.closest(".hbm-cancel");
+    if (cancel) { hbmView.bearbeitet = null; renderHunterbaseModal(); }
+  });
+}
+
 function wireHunterbase() {
   // Die Zeilen entstehen bei jedem Render neu, der Container steht statisch
   // im Markup.
@@ -3718,6 +4003,7 @@ function wireUi() {
     ["Neue Jagd", wireNeueJagd],
     ["Einladen", wireEinladen],
     ["Hunterbase", wireHunterbase],
+    ["Hunterbase-Fenster", wireHunterbaseModal],
     ["Jägerliste", wireRoster],
     ["Runden", wireRunden],
     ["Karte", wireKarte],

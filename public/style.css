@@ -2682,6 +2682,15 @@ body.rsvp-page #rsvp-topbar {
   text-overflow: ellipsis;
 }
 .treiber-tile .tile-member-stand { color: #1e2a36; }
+.tile-member-hund {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: #1b3a55;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* "ohne Stand" ist die eigentliche Information der Kachel, keine Leerstelle. */
 .tile-member-stand--offen {
   color: var(--accent-text);
@@ -3035,6 +3044,22 @@ body.rsvp-page #rsvp-topbar {
 .infomail-pdf-note a { color: #16a34a; font-weight: 600; }
 
 /* Hint shown inside a Treibergruppe row when no acceptances yet. */
+/* Der Hund an einer Position. Das Häkchen sitzt bewusst hier und nicht beim
+   Jäger: der Hund hängt am Menschen, das Mitkommen am Jagdtag — Leute bringen
+   ihn nicht immer mit. */
+.sr-hund {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.sr-hund input { width: 16px; height: 16px; accent-color: var(--ctl-edge); cursor: pointer; }
+.sr-hund-rasse { color: var(--muted); font-size: 12px; }
+.sr-hund--keiner { color: var(--muted); font-size: 11.5px; font-style: italic; cursor: default; }
+.sr-hund-line { min-height: 20px; }
+
 .sr-empty {
   margin: 4px 0 0 32px;
   font-size: 12.5px;
@@ -3391,6 +3416,151 @@ body.rsvp-page #rsvp-topbar {
 }
 
 /* Hunter list -------------------------------------------------------------- */
+
+/* Hunterbase-Fenster ---------------------------------------------------------
+   Der Bestand, aus dem Jagden bestückt werden — anlegen, ändern, löschen,
+   CSV. Bewusst das breiteste Fenster nach der Infomail: neun Spalten, und
+   die Notiz soll lesbar sein.
+   -------------------------------------------------------------------------- */
+
+#hunterbase-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 50;
+}
+#hunterbase-modal {
+  position: fixed;
+  z-index: 51;
+  left: 8px;
+  right: 8px;
+  top: calc(8px + var(--safe-top) + var(--vv-top));
+  bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--ctl);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+#hunterbase-modal[hidden],
+#hunterbase-backdrop[hidden] { display: none; }
+#hunterbase-modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+#hunterbase-modal > header h2 { margin: 0; font-size: 18px; font-weight: 700; }
+#hunterbase-close {
+  background: none; border: none; font-size: 24px; line-height: 1;
+  color: var(--muted); cursor: pointer; padding: 0 4px;
+}
+
+.hbm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px 0;
+}
+.hbm-toolbar .hbm-search { flex: 0 1 280px; }
+.hbm-count { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hbm-tools { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.hbm-hint { margin: 8px 16px 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+.hbm-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 16px 16px;
+}
+
+.hbm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hbm-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 8px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.hbm-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.hbm-table tbody tr:hover td { background: var(--ctl-tint); }
+.hbm-table .hbm-mail, .hbm-table .hbm-notiz { color: var(--muted); }
+.hbm-table .hbm-tel { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hbm-table .hbm-tel a { color: var(--ctl-ink); text-decoration: none; }
+.hbm-table .hbm-lang { text-align: center; }
+.hbm-table .hbm-jagden { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.hbm-table .hbm-akt { white-space: nowrap; text-align: right; width: 96px; }
+.hbm-table .hbm-akt .link-btn { opacity: 0.35; font-size: 15px; padding: 0 3px; }
+.hbm-table tr:hover .hbm-akt .link-btn,
+.hbm-table .hbm-akt .link-btn:focus-visible { opacity: 1; }
+
+/* Die Bearbeitungszeile bleibt eine Tabellenzeile — Felder statt Text, damit
+   die Spalten nicht springen, während man tippt. */
+.hbm-row--form td { background: var(--ctl-tint); }
+.hbm-row--form input,
+.hbm-row--form select {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  box-sizing: border-box;
+}
+.hbm-row--form input:focus, .hbm-row--form select:focus { outline: none; border-color: var(--ctl-edge); }
+.hbm-row--form .hbm-akt { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.invite-status.is-fehler { color: var(--accent-text); font-weight: 650; }
+
+@media (min-width: 1000px) {
+  #hunterbase-modal {
+    inset: 0;
+    margin: auto;
+    width: min(1240px, calc(100vw - 64px));
+    height: min(840px, calc(100vh - 64px));
+    border-radius: 14px;
+  }
+}
+
+/* Handy: die Tabelle faltet wie überall sonst in Karten. */
+@media (max-width: 720px) {
+  .hbm-table thead { display: none; }
+  .hbm-table, .hbm-table tbody, .hbm-table tr, .hbm-table td { display: block; width: auto; }
+  .hbm-table tr {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+  }
+  .hbm-table td { border: none; padding: 2px 0; }
+  .hbm-table td::before {
+    content: attr(data-label) ": ";
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .hbm-table td.hbm-akt::before { content: ""; }
+  .hbm-table .hbm-akt { text-align: left; width: auto; }
+  .hbm-table .hbm-akt .link-btn { opacity: 1; }
+  .hbm-tools { margin-left: 0; }
+}
 
 /* Hunterbase als Spalte -------------------------------------------------------
    Warum eigener Scroll-Container UND sticky: 200 Kontakte à 44 px sind

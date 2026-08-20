@@ -264,6 +264,12 @@ function renderMine() {
     if (index >= 0 && isAnsteller) {
       rows.push(`<div class="stk-mine-row"><span>Reihenfolge</span><strong>${index === 0 ? "Ansteller" : index + ". Stand der Runde"}</strong></div>`);
     }
+    // Der Hund hängt am Menschen, das Mitkommen an der Position — die
+    // Einteilung entscheidet, ob er an diesem Tag dabei ist. Steht nur da,
+    // wenn das Häkchen gesetzt wurde.
+    if (pos.dog) {
+      rows.push(`<div class="stk-mine-row"><span>Hund</span><strong>${escapeHtml(pos.dog_label || "dabei")}</strong></div>`);
+    }
     const post = pos.post_id ? postById(pos.post_id) : null;
     const lat = pos.lat || (post && post.lat);
     const lng = pos.lng || (post && post.lng);

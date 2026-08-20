@@ -462,6 +462,38 @@
       </div>
     </section>
 
+    <!-- Die Hunterbase als Bestand: hier wird gepflegt, wer überhaupt
+         eingeladen werden kann. Die einzelne Jagd wird links in der Spalte
+         bestückt, nicht hier. -->
+    <div id="hunterbase-backdrop" hidden></div>
+    <section id="hunterbase-modal" hidden aria-modal="true" role="dialog" aria-labelledby="hunterbase-title">
+      <header>
+        <h2 id="hunterbase-title">Hunterbase</h2>
+        <button id="hunterbase-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div class="hbm-toolbar">
+        <label class="jgr-search hbm-search">
+          <span class="jgr-search-icon" aria-hidden="true">⌕</span>
+          <input type="search" id="hbm-search" placeholder="Name, E-Mail, Notiz" autocomplete="off" aria-label="Hunterbase durchsuchen" />
+        </label>
+        <span class="hbm-count" id="hbm-count"></span>
+        <span class="hbm-tools">
+          <button type="button" id="hbm-neu" class="primary-btn small">+ Neuer Kontakt</button>
+          <button type="button" id="open-csv-upload" class="ghost-btn">CSV importieren</button>
+        </span>
+      </div>
+      <p class="hbm-hint">
+        Ein fester Bestand — wer hier steht, lässt sich zu jeder Jagd einladen.
+        Löschen entfernt nur den Stammeintrag; wer schon auf einer Jagd steht,
+        bleibt dort.
+      </p>
+      <div class="hbm-body" id="hunterbase-body"></div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="hunterbase-fertig" type="button" class="primary-btn">Fertig</button>
+        <span id="hbm-status" class="invite-status"></span>
+      </div>
+    </section>
+
     <div id="squad-edit-backdrop" hidden></div>
     <section id="squad-edit-modal" hidden aria-modal="true" role="dialog" aria-labelledby="squad-edit-title">
       <header>

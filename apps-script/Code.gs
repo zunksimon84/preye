@@ -230,7 +230,20 @@ const DOG_BREEDS = [
 // (Treiber led by a Hundeführer). Both share the same row schema; the
 // "type" column distinguishes them ("ansteller" / "treiber"; empty = ansteller).
 const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions", "type", "start_pos", "infomail_sent_at", "infomail_count"];
-const ADDRESS_BOOK_HEADER = ["name", "email", "language"];
+// Die Stammliste der Jäger — ein fester Bestand, aus dem Jagden bestückt
+// werden, nicht eine Nebenwirkung der einzelnen Jagd.
+//
+// ensureSheet_ hängt fehlende Spalten HINTEN an und fasst vorhandene nie an;
+// gelesen und geschrieben wird über appendByName_ / readSheet_ nach Namen.
+// Die Reihenfolge hier ist deshalb nur Dokumentation, keine Sheet-Ordnung.
+//
+// "dogs" ist dasselbe JSON wie in event_hunters: [{breed, count}]. Es kommt
+// aus den Zusagen und dient als Vorgabe für die nächste Jagd — ob der Hund
+// wirklich mitkommt, entscheidet das Häkchen an der Position in der Runde.
+const ADDRESS_BOOK_HEADER = [
+  "name", "email", "language",
+  "id", "phone", "note", "default_role", "dogs", "updated_at",
+];
 
 // Outgoing "From" address for all GmailApp.sendEmail calls. Must be a
 // verified "Send mail as" alias on the script-owner Gmail account
@@ -472,6 +485,19 @@ function doPost(e) {
     }
     if (action === "posts-batch-add") {
       const r = postsBatchAdd_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    // Stammliste pflegen — aus dem Hunterbase-Fenster.
+    if (action === "address-book-save") {
+      const r = addressBookSave_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "address-book-delete") {
+      const r = addressBookDelete_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "address-book-batch-add") {
+      const r = addressBookBatchAdd_(body);
       return json_(r, r.error ? 400 : 200);
     }
     if (action === "event-create") {
@@ -4099,6 +4125,31 @@ function rsvpRespond_(body) {
       sheet.getRange(i + 2, colResponded + 1).setValue(now);
       if (colConfirmedJs >= 0) sheet.getRange(i + 2, colConfirmedJs + 1).setValue(confirmedJs);
       if (colConfirmedVsg >= 0) sheet.getRange(i + 2, colConfirmedVsg + 1).setValue(confirmedVsg);
+
+      // Hund und Rolle in die Stammliste zurückschreiben. Wer einmal mit
+      // seinem Bloodhound zugesagt hat, soll ihn bei der nächsten Jagd
+      // vorbelegt haben — ob er wirklich mitkommt, entscheidet dann das
+      // Häkchen an der Position in der Runde.
+      //
+      // Nur bei einer Zusage MIT Hund: eine Absage sagt nichts darüber aus,
+      // ob jemand einen Hund hat, und würde einen gepflegten Eintrag löschen.
+      if (choice === "accepted" && dogs.length) {
+        try {
+          const colHunter = headers.indexOf("hunter");
+          const colEmail = headers.indexOf("email");
+          const colLang = headers.indexOf("language");
+          addressBookUpsert_(
+            String(rows[i][colHunter] || "").trim(),
+            String(rows[i][colEmail] || "").trim(),
+            String(rows[i][colLang] || "de"),
+            { dogs: dogs, default_role: role }
+          );
+        } catch (err) {
+          // Die Zusage darf nicht daran scheitern, dass die Stammliste
+          // hakt — sie ist Beiwerk, die Antwort ist die Hauptsache.
+        }
+      }
+
       return {
         ok: true,
         status: choice,
@@ -4163,6 +4214,14 @@ function eventSquadSave_(body) {
             lat: Number.isFinite(lat) ? lat : "",
             lng: Number.isFinite(lng) ? lng : "",
             label: String(p.label || "").trim().slice(0, 60),
+            // Ob der Hund an DIESEM Tag mitkommt. Der Hund selbst hängt am
+            // Menschen (Zusage bzw. Stammliste), das Mitkommen an der
+            // Position — Leute bringen ihn nicht immer mit.
+            dog: !!p.dog,
+            // Was drauf steht, wird mitgeschrieben statt nachgeschlagen:
+            // standkarte.js und das Infomail-PDF lesen die Position ohne
+            // Zugriff auf die Stammliste. Dasselbe Muster wie post_name.
+            dog_label: String(p.dog_label || "").trim().slice(0, 60),
           };
         })
     : [];
@@ -5722,7 +5781,13 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
     const table = body.appendTable();
     table.setBorderColor(BORDER).setBorderWidth(0.5);
     const head = table.appendTableRow();
-    (istTreiber ? ["Nr.", "Treiber", ""] : ["Nr.", "Schütze", "Stand"]).forEach(function (h) {
+    // Hunde-Spalte nur, wenn in dieser Gruppe überhaupt einer mitkommt.
+    // Eine leere Spalte in jedem PDF wäre schlechter als keine.
+    const mitHund = positions.some(function (p) { return p && p.dog; });
+    const kopfzeilen = istTreiber
+      ? ["Nr.", "Treiber", ""]
+      : (mitHund ? ["Nr.", "Schütze", "Stand", "Hund"] : ["Nr.", "Schütze", "Stand"]);
+    kopfzeilen.forEach(function (h) {
       const c = head.appendTableCell(h);
       const p = c.getChild(0).asParagraph();
       styleParagraph(p, { size: 8, bold: true, color: SOFT, line: 1.0 });
@@ -5746,7 +5811,15 @@ function buildInfoMailPdf_(ev, squad, positions, recipientPos, postsById) {
       styleParagraph(standCell.getChild(0).asParagraph(), {
         size: 10, color: SOFT, line: 1.0,
       });
-      [numCell, hunterCell, standCell].forEach(function (c) {
+      const zellen = [numCell, hunterCell, standCell];
+      if (!istTreiber && mitHund) {
+        const hundCell = row.appendTableCell(p.dog ? (p.dog_label || "mit Hund") : "");
+        styleParagraph(hundCell.getChild(0).asParagraph(), {
+          size: 10, color: p.dog ? INK : SOFT, line: 1.0,
+        });
+        zellen.push(hundCell);
+      }
+      zellen.forEach(function (c) {
         c.setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(8).setPaddingRight(8);
       });
     }
@@ -6118,42 +6191,232 @@ function fromRoman_(s) {
   return result;
 }
 
+// ---------- Stammliste (address_book) ----------
+// Ein fester Bestand von Leuten mit ihren Angaben, aus dem Jagden bestückt
+// werden. Bis 20.08.2026 wuchs sie nur als Nebenwirkung von eventHunterAdd_
+// und ließ sich weder ändern noch löschen.
+
+// Die Zeilen hatten bis dahin keinen Schlüssel; der Abgleich lief über den
+// Namen. Beim Umbenennen bricht das, und zwei Leute können gleich heißen.
+// Fehlende IDs werden beim ersten Lesen nachgetragen — einmalig, danach
+// steht sie im Blatt.
+function addressBookEnsureIds_(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const headers = sheetHeader_(sheet);
+  const cId = headers.indexOf("id");
+  if (cId < 0) return;
+  const spalte = sheet.getRange(2, cId + 1, lastRow - 1, 1);
+  const werte = spalte.getValues();
+  let geaendert = false;
+  for (let i = 0; i < werte.length; i++) {
+    if (!String(werte[i][0] || "").trim()) {
+      werte[i][0] = "AB-" + Utilities.getUuid().replace(/-/g, "").slice(0, 10).toUpperCase();
+      geaendert = true;
+    }
+  }
+  if (geaendert) spalte.setValues(werte);
+}
+
+function addressBookDogs_(roh) {
+  try {
+    const arr = JSON.parse(roh || "[]");
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(function (d) { return d && d.breed; })
+      .slice(0, 8)
+      .map(function (d) {
+        return { breed: String(d.breed), count: Math.max(1, Math.min(10, parseInt(d.count, 10) || 1)) };
+      });
+  } catch (err) { return []; }
+}
+
+// Wie oft jemand schon auf einer Jagd stand. Ein Blattdurchlauf über
+// event_hunters; das Blatt ist klein, und die Zahl ist beim Pflegen der
+// Stammliste die einzige, die sagt, ob ein Eintrag noch gebraucht wird.
+function addressBookEinsaetze_() {
+  const zaehler = {};
+  try {
+    readSheet_(SHEETS.event_hunters, EVENT_HUNTER_HEADER).forEach(function (r) {
+      const mail = String(r.email || "").trim().toLowerCase();
+      if (mail) zaehler[mail] = (zaehler[mail] || 0) + 1;
+    });
+  } catch (err) { /* ohne Zahl ist die Liste immer noch brauchbar */ }
+  return zaehler;
+}
+
 function addressBookList_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  const sheet = ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  addressBookEnsureIds_(sheet);
+  const einsaetze = addressBookEinsaetze_();
   return readSheet_(SHEETS.address_book, ADDRESS_BOOK_HEADER).map(function (r) {
     let lang = String(r.language || "").trim().toLowerCase();
     if (lang !== "de" && lang !== "en") lang = "de";
     return {
+      id: String(r.id || ""),
       name: String(r.name || ""),
       email: String(r.email || ""),
       language: lang,
+      phone: String(r.phone || ""),
+      note: String(r.note || ""),
+      default_role: normalizeRole_(String(r.default_role || "")),
+      dogs: addressBookDogs_(r.dogs),
+      jagden: einsaetze[String(r.email || "").trim().toLowerCase()] || 0,
     };
-  });
+  }).filter(function (c) { return c.name || c.email; });
 }
 
-function addressBookUpsert_(name, email, language) {
-  if (!name || !email) return;
+function addressBookFindRow_(sheet, id, name, email) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  const headers = sheetHeader_(sheet);
+  const rows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  const cId = headers.indexOf("id");
+  const cName = headers.indexOf("name");
+  const cMail = headers.indexOf("email");
+  const key = String(id || "").trim();
+  if (key && cId >= 0) {
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][cId]).trim() === key) return i + 2;
+    }
+  }
+  // Ohne ID: erst über die E-Mail, dann über den Namen. Die E-Mail ist der
+  // verlässlichere Schlüssel — eventHunterAdd_ prüft Duplikate darüber.
+  const mail = String(email || "").trim().toLowerCase();
+  if (mail && cMail >= 0) {
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][cMail]).trim().toLowerCase() === mail) return i + 2;
+    }
+  }
+  const nam = String(name || "").trim().toLowerCase();
+  if (nam && cName >= 0) {
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][cName]).trim().toLowerCase() === nam) return i + 2;
+    }
+  }
+  return -1;
+}
+
+// Der schmale Weg, den eventHunterAdd_ und rsvpRespond_ gehen: was bekannt
+// ist, wird geschrieben, alles andere bleibt stehen. Ein Jäger, der zu einer
+// zweiten Jagd eingeladen wird, darf seine Telefonnummer nicht verlieren.
+function addressBookUpsert_(name, email, language, extra) {
+  if (!name || !email) return "";
   const lang = (language === "en") ? "en" : "de";
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
-    .map(function (s) { return String(s).trim(); });
-  const colName = headers.indexOf("name");
-  const colEmail = headers.indexOf("email");
-  const colLang = headers.indexOf("language");
-  const lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    const rows = sheet.getRange(2, 1, lastRow - 1, ADDRESS_BOOK_HEADER.length).getValues();
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][colName]).trim().toLowerCase() === name.toLowerCase()) {
-        sheet.getRange(i + 2, colEmail + 1).setValue(email);
-        if (colLang >= 0) sheet.getRange(i + 2, colLang + 1).setValue(lang);
-        return;
-      }
+  addressBookEnsureIds_(sheet);
+  const headers = sheetHeader_(sheet);
+  const zusatz = extra || {};
+  const rowIdx = addressBookFindRow_(sheet, zusatz.id, name, email);
+
+  const setzen = function (spalte, wert) {
+    const c = headers.indexOf(spalte);
+    if (c >= 0) sheet.getRange(rowIdx, c + 1).setValue(wert);
+  };
+
+  if (rowIdx > 0) {
+    setzen("name", name);
+    setzen("email", email);
+    setzen("language", lang);
+    // Nur überschreiben, was mitgeliefert wurde.
+    if (zusatz.phone !== undefined) setzen("phone", String(zusatz.phone || ""));
+    if (zusatz.note !== undefined) setzen("note", String(zusatz.note || ""));
+    if (zusatz.default_role !== undefined) setzen("default_role", normalizeRole_(String(zusatz.default_role || "")));
+    if (zusatz.dogs !== undefined) setzen("dogs", JSON.stringify(addressBookDogs_(JSON.stringify(zusatz.dogs))));
+    setzen("updated_at", new Date().toISOString());
+    const cId = headers.indexOf("id");
+    return cId >= 0 ? String(sheet.getRange(rowIdx, cId + 1).getValue() || "") : "";
+  }
+
+  const id = "AB-" + Utilities.getUuid().replace(/-/g, "").slice(0, 10).toUpperCase();
+  appendByName_(sheet, {
+    id: id,
+    name: name,
+    email: email,
+    language: lang,
+    phone: String(zusatz.phone || ""),
+    note: String(zusatz.note || ""),
+    default_role: normalizeRole_(String(zusatz.default_role || "")),
+    dogs: JSON.stringify(addressBookDogs_(JSON.stringify(zusatz.dogs || []))),
+    updated_at: new Date().toISOString(),
+  });
+  return id;
+}
+
+// Anlegen und Ändern aus dem Hunterbase-Fenster. Anders als der schmale Weg
+// oben schreibt das ALLE Felder — wer dort ein Feld leert, will es leer.
+function addressBookSave_(body) {
+  const name = String(body.name || "").trim();
+  const email = String(body.email || "").trim();
+  if (!name) return { error: "Name fehlt" };
+  if (!email) return { error: "E-Mail fehlt" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "E-Mail sieht nicht richtig aus" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  addressBookEnsureIds_(sheet);
+  const headers = sheetHeader_(sheet);
+  const id = String(body.id || "").trim();
+
+  // Zwei Zeilen mit derselben E-Mail wären zwei Personen, die dieselbe Post
+  // bekommen. Beim Anlegen und beim Ändern prüfen.
+  const kollision = addressBookFindRow_(sheet, "", "", email);
+  if (kollision > 0) {
+    const cId = headers.indexOf("id");
+    const vorhandeneId = cId >= 0 ? String(sheet.getRange(kollision, cId + 1).getValue() || "").trim() : "";
+    if (!id || vorhandeneId !== id) {
+      return { error: "Diese E-Mail steht schon in der Hunterbase" };
     }
   }
-  appendByName_(sheet, { name: name, email: email, language: lang });
+
+  const neueId = addressBookUpsert_(name, email, body.language, {
+    id: id,
+    phone: body.phone !== undefined ? body.phone : "",
+    note: body.note !== undefined ? body.note : "",
+    default_role: body.default_role !== undefined ? body.default_role : "",
+    dogs: Array.isArray(body.dogs) ? body.dogs : [],
+  });
+  return { ok: true, id: id || neueId };
+}
+
+function addressBookDelete_(body) {
+  const id = String(body.id || "").trim();
+  if (!id) return { error: "id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  addressBookEnsureIds_(sheet);
+  const rowIdx = addressBookFindRow_(sheet, id, "", "");
+  if (rowIdx < 0) return { error: "Kontakt nicht gefunden" };
+  sheet.deleteRow(rowIdx);
+  // Die Jagden bleiben, wie sie sind: sie tragen Name und E-Mail als eigene
+  // Kopie in event_hunters. Wer schon eingeladen ist, verschwindet nicht,
+  // nur weil der Stammeintrag weg ist.
+  return { ok: true };
+}
+
+// CSV in die Stammliste. Füllt NUR den Pool — wer zu einer Jagd soll, wird
+// dort hineingezogen.
+function addressBookBatchAdd_(body) {
+  const rows = Array.isArray(body.contacts) ? body.contacts : [];
+  let added = 0;
+  const skipped = [];
+  const errors = [];
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  addressBookEnsureIds_(sheet);
+  for (let i = 0; i < rows.length && i < 200; i++) {
+    const r = rows[i] || {};
+    const name = String(r.name || "").trim();
+    const email = String(r.email || "").trim();
+    if (!name || !email) { errors.push("Zeile " + (i + 1) + ": Name oder E-Mail fehlt"); continue; }
+    if (addressBookFindRow_(sheet, "", "", email) > 0) { skipped.push(name); continue; }
+    addressBookUpsert_(name, email, r.language, {
+      phone: r.phone || "", note: r.note || "", default_role: r.default_role || "",
+    });
+    added++;
+  }
+  return { ok: true, added: added, skipped: skipped, errors: errors };
 }
 
 function randomToken_() {
