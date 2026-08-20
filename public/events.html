@@ -173,6 +173,26 @@
               <button type="submit" class="primary-btn small" id="add-hunter-btn">+ Hinzufügen</button>
             </form>
             <datalist id="address-book-options"></datalist>
+
+            <!-- Reiter, Suche und Trefferzahl stehen STATISCH hier und werden
+                 nie neu gerendert. renderEventDetail läuft pro Öffnen zweimal
+                 (erst aus dem Zwischenspeicher, dann frisch) — würde die
+                 Leiste mitgerendert, verlöre das Suchfeld mitten im Tippen
+                 Text und Cursor. -->
+            <div class="jgr-toolbar">
+              <div class="ev-tabs" id="jgr-tabs" role="tablist" aria-label="Nach Status filtern">
+                <button type="button" class="ev-tab active" data-tab="alle" role="tab" aria-selected="true">Alle <span class="ev-tab-count">0</span></button>
+                <button type="button" class="ev-tab" data-tab="zugesagt" role="tab" aria-selected="false">Zugesagt <span class="ev-tab-count">0</span></button>
+                <button type="button" class="ev-tab" data-tab="offen" role="tab" aria-selected="false">Offen <span class="ev-tab-count">0</span></button>
+                <button type="button" class="ev-tab" data-tab="abgesagt" role="tab" aria-selected="false">Abgesagt <span class="ev-tab-count">0</span></button>
+              </div>
+              <label class="jgr-search">
+                <span class="jgr-search-icon" aria-hidden="true">⌕</span>
+                <input type="search" id="jgr-search" placeholder="Name, E-Mail oder Rolle" autocomplete="off" aria-label="Jäger suchen" />
+              </label>
+              <span class="jgr-count" id="jgr-count"></span>
+            </div>
+
             <div id="hunters-list"></div>
             <div class="invite-actions">
               <button id="open-invite-preview" type="button" class="primary-btn">Einladung erstellen</button>

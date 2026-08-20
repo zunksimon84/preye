@@ -3246,33 +3246,268 @@ body.rsvp-page #rsvp-topbar {
 
 /* Hunter list -------------------------------------------------------------- */
 
-#hunters-list {
+/* Jägerregister ---------------------------------------------------------------
+   Aus der Kartenliste (eine .hunter-row à 59 px) wird eine Tabelle mit
+   Reitern, Suche und Sortierung. Bei 60 Jägern spart das rund 1900 px
+   Seitenhöhe — und man findet überhaupt jemanden wieder.
+
+   Die Kopfzeile ist die von .rn-table aus revier-neu.css, auf die Token
+   dieser Seite übersetzt: --rule → --border, --ink-faint → --muted,
+   --tint → --ctl-tint, --sea → --ctl-edge, --paper → --card. revier-neu.css
+   läuft auf dashboard.css, und dessen Token gibt es hier nicht.
+
+   Die Filterreiter benutzen .ev-tabs / .ev-tab weiter unten im Blatt — das
+   Reitermuster lag seit dem Wegfall der Tab-Navigation ungenutzt herum. Neu
+   ist nur die Zählpille.
+   -------------------------------------------------------------------------- */
+
+.jgr-toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: flex-end;
+  gap: 10px 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.jgr-toolbar .ev-tabs { margin: 0; flex: 1 1 auto; }
+
+.ev-tab-count {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  vertical-align: 1px;
+}
+.ev-tab.active .ev-tab-count { background: var(--ctl-tint); color: var(--ctl-ink); }
+
+.jgr-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 250px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+}
+.jgr-search:focus-within { border-color: var(--ctl-edge); }
+.jgr-search-icon { color: var(--muted); font-size: 16px; line-height: 1; }
+.jgr-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+}
+/* Das native X sitzt schief im Pillenrand. */
+.jgr-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.jgr-count {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding-bottom: 6px;
+}
+
+/* Der Container hieß bisher Flexspalte; als Tabellenhülle braucht er
+   stattdessen die waagerechte Notrolle und min-width: 0, damit eine breite
+   Tabelle nicht die Rasterspalte aufsprengt. */
+#hunters-list {
+  display: block;
+  min-width: 0;
+  overflow-x: auto;
   margin-bottom: 14px;
 }
 
-.hunter-row {
-  display: flex;
-  /* Umbruch, damit die aufklappende Rollenauswahl eine zweite Zeile bekommt
-     statt die Zeile zu sprengen. */
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+.jgr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.jgr-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 7px;
 }
-.hunter-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
+.jgr-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  background: var(--card);
 }
-.hunter-main strong { font-size: 14px; }
+.jgr-table tbody tr:hover td { background: var(--ctl-tint); }
+/* Abgesagte bleiben lesbar, treten aber zurück. */
+.jgr-table tr.hunter-declined td { opacity: 0.55; }
+
+.jgr-col-lang { width: 34px; text-align: center; padding-left: 4px; padding-right: 4px; }
+.jgr-col-role { width: 168px; }
+.jgr-col-stat { width: 132px; white-space: nowrap; }
+.jgr-col-pap  { width: 138px; }
+.jgr-col-dogs { width: 150px; }
+.jgr-col-act  { width: 74px; white-space: nowrap; text-align: right; }
+.jgr-table td.jgr-col-name strong { font-size: 14px; font-weight: 650; }
+/* max-width: 0 zwingt die Ellipse in einer Tabelle mit Auto-Layout. */
+.jgr-table td.jgr-col-mail,
+.jgr-table td.jgr-col-dogs {
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jgr-table td.jgr-col-mail { font-size: 12.5px; }
+.jgr-table td.jgr-col-mail a { color: var(--muted); text-decoration: none; }
+.jgr-table td.jgr-col-mail a:hover { color: var(--ctl-ink); text-decoration: underline; }
+.jgr-table td.jgr-col-dogs { font-size: 12px; color: var(--steel-dark); }
+.jgr-table .hunter-dogs { display: inline; margin: 0; }
+.jgr-table .hunter-email { display: inline; }
+
+.jgr-pap-ok { color: var(--ctl-ink); font-weight: 700; }
+/* "gesetzt" ist die einzige Anzeige dafür, dass keine Bestätigungen
+   vorliegen — der Rest des alten Statuslabel-Tricks, der bleiben muss. */
+.jgr-gesetzt {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.jgr-sort {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.jgr-sort:hover { color: var(--ctl-ink); }
+.jgr-sort::after { content: "↕"; font-size: 11px; opacity: 0.35; }
+th[aria-sort="ascending"] .jgr-sort,
+th[aria-sort="descending"] .jgr-sort { color: var(--ctl-ink); }
+th[aria-sort="ascending"] .jgr-sort::after { content: "↑"; opacity: 1; }
+th[aria-sort="descending"] .jgr-sort::after { content: "↓"; opacity: 1; }
+
+.jgr-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Bei 60 Zeilen flimmerten sonst 120 Zeichen über die Tabelle. Auf Tastatur
+   bleiben sie sichtbar. */
+.jgr-table td.jgr-col-act .link-btn { opacity: 0.3; transition: opacity 0.1s; }
+.jgr-table tr:hover td.jgr-col-act .link-btn,
+.jgr-table td.jgr-col-act .link-btn:focus-visible { opacity: 1; }
+
+/* Die Rollenauswahl klappt als eigene Zeile auf — ein <div> im <tr> würde
+   der Browser aus der Tabelle werfen. */
+.jgr-pickrow > td { padding: 0 8px 10px; border-bottom: 1px solid var(--border); }
+.jgr-pickrow .hunter-setpick { margin-top: 0; padding-top: 8px; border-top: none; }
+
+/* Handy: aus acht Spalten wird eine Karte je Jäger. Muster wörtlich von
+   .stk-table weiter unten — thead weg, alles display: block, die
+   Beschriftungen kommen über td::before { content: attr(data-label) }
+   zurück. Gleiche Zahl (620), damit die Seite nicht zwei Faltpunkte hat. */
+@media (max-width: 620px) {
+  #hunters-list { overflow-x: visible; }
+  .jgr-table thead { display: none; }
+  .jgr-table,
+  .jgr-table tbody,
+  .jgr-table tr,
+  .jgr-table td { display: block; width: auto; }
+  .jgr-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    margin-bottom: 6px;
+    padding: 8px 10px;
+    background: var(--card);
+  }
+  .jgr-table td {
+    border: none;
+    padding: 0;
+    background: none;
+    max-width: none;
+    width: auto;
+  }
+  .jgr-table td.jgr-col-lang { flex: 0 0 auto; }
+  .jgr-table td.jgr-col-name { flex: 1 1 auto; }
+  .jgr-table td.jgr-col-act  { flex: 0 0 auto; margin-left: auto; }
+  .jgr-table td.jgr-col-act .link-btn { opacity: 1; }
+  /* max-width: none muss hier stehen und nicht nur an .jgr-table td: die
+     Ellipsen-Regel oben ist .jgr-table td.jgr-col-mail (0,2,1) und schlägt
+     .jgr-table td (0,1,1), egal wie weit unten die steht. Ohne das ist die
+     Zelle auf dem Handy 0 px breit und die E-Mail unsichtbar. */
+  .jgr-table td.jgr-col-mail { flex: 1 1 100%; order: 1; max-width: none; }
+  .jgr-table td.jgr-col-dogs { max-width: none; }
+  .jgr-table td.jgr-col-role,
+  .jgr-table td.jgr-col-stat,
+  .jgr-table td.jgr-col-pap,
+  .jgr-table td.jgr-col-dogs {
+    order: 2;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--steel-dark);
+  }
+  .jgr-table td.jgr-col-role::before,
+  .jgr-table td.jgr-col-dogs::before {
+    content: attr(data-label) ":";
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  /* Leere Zellen dürfen kein leeres Etikett hinterlassen. */
+  .jgr-table td:empty { display: none; }
+  .jgr-table tr.hunter-declined td { opacity: 1; }
+  .jgr-table tr.hunter-declined { opacity: 0.6; }
+  .jgr-pickrow { border: none; padding: 0; margin: -4px 0 8px; }
+  .jgr-pickrow > td { padding: 0; }
+  .jgr-toolbar { flex-direction: column; align-items: stretch; }
+  .jgr-toolbar .ev-tabs { overflow-x: auto; }
+  .jgr-count { padding-bottom: 0; }
+}
+
+
+/* .hunter-row war bis 20.08.2026 eine Flex-Karte und .hunter-main ihre
+   mittlere Spalte. Seit die Liste eine Tabelle ist, ist .hunter-row ein <tr>
+   — eine Kartenregel darauf hätte die Tabelle zerlegt, und genau das tat sie
+   auch, bis es auffiel: die Zellen stapelten sich in einer 190 px schmalen
+   Spalte, während die Kopfzeile über die volle Breite lief.
+
+   Was von der Familie bleibt, ist alles, was NICHT Layout ist: die vier
+   Statusfarben (sie hängen an der Zeile und wirken auf .hunter-status), die
+   Schriftgrößen und die Knöpfe. Die stehen unverändert weiter unten. */
+
 .hunter-email {
   font-size: 12px;
   color: var(--muted);

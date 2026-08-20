@@ -415,6 +415,9 @@ async function submitNewEvent(e) {
 // ---------- Detail ----------
 
 async function loadEventDetail(id) {
+  // Reiter, Suche und Sortierung überleben das doppelte Rendern derselben
+  // Jagd und werden nur beim Wechsel zurückgesetzt.
+  jgrReset(id);
   const cached = readCache("event-detail", { id });
   if (cached) {
     state.currentEvent = cached;
@@ -533,60 +536,213 @@ function renderContactsBlock(event) {
   el.innerHTML = `<h3 class="ev-contacts-title">Kontakte <span class="muted">(für die schriftliche Einladung)</span></h3>${lines.join("")}`;
 }
 
+// ---------- Jägerregister (jgr-) ----------
+// Aus der Kartenliste (eine .hunter-row à 59 px) wird eine Tabelle mit
+// Reitern, Suche und Sortierung. Bei 60 Jägern spart das rund 1900 px
+// Seitenhöhe — und man findet überhaupt jemanden wieder.
+
+const JGR_TABS = [
+  { key: "alle",     label: "Alle" },
+  { key: "zugesagt", label: "Zugesagt" },
+  { key: "offen",    label: "Offen" },
+  { key: "abgesagt", label: "Abgesagt" },
+];
+
+// Die Sicht auf die Liste, kein zweiter Datenbestand. Steht bewusst NEBEN
+// state.currentEvent: das wird bei jedem Nachladen komplett ersetzt, die
+// Reiterwahl soll das überleben.
+const jgrView = { eventId: null, tab: "alle", q: "", sort: "name", dir: 1 };
+
+function jgrReset(eventId) {
+  if (jgrView.eventId === eventId) return;   // dieselbe Jagd: Stand behalten
+  Object.assign(jgrView, { eventId, tab: "alle", q: "", sort: "name", dir: 1 });
+  const feld = $("#jgr-search");
+  if (feld) feld.value = "";
+}
+
+const JGR_COLL = new Intl.Collator("de", { sensitivity: "base", numeric: true });
+
+const JGR_STATUS_LABEL = {
+  accepted: "Zugesagt ✓",
+  declined: "Abgesagt ✗",
+  invited:  "Eingeladen ⋯",
+  pending:  "Offen",
+};
+
+// pending und invited liegen im selben Topf: beides heißt "noch keine
+// Antwort", und die Reiter sollen vier sein, nicht fünf.
+function jgrBucket(status) {
+  if (status === "accepted") return "zugesagt";
+  if (status === "declined") return "abgesagt";
+  return "offen";
+}
+
+function jgrRow(h) {
+  const gesetzt = !!h.set_manually;
+  // Bei einer Zusage über den Link liegen Jagdschein- und VSG-Bestätigung vor,
+  // bei einem gesetzten Eintrag nicht. Das ist bei Schützen und Hundeführern
+  // ein Unterschied, den man vor der Jagd sehen will; ein Treiber führt keine
+  // Waffe.
+  //
+  // "nicht mitgeliefert" ist nicht dasselbe wie "nicht bestätigt". Solange das
+  // Backend die Felder nicht kennt (alte Fassung), darf die Papierspalte
+  // NICHTS behaupten — sonst steht bei jemandem, der über den Link zugesagt
+  // und beides bestätigt hat, es fehle etwas. Diese Prüfung steht nur hier.
+  const kenntBestaetigungen = h.confirmed_jagdschein !== undefined;
+  const brauchtPapiere = kenntBestaetigungen && h.status === "accepted" &&
+    (h.role === "Schütze/Standschnaller" || h.role === "Hundeführer");
+  const fehlt = brauchtPapiere
+    ? [!h.confirmed_jagdschein ? "Jagdschein" : "", !h.confirmed_vsg44 ? "VSG 4.4" : ""].filter(Boolean)
+    : [];
+  const name = h.hunter || "";
+  return {
+    id: h.id,
+    name,
+    email: h.email || "",
+    language: h.language === "en" ? "en" : "de",
+    status: h.status || "pending",
+    bucket: jgrBucket(h.status),
+    role: h.role || "",
+    gesetzt,
+    kenntBestaetigungen,
+    brauchtPapiere,
+    fehlt,
+    dogs: (h.status === "accepted" && Array.isArray(h.dogs)) ? h.dogs : [],
+    such: (name + " " + (h.email || "") + " " + (h.role || "")).toLowerCase(),
+  };
+}
+
+const JGR_SORT = {
+  name:   (r) => r.name,
+  email:  (r) => r.email || "zzz",
+  role:   (r) => r.role || "zzz",
+  status: (r) => ({ accepted: 0, invited: 1, pending: 2, declined: 3 }[r.status] ?? 9),
+  // Probleme nach oben: erst "es fehlt was", dann "geprüft", dann
+  // "betrifft ihn nicht".
+  papiere: (r) => (r.fehlt.length ? 0 : (r.brauchtPapiere ? 1 : 2)),
+};
+
+function jgrSichtbar(zeilen) {
+  const gefiltert = zeilen.filter((r) =>
+    (jgrView.tab === "alle" || r.bucket === jgrView.tab) &&
+    (!jgrView.q || r.such.includes(jgrView.q))
+  );
+  const schluessel = JGR_SORT[jgrView.sort] || JGR_SORT.name;
+  return gefiltert.sort((a, b) => {
+    const ka = schluessel(a), kb = schluessel(b);
+    const c = (typeof ka === "number") ? ka - kb : JGR_COLL.compare(ka, kb);
+    // Der Name ist der zweite Schlüssel, damit gleiche Werte nicht springen.
+    return (c || JGR_COLL.compare(a.name, b.name)) * jgrView.dir;
+  });
+}
+
+// Die Zähler kommen aus der UNGEFILTERTEN Liste. Sonst zeigt der aktive Reiter
+// seine eigene Trefferzahl und die anderen null.
+function jgrUpdateTabs(alle) {
+  const wrap = $("#jgr-tabs");
+  if (!wrap) return;
+  const zaehler = { alle: alle.length, zugesagt: 0, offen: 0, abgesagt: 0 };
+  alle.forEach((r) => { zaehler[r.bucket]++; });
+  $$(".ev-tab", wrap).forEach((b) => {
+    const k = b.dataset.tab;
+    const an = k === jgrView.tab;
+    b.classList.toggle("active", an);
+    b.setAttribute("aria-selected", an ? "true" : "false");
+    const pille = b.querySelector(".ev-tab-count");
+    if (pille) pille.textContent = zaehler[k] ?? 0;
+  });
+}
+
+function jgrPapiereZelle(r) {
+  if (!r.kenntBestaetigungen) return "";   // alte Backend-Fassung: nichts
+  if (!r.brauchtPapiere) return "";        // Treiber oder noch keine Zusage
+  if (!r.fehlt.length) {
+    return '<span class="jgr-pap-ok" title="Jagdschein und VSG 4.4 bestätigt">✓</span>';
+  }
+  return '<span class="hunter-missing" title="Beim Setzen von Hand liegt keine Bestätigung vor">ohne ' +
+         escapeHtml(r.fehlt.join(" + ")) + "</span>";
+}
+
+function jgrKopf(schluessel, text, klasse) {
+  const aktiv = jgrView.sort === schluessel;
+  const sortiert = aktiv ? (jgrView.dir > 0 ? "ascending" : "descending") : "none";
+  return `<th class="${klasse}" scope="col" aria-sort="${sortiert}">` +
+         `<button type="button" class="jgr-sort" data-sort="${schluessel}">${escapeHtml(text)}</button></th>`;
+}
+
 function renderHuntersList(hunters) {
   const list = $("#hunters-list");
-  if (!hunters.length) {
+  if (!list) return;
+  const alle = (hunters || []).map(jgrRow);
+  jgrUpdateTabs(alle);
+
+  if (!alle.length) {
     list.innerHTML = "<p class='empty-msg'>Noch keine Jäger hinzugefügt.</p>";
+    jgrUpdateCount(0, 0);
     updateInviteStatus();
     return;
   }
-  list.innerHTML = hunters.map((h) => {
-    const baseLabel = {
-      accepted: "Zugesagt ✓",
-      declined: "Abgesagt ✗",
-      invited: "Eingeladen ⋯",
-      pending: "Offen",
-    }[h.status] || h.status;
-    const gesetzt = !!h.set_manually;
-    const statusLabel = h.status === "accepted" && h.role
-      ? h.role + (gesetzt ? " · gesetzt" : " ✓")
-      : baseLabel;
-    // Bei einer Zusage über den Link liegen Jagdschein- und VSG-Bestätigung
-    // vor. Bei einem gesetzten Eintrag nicht — und das ist bei Schützen und
-    // Hundeführern ein Unterschied, den man vor der Jagd sehen will. Ein
-    // Treiber führt keine Waffe, dort steht nichts.
-    // „nicht mitgeliefert" ist nicht dasselbe wie „nicht bestätigt". Solange
-    // das Backend die Felder nicht kennt (alte Fassung), darf hier nichts
-    // stehen — sonst behauptet die Liste bei jemandem, der über den Link
-    // zugesagt und beides bestätigt hat, es fehle etwas.
-    const kenntBestaetigungen = h.confirmed_jagdschein !== undefined;
-    const brauchtPapiere = kenntBestaetigungen && h.status === "accepted" &&
-      (h.role === "Schütze/Standschnaller" || h.role === "Hundeführer");
-    const fehlt = brauchtPapiere
-      ? [!h.confirmed_jagdschein ? "Jagdschein" : "", !h.confirmed_vsg44 ? "VSG 4.4" : ""].filter(Boolean)
-      : [];
-    const dogsText = (h.status === "accepted" && Array.isArray(h.dogs) && h.dogs.length)
-      ? "Hunde: " + h.dogs.map((d) => d.count + "× " + d.breed).join(", ")
-      : "";
-    const flag = h.language === "en" ? "🇬🇧" : "🇩🇪";
-    return `
-      <div class="hunter-row hunter-${escapeHtml(h.status || "pending")}">
-        <span class="hunter-flag" title="${h.language === "en" ? "English" : "Deutsch"}">${flag}</span>
-        <div class="hunter-main">
-          <strong>${escapeHtml(h.hunter)}</strong>
-          <span class="hunter-email">${escapeHtml(h.email || "—")}</span>
-          ${dogsText ? `<span class="hunter-dogs">${escapeHtml(dogsText)}</span>` : ""}
-        </div>
-        <span class="hunter-status${gesetzt ? " hunter-status--gesetzt" : ""}">${escapeHtml(statusLabel)}</span>
-        ${fehlt.length ? `<span class="hunter-missing" title="Beim Setzen von Hand liegt keine Bestätigung vor">ohne ${escapeHtml(fehlt.join(" + "))}</span>` : ""}
-        <button class="link-btn hunter-set" data-hid="${escapeHtml(h.id)}"
-                data-gesetzt="${gesetzt ? "1" : ""}"
-                title="${gesetzt ? "Setzen zurücknehmen" : "Ohne Einladung als zugesagt setzen"}">${gesetzt ? "↺" : "✓"}</button>
-        <button class="link-btn hunter-remove" data-hid="${escapeHtml(h.id)}" title="Entfernen">×</button>
-      </div>
-    `;
-  }).join("");
+
+  const zeilen = jgrSichtbar(alle);
+  jgrUpdateCount(zeilen.length, alle.length);
+
+  if (!zeilen.length) {
+    list.innerHTML = "<p class='empty-msg'>Kein Treffer — Reiter oder Suche ändern.</p>";
+    updateInviteStatus();
+    return;
+  }
+
+  list.innerHTML = `
+    <table class="jgr-table">
+      <thead>
+        <tr>
+          <th class="jgr-col-lang" scope="col"><span class="jgr-sr">Sprache</span></th>
+          ${jgrKopf("name", "Name", "jgr-col-name")}
+          ${jgrKopf("email", "E-Mail", "jgr-col-mail")}
+          ${jgrKopf("role", "Rolle", "jgr-col-role")}
+          ${jgrKopf("status", "Status", "jgr-col-stat")}
+          ${jgrKopf("papiere", "Papiere", "jgr-col-pap")}
+          <th class="jgr-col-dogs" scope="col">Hunde</th>
+          <th class="jgr-col-act" scope="col"><span class="jgr-sr">Aktionen</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${zeilen.map((r) => {
+          const dogs = r.dogs.length ? r.dogs.map((d) => d.count + "× " + d.breed).join(", ") : "";
+          return `
+          <tr class="hunter-row hunter-${escapeHtml(r.status)}" data-hid="${escapeHtml(r.id)}">
+            <td class="jgr-col-lang" data-label="Sprache"><span class="hunter-flag" title="${r.language === "en" ? "English" : "Deutsch"}">${r.language === "en" ? "🇬🇧" : "🇩🇪"}</span></td>
+            <td class="jgr-col-name" data-label="Name"><strong>${escapeHtml(r.name)}</strong></td>
+            <td class="jgr-col-mail" data-label="E-Mail">${r.email ? `<a class="hunter-email" href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a>` : '<span class="muted">—</span>'}</td>
+            <td class="jgr-col-role" data-label="Rolle">${r.role ? escapeHtml(r.role) : '<span class="muted">—</span>'}</td>
+            <td class="jgr-col-stat" data-label="Status"><span class="hunter-status">${escapeHtml(JGR_STATUS_LABEL[r.status] || r.status)}</span>${r.gesetzt ? '<span class="jgr-gesetzt" title="Von Hand gesetzt — Jagdschein und VSG 4.4 sind damit nicht bestätigt">gesetzt</span>' : ""}</td>
+            <td class="jgr-col-pap" data-label="Papiere">${jgrPapiereZelle(r)}</td>
+            <td class="jgr-col-dogs" data-label="Hunde">${dogs ? `<span class="hunter-dogs">${escapeHtml(dogs)}</span>` : ""}</td>
+            <td class="jgr-col-act">
+              <button class="link-btn hunter-set" data-hid="${escapeHtml(r.id)}"
+                      data-gesetzt="${r.gesetzt ? "1" : ""}"
+                      title="${r.gesetzt ? "Setzen zurücknehmen" : "Ohne Einladung als zugesagt setzen"}">${r.gesetzt ? "↺" : "✓"}</button>
+              <button class="link-btn hunter-remove" data-hid="${escapeHtml(r.id)}" title="Entfernen">×</button>
+            </td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
   updateInviteStatus();
+}
+
+// "12 von 60" nur, wenn wirklich gefiltert wird — eine stumm gefilterte Liste
+// liest sich wie eine kaputte.
+function jgrUpdateCount(sichtbar, gesamt) {
+  const el = $("#jgr-count");
+  if (!el) return;
+  el.textContent = !gesamt ? ""
+    : (sichtbar === gesamt ? `${gesamt} ${gesamt === 1 ? "Jäger" : "Jäger"}` : `${sichtbar} von ${gesamt}`);
+}
+
+function jgrNeuZeichnen() {
+  renderHuntersList(state.currentEvent?.hunters || []);
 }
 
 function updateInviteStatus() {
@@ -656,20 +812,30 @@ async function addHunter(e) {
 // Fehler fiele erst nach dem Absenden auf.
 const SET_ROLES = ["Schütze/Standschnaller", "Treiber", "Hundeführer"];
 
+// Die Rollenauswahl klappt UNTER der Zeile auf, als eigene Tabellenzeile.
+// Bis 20.08.2026 hing sie als <div> in der Zeile selbst — in einem <tr> ist
+// ein <div> nicht platzierbar, der Browser wirft es aus der Tabelle heraus
+// und die Auswahl stünde irgendwo oben auf der Seite. Der Fehler wäre stumm:
+// sichtbar, nur an der falschen Stelle.
 function openSetPicker(row, id, hunterName) {
-  if (row.querySelector(".hunter-setpick")) return;
-  const box = document.createElement("div");
-  box.className = "hunter-setpick";
-  box.innerHTML =
+  const naechste = row.nextElementSibling;
+  if (naechste && naechste.classList.contains("jgr-pickrow")) return;
+
+  const spalten = row.children.length || 1;
+  const pick = document.createElement("tr");
+  pick.className = "jgr-pickrow";
+  pick.innerHTML =
+    `<td colspan="${spalten}"><div class="hunter-setpick">` +
     `<span>${escapeHtml(hunterName)} setzen als</span>` +
     SET_ROLES.map((r) => `<button type="button" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`).join("") +
-    `<button type="button" data-cancel="1" class="hunter-setpick-x">Abbrechen</button>`;
-  row.appendChild(box);
-  box.addEventListener("click", (e) => {
+    `<button type="button" data-cancel="1" class="hunter-setpick-x">Abbrechen</button>` +
+    `</div></td>`;
+  row.after(pick);
+  pick.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
-    if (b.dataset.cancel) { box.remove(); return; }
-    box.remove();
+    if (b.dataset.cancel) { pick.remove(); return; }
+    pick.remove();
     applySet(id, b.dataset.role, false, hunterName);
   });
 }
@@ -3129,7 +3295,28 @@ function wireRoster() {
     const btn = e.target.closest(".hunter-remove");
     if (btn) { removeHunter(btn.dataset.hid); return; }
     const setBtn = e.target.closest(".hunter-set");
-    if (setBtn) setHunter(setBtn.dataset.hid, !!setBtn.dataset.gesetzt);
+    if (setBtn) { setHunter(setBtn.dataset.hid, !!setBtn.dataset.gesetzt); return; }
+    // Die Sortierköpfe entstehen bei jedem Render neu, deshalb delegiert.
+    const kopf = e.target.closest(".jgr-sort");
+    if (kopf) {
+      const k = kopf.dataset.sort;
+      jgrView.dir = (jgrView.sort === k) ? -jgrView.dir : 1;
+      jgrView.sort = k;
+      jgrNeuZeichnen();
+    }
+  });
+
+  // Reiter und Suchfeld stehen statisch im Markup und werden nie neu
+  // gerendert — sonst verlöre das Feld beim Tippen Text und Cursor.
+  on("#jgr-tabs", "click", (e) => {
+    const b = e.target.closest(".ev-tab");
+    if (!b) return;
+    jgrView.tab = b.dataset.tab;
+    jgrNeuZeichnen();
+  });
+  on("#jgr-search", "input", (e) => {
+    jgrView.q = e.target.value.trim().toLowerCase();
+    jgrNeuZeichnen();
   });
 }
 
