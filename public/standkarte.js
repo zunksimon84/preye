@@ -311,6 +311,75 @@ function saveList() {
   try { localStorage.setItem(listKey(), JSON.stringify(rows)); } catch {}
 }
 
+// ---------- Anmerkungen zur Jagdeinrichtung ----------
+// Eigener Schlüssel, nicht in der Beobachtungsliste: "Liste leeren" leert die
+// Beobachtungen, nicht den Hinweis, dass die Leiter gebrochen ist.
+
+const JE_FLAGS = {
+  beschaedigt: "beschädigt",
+  zugewachsen: "zugewachsen",
+  aufstieg: "Aufstieg unsicher",
+  auflage: "Auflage fehlt",
+  ok: "alles in Ordnung",
+};
+
+function jeKey() {
+  if (state.blank) return "preye.stk.einrichtung.blanko";
+  return "preye.stk.einrichtung." + (state.detail.event.id || "x") + "." + (state.me || "anon");
+}
+
+function readJe() {
+  try {
+    const o = JSON.parse(localStorage.getItem(jeKey()) || "{}");
+    return { flags: Array.isArray(o.flags) ? o.flags : [], text: String(o.text || "") };
+  } catch { return { flags: [], text: "" }; }
+}
+
+function saveJe() {
+  const flags = $$("#stk-je-flags input:checked").map((cb) => cb.dataset.je);
+  const text = ($("#stk-je-text") || {}).value || "";
+  try { localStorage.setItem(jeKey(), JSON.stringify({ flags, text })); } catch {}
+}
+
+function renderJe() {
+  const box = $("#stk-je-flags");
+  const feld = $("#stk-je-text");
+  if (!box || !feld) return;
+  const gespeichert = readJe();
+  $$("#stk-je-flags input").forEach((cb) => { cb.checked = gespeichert.flags.includes(cb.dataset.je); });
+  feld.value = gespeichert.text;
+}
+
+function wireJe() {
+  const box = $("#stk-je-flags");
+  const feld = $("#stk-je-text");
+  if (!box || !feld) return;
+  box.addEventListener("change", (e) => {
+    const cb = e.target.closest("input[data-je]");
+    if (!cb) return;
+    // "alles in Ordnung" und ein Mangel schließen einander aus — sonst steht
+    // in der Meldung "alles in Ordnung, Aufstieg unsicher".
+    if (cb.dataset.je === "ok" && cb.checked) {
+      $$("#stk-je-flags input").forEach((x) => { if (x !== cb) x.checked = false; });
+    } else if (cb.checked) {
+      const ok = $('#stk-je-flags input[data-je="ok"]');
+      if (ok) ok.checked = false;
+    }
+    saveJe();
+  });
+  feld.addEventListener("input", saveJe);
+}
+
+// Für die Meldung: eine Zeile, oder nichts, wenn nichts eingetragen wurde.
+function jeReportLines() {
+  const { flags, text } = readJe();
+  if (!flags.length && !text.trim()) return [];
+  const teile = flags.map((f) => JE_FLAGS[f]).filter(Boolean);
+  const out = ["", "Jagdeinrichtung: " + (teile.join(", ") || "—")];
+  if (text.trim()) out.push(text.trim());
+  return out;
+}
+
 // 1–20 and a "20+" bucket for the rare Rotte that nobody counted exactly.
 function countOptions(selected) {
   let out = `<option value="">Anzahl</option>`;
@@ -417,6 +486,7 @@ function buildReport() {
       lines.push(`${i + 1}. ${r.time || "--:--"} ${wild}${wo}${flags ? " — " + flags : ""}`.trim());
     });
   }
+  lines.push(...jeReportLines());
   return lines.join("\n");
 }
 
@@ -593,6 +663,7 @@ function renderBlankCard() {
     </label>`;
 
   renderList();
+  renderJe();
   renderOfflineNote();
 
   $("#stk-foot").textContent = "Waidmannsheil!";
@@ -615,6 +686,7 @@ function renderCard() {
   renderContacts();
   renderFreigaben();
   renderList();
+  renderJe();
   renderOfflineNote();
 
   $("#stk-foot").textContent = "Waidmannsheil!";
@@ -804,16 +876,23 @@ function wireUi() {
 
   $("#stk-print").addEventListener("click", () => window.print());
 
+  wireJe();
+
   $("#stk-reset").addEventListener("click", () => {
     const what = state.blank ? "Alle Eingaben dieser Standkarte leeren?" : "Alle Zeilen dieser Standkarte leeren?";
     if (!confirm(what)) return;
     try { localStorage.removeItem(listKey()); } catch {}
     if (state.blank) {
+      // Dort heißt der Knopf "alle Eingaben leeren", also auch die Rubrik.
       try { localStorage.removeItem(BLANK_KEY); } catch {}
+      try { localStorage.removeItem(jeKey()); } catch {}
       renderBlankCard();
       showToast("Zurückgesetzt");
       return;
     }
+    // Die Anmerkung zur Jagdeinrichtung bleibt bewusst stehen: "Liste leeren"
+    // meint die Beobachtungen, nicht den Hinweis, dass die Leiter gebrochen
+    // ist. Der gilt weiter, auch wenn man sich beim Eintragen vertan hat.
     renderList();
     showToast("Liste geleert");
   });

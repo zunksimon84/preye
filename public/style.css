@@ -5033,6 +5033,61 @@ body.stk-page {
 .stk-mine-row span { color: var(--muted); font-size: 12px; align-self: center; }
 .stk-mine-nav a { font-weight: 700; }
 
+/* Anmerkungen zur Jagdeinrichtung. Die Häkchen decken den Regelfall ab —
+   wer den ganzen Tag auf dem Sitz saß, tippt im Wald ungern. Das Feld
+   darunter ist für alles andere. */
+.stk-je-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0 0 10px;
+}
+.stk-je-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--card);
+}
+.stk-je-flag input { width: 15px; height: 15px; accent-color: var(--act); cursor: pointer; }
+.stk-je-flag:has(input:checked) {
+  border-color: var(--act);
+  background: var(--act-soft);
+  color: var(--act-text);
+  font-weight: 650;
+}
+/* "alles in Ordnung" ist die Entwarnung, kein Mangel — grün wie eine Zusage,
+   die anderen bleiben in der Aufmerksamkeitsfarbe. */
+.stk-je-flag:has(input[data-je="beschaedigt"]:checked),
+.stk-je-flag:has(input[data-je="zugewachsen"]:checked),
+.stk-je-flag:has(input[data-je="aufstieg"]:checked),
+.stk-je-flag:has(input[data-je="auflage"]:checked) {
+  border-color: var(--accent);
+  background: #fdf1e4;
+  color: var(--accent-text);
+}
+#stk-je-text {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  resize: vertical;
+}
+#stk-je-text:focus { outline: none; border-color: var(--act); }
+/* Im Druck und im PDF soll auch ein leeres Feld eine Schreiblinie sein. */
+@media print {
+  #stk-je-text { min-height: 46px; }
+  .stk-je-flag { break-inside: avoid; }
+}
+
 .stk-grid { display: grid; gap: 14px; }
 
 .stk-block {

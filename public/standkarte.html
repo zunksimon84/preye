@@ -134,6 +134,24 @@
           </table>
         </section>
 
+        <!-- Anmerkungen zur Jagdeinrichtung. Wer den ganzen Tag auf dem Sitz
+             war, weiß als Einziger, ob die Leiter wackelt oder der Einblick
+             zugewachsen ist — und vergisst es bis zur nächsten Jagd. Die
+             Häkchen sind für den Regelfall, das Feld für alles andere. -->
+        <section class="stk-block stk-block--einrichtung">
+          <h3>Anmerkungen zur Jagdeinrichtung</h3>
+          <p class="stk-hint">Ist am Sitz etwas kaputt oder zugewachsen? Wird mit der Meldung mitgeschickt.</p>
+          <div class="stk-je-flags" id="stk-je-flags">
+            <label class="stk-je-flag"><input type="checkbox" data-je="beschaedigt" /><span>beschädigt</span></label>
+            <label class="stk-je-flag"><input type="checkbox" data-je="zugewachsen" /><span>zugewachsen</span></label>
+            <label class="stk-je-flag"><input type="checkbox" data-je="aufstieg" /><span>Aufstieg unsicher</span></label>
+            <label class="stk-je-flag"><input type="checkbox" data-je="auflage" /><span>Auflage fehlt</span></label>
+            <label class="stk-je-flag"><input type="checkbox" data-je="ok" /><span>alles in Ordnung</span></label>
+          </div>
+          <textarea id="stk-je-text" rows="3" maxlength="600"
+                    placeholder="z.B. zweite Sprosse gebrochen · Einblick nach Süden zugewachsen · Dach undicht"></textarea>
+        </section>
+
         <div class="stk-actions">
           <button type="button" id="stk-anschuss" class="primary-btn stk-alert">Anschuss melden</button>
           <button type="button" id="stk-send" class="primary-btn">Meldung senden</button>
