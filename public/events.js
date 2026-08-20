@@ -2814,7 +2814,7 @@ function renderFreigabenBlock(event, matrix) {
     <p class="muted freigabe-hint">
       Häkchen setzen, was am Jagdtag erlegt werden darf — wird automatisch gespeichert und in der nächsten Infomail-PDF verwendet.
     </p>
-    ${speciesHtml}
+    <div class="freigabe-arten">${speciesHtml}</div>
     <p class="muted freigabe-foot">Raubwild ist generell nicht freigegeben · Leitbachen verschonen.</p>
   `;
   // Toggle the on/off pill class + schedule a debounced save.

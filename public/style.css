@@ -3003,6 +3003,19 @@ body.rsvp-page #rsvp-topbar {
 }
 .freigabe-hint { margin: 0 0 12px; font-size: 12.5px; }
 .freigabe-foot { margin: 8px 0 0; font-size: 12.5px; font-style: italic; }
+/* Am Rechner zwei Spalten: Rot- und Damwild links, Schwarz- und Rehwild
+   rechts. Untereinander lief der Kasten über die volle Breite und war
+   trotzdem halb leer — die AK-Pillen brauchen nur die halbe Zeile. */
+.freigabe-arten { display: block; }
+@media (min-width: 1000px) {
+  /* Mehrspaltensatz statt Raster: der füllt SPALTENWEISE, also links Rot-
+     und Damwild, rechts Schwarz- und Rehwild. Ein Raster füllt zeilenweise
+     und hätte Damwild neben Rotwild gestellt. Und es rechnet die Aufteilung
+     selbst aus, wenn eine fünfte Wildart dazukommt. */
+  .freigabe-arten { columns: 2; column-gap: 36px; }
+  .freigabe-species { break-inside: avoid; }
+}
+
 .freigabe-species { margin: 0 0 12px; }
 .freigabe-species:last-of-type { margin-bottom: 0; }
 .freigabe-species-label {
