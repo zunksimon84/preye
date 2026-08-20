@@ -3041,62 +3041,35 @@ function buildNewEventForm() {
   window.preyeWireRevierGrid(grid, "teilgebiet");
 }
 
-function wireUi() {
-  buildNewEventForm();
+// Ein fehlendes Element hat wireUi() bisher mitten im Lauf beendet: $ ist
+// querySelector und liefert null, und null.addEventListener wirft. Alles nach
+// der Fundstelle war damit tot, ohne dass die Seite kaputt aussah. Jetzt fehlt
+// genau ein Knopf, und die Konsole sagt welcher.
+function on(sel, type, handler, root = document) {
+  const el = root.querySelector(sel);
+  if (!el) { console.warn("PREYE: Element fehlt, Verdrahtung übersprungen:", sel); return null; }
+  el.addEventListener(type, handler);
+  return el;
+}
+
+function onAll(sel, type, handler, root = document) {
+  const els = Array.from(root.querySelectorAll(sel));
+  if (!els.length) console.warn("PREYE: keine Elemente für", sel);
+  els.forEach((el) => el.addEventListener(type, handler));
+  return els;
+}
+
+// Grundgerüst: Kopfleiste, Zurück-Knopf, Adresszeile.
+function wireShell() {
+  on("#new-event-btn", "click", () => { location.hash = "#/new"; });
+  on("#back-to-list", "click", () => { location.hash = "#/"; });
+  window.addEventListener("hashchange", route);
+}
+
+function wireListe() {
   wireFilters();
-  $("#new-event-btn").addEventListener("click", () => { location.hash = "#/new"; });
-  $("#new-event-form").addEventListener("submit", submitNewEvent);
-  $("#ev-treffpunkt-here").addEventListener("click", () => fillTreffpunktCoords("#ev-treffpunkt-lat", "#ev-treffpunkt-lng"));
-  $("#new-event-cancel").addEventListener("click", () => { location.hash = "#/"; });
-  $("#back-to-list").addEventListener("click", () => { location.hash = "#/"; });
-  $("#add-hunter-form").addEventListener("submit", addHunter);
-  $("#add-hunter-mode").addEventListener("change", (e) => {
-    // Der Knopf soll benennen, was gleich passiert — sonst merkt niemand, dass
-    // die Auswahl daneben den Ablauf ändert.
-    $("#add-hunter-btn").textContent = e.target.value
-      ? "+ Gesetzt hinzufügen"
-      : "+ Hinzufügen";
-  });
-  $("#add-hunter-name").addEventListener("change", onHunterNamePick);
-
-  // CSV import — wire the hidden file input via a visible toolbar button.
-  $("#open-csv-upload").addEventListener("click", () => $("#csv-input").click());
-  $("#csv-input").addEventListener("change", async (e) => {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = ""; // allow re-selecting the same file later
-    if (file) await importHuntersFromCsv(file);
-  });
-
-  // Address book picker.
-  $("#open-address-book").addEventListener("click", openAddressBookModal);
-  $("#address-book-close").addEventListener("click", closeAddressBookModal);
-  $("#address-book-cancel").addEventListener("click", closeAddressBookModal);
-  $("#address-book-backdrop").addEventListener("click", closeAddressBookModal);
-  $("#address-book-apply").addEventListener("click", applyAddressBookSelection);
-
-  $("#open-invite-preview").addEventListener("click", openInvitePreview);
-  $("#send-invites-btn").addEventListener("click", sendInvites);
-  $("#invite-close").addEventListener("click", closeInvitePreview);
-  $("#invite-cancel").addEventListener("click", closeInvitePreview);
-  $("#invite-backdrop").addEventListener("click", closeInvitePreview);
-  $$(".invite-lang-tab").forEach((b) => {
-    b.addEventListener("click", () => showInviteLang(b.dataset.lang));
-  });
-  $("#new-squad-btn").addEventListener("click", addSquad);
-  $("#new-treiber-btn").addEventListener("click", addTreibergruppe);
-  $("#send-infomails-btn").addEventListener("click", sendInfomails);
-  $("#infomail-close").addEventListener("click", closeInfomailPreviewModal);
-  $("#infomail-cancel").addEventListener("click", closeInfomailPreviewModal);
-  $("#infomail-backdrop").addEventListener("click", closeInfomailPreviewModal);
-  $("#infomail-send").addEventListener("click", confirmSendInfomails);
-  $("#ev-nsf-add").addEventListener("click", () => addNsfRow());
-  $("#hunters-list").addEventListener("click", (e) => {
-    const btn = e.target.closest(".hunter-remove");
-    if (btn) { removeHunter(btn.dataset.hid); return; }
-    const setBtn = e.target.closest(".hunter-set");
-    if (setBtn) setHunter(setBtn.dataset.hid, !!setBtn.dataset.gesetzt);
-  });
-  $("#events-list").addEventListener("click", (e) => {
+  // Delegiert: die Karten entstehen bei jedem Render neu.
+  on("#events-list", "click", (e) => {
     const btn = e.target.closest(".event-delete-btn");
     if (btn) {
       e.preventDefault();
@@ -3104,28 +3077,96 @@ function wireUi() {
       deleteEvent(btn.dataset.eid);
     }
   });
-  $("#squad-edit-close").addEventListener("click", closeSquadEditor);
-  $("#squad-edit-cancel").addEventListener("click", closeSquadEditor);
-  $("#squad-edit-backdrop").addEventListener("click", closeSquadEditor);
-  $("#squad-edit-save").addEventListener("click", saveEditingSquad);
+}
 
-  // Revierkarte — live "Mein Standort" dot.
-  $("#plan-locate-btn").addEventListener("click", startPlanGeo);
+function wireNeueJagd() {
+  buildNewEventForm();
+  on("#new-event-form", "submit", submitNewEvent);
+  on("#ev-treffpunkt-here", "click", () => fillTreffpunktCoords("#ev-treffpunkt-lat", "#ev-treffpunkt-lng"));
+  on("#new-event-cancel", "click", () => { location.hash = "#/"; });
+  on("#ev-nsf-add", "click", () => addNsfRow());
+}
 
-  // Edit existing event
-  $("#edit-event-btn").addEventListener("click", openEventEditor);
-  $("#event-edit-close").addEventListener("click", closeEventEditor);
-  $("#event-edit-cancel").addEventListener("click", closeEventEditor);
-  $("#event-edit-backdrop").addEventListener("click", closeEventEditor);
-  $("#event-edit-save").addEventListener("click", saveEventEdit);
+// Jäger hinzufügen, CSV-Import, Einladungsversand.
+function wireEinladen() {
+  on("#add-hunter-form", "submit", addHunter);
+  on("#add-hunter-mode", "change", (e) => {
+    // Der Knopf soll benennen, was gleich passiert — sonst merkt niemand, dass
+    // die Auswahl daneben den Ablauf ändert.
+    const btn = $("#add-hunter-btn");
+    if (btn) btn.textContent = e.target.value ? "+ Gesetzt hinzufügen" : "+ Hinzufügen";
+  });
+  on("#add-hunter-name", "change", onHunterNamePick);
 
-  // Stände verwalten
-  $("#manage-posts-btn").addEventListener("click", openPostsModal);
-  $("#posts-close").addEventListener("click", closePostsModal);
-  $("#posts-cancel").addEventListener("click", closePostsModal);
-  $("#posts-backdrop").addEventListener("click", closePostsModal);
-  $("#add-post-form").addEventListener("submit", submitNewPost);
-  $("#post-here-btn").addEventListener("click", () => {
+  // CSV import — wire the hidden file input via a visible toolbar button.
+  on("#open-csv-upload", "click", () => { const i = $("#csv-input"); if (i) i.click(); });
+  on("#csv-input", "change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (file) await importHuntersFromCsv(file);
+  });
+
+  on("#open-invite-preview", "click", openInvitePreview);
+  on("#send-invites-btn", "click", sendInvites);
+  on("#invite-close", "click", closeInvitePreview);
+  on("#invite-cancel", "click", closeInvitePreview);
+  on("#invite-backdrop", "click", closeInvitePreview);
+  onAll(".invite-lang-tab", "click", (e) => showInviteLang(e.currentTarget.dataset.lang));
+}
+
+function wireHunterbase() {
+  on("#open-address-book", "click", openAddressBookModal);
+  on("#address-book-close", "click", closeAddressBookModal);
+  on("#address-book-cancel", "click", closeAddressBookModal);
+  on("#address-book-backdrop", "click", closeAddressBookModal);
+  on("#address-book-apply", "click", applyAddressBookSelection);
+}
+
+// Die Jägerliste dieser Jagd. Delegiert auf den Container, weil die Zeilen bei
+// jedem Render neu entstehen — der Container steht statisch in events.html.
+function wireRoster() {
+  on("#hunters-list", "click", (e) => {
+    const btn = e.target.closest(".hunter-remove");
+    if (btn) { removeHunter(btn.dataset.hid); return; }
+    const setBtn = e.target.closest(".hunter-set");
+    if (setBtn) setHunter(setBtn.dataset.hid, !!setBtn.dataset.gesetzt);
+  });
+}
+
+function wireRunden() {
+  on("#new-squad-btn", "click", addSquad);
+  on("#new-treiber-btn", "click", addTreibergruppe);
+  on("#squad-edit-close", "click", closeSquadEditor);
+  on("#squad-edit-cancel", "click", closeSquadEditor);
+  on("#squad-edit-backdrop", "click", closeSquadEditor);
+  on("#squad-edit-save", "click", saveEditingSquad);
+
+  on("#send-infomails-btn", "click", sendInfomails);
+  on("#infomail-close", "click", closeInfomailPreviewModal);
+  on("#infomail-cancel", "click", closeInfomailPreviewModal);
+  on("#infomail-backdrop", "click", closeInfomailPreviewModal);
+  on("#infomail-send", "click", confirmSendInfomails);
+}
+
+// Revierkarte — live "Mein Standort" dot.
+function wireKarte() {
+  on("#plan-locate-btn", "click", startPlanGeo);
+}
+
+// Jagd bearbeiten, Stände verwalten, Einladungsentwurf.
+function wireModals() {
+  on("#edit-event-btn", "click", openEventEditor);
+  on("#event-edit-close", "click", closeEventEditor);
+  on("#event-edit-cancel", "click", closeEventEditor);
+  on("#event-edit-backdrop", "click", closeEventEditor);
+  on("#event-edit-save", "click", saveEventEdit);
+
+  on("#manage-posts-btn", "click", openPostsModal);
+  on("#posts-close", "click", closePostsModal);
+  on("#posts-cancel", "click", closePostsModal);
+  on("#posts-backdrop", "click", closePostsModal);
+  on("#add-post-form", "submit", submitNewPost);
+  on("#post-here-btn", "click", () => {
     if (!navigator.geolocation) { showToast("Standort nicht verfügbar", "error"); return; }
     navigator.geolocation.getCurrentPosition((pos) => {
       $("#post-lat").value = pos.coords.latitude.toFixed(6);
@@ -3134,24 +3175,40 @@ function wireUi() {
     }, (err) => showToast("Standort: " + err.message, "error", 4000),
     { enableHighAccuracy: true, timeout: 8000 });
   });
-  $("#post-csv-btn").addEventListener("click", () => $("#post-csv-input").click());
-  $("#post-csv-input").addEventListener("change", async (e) => {
+  on("#post-csv-btn", "click", () => { const i = $("#post-csv-input"); if (i) i.click(); });
+  on("#post-csv-input", "change", async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
     if (file) await handlePostCsv(file);
   });
 
-  // Einladungsentwurf
-  $("#edit-template-btn").addEventListener("click", openTemplateEditor);
-  $("#template-close").addEventListener("click", closeTemplateEditor);
-  $("#template-cancel").addEventListener("click", closeTemplateEditor);
-  $("#template-backdrop").addEventListener("click", closeTemplateEditor);
-  $("#template-save").addEventListener("click", saveTemplate);
-  $("#template-reset").addEventListener("click", resetTemplate);
-  document.querySelectorAll(".tpl-lang-tab").forEach((b) =>
-    b.addEventListener("click", () => showTemplateLang(b.dataset.lang))
-  );
-  window.addEventListener("hashchange", route);
+  on("#edit-template-btn", "click", openTemplateEditor);
+  on("#template-close", "click", closeTemplateEditor);
+  on("#template-cancel", "click", closeTemplateEditor);
+  on("#template-backdrop", "click", closeTemplateEditor);
+  on("#template-save", "click", saveTemplate);
+  on("#template-reset", "click", resetTemplate);
+  onAll(".tpl-lang-tab", "click", (e) => showTemplateLang(e.currentTarget.dataset.lang));
+}
+
+// In Gruppen, damit eine kaputte Gruppe die anderen nicht mitnimmt. on() fängt
+// den erwarteten Fehler (Element fehlt), das try den unerwarteten.
+function wireUi() {
+  const gruppen = [
+    ["Grundgerüst", wireShell],
+    ["Liste", wireListe],
+    ["Neue Jagd", wireNeueJagd],
+    ["Einladen", wireEinladen],
+    ["Hunterbase", wireHunterbase],
+    ["Jägerliste", wireRoster],
+    ["Runden", wireRunden],
+    ["Karte", wireKarte],
+    ["Fenster", wireModals],
+  ];
+  for (const [name, fn] of gruppen) {
+    try { fn(); }
+    catch (err) { console.error("PREYE: Verdrahtung „" + name + "“ fehlgeschlagen:", err); }
+  }
 }
 
 // ---------- Main ----------
