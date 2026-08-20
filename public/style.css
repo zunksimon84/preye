@@ -3401,6 +3401,7 @@ body.rsvp-page #rsvp-topbar {
 .ev-invite-split { display: grid; gap: 16px; }
 
 .hb-panel {
+  --hb-zeile: 34px;
   background: var(--card);
   border: 1px solid var(--border);
   border-top: 3px solid var(--ev-block-hue, var(--ctl));
@@ -3420,12 +3421,23 @@ body.rsvp-page #rsvp-topbar {
 }
 .hb-title {
   margin: 0;
+  padding: 0;
+  font: inherit;
   font-size: 14px;
   font-weight: 700;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
+  text-align: left;
 }
+.hb-title:hover { color: var(--ctl-ink); }
+.hb-title-stift { font-size: 11px; opacity: 0; }
+.hb-title:hover .hb-title-stift,
+.hb-title:focus-visible .hb-title-stift { opacity: 0.7; }
 .hb-count {
   font-size: 11px;
   font-weight: 700;
@@ -3444,6 +3456,9 @@ body.rsvp-page #rsvp-topbar {
 .hb-head .hb-search { flex: 0 0 auto; width: 100%; }
 
 .hb-scroll {
+  /* Zehn Namen sichtbar, danach wird gescrollt. Ausgerechnet aus Zeilenhöhe
+     plus Abstand, damit die Zahl auch stimmt, wenn sich die Zeile ändert. */
+  max-height: calc(10 * (var(--hb-zeile) + 3px));
   flex: 1 1 auto;
   /* Ohne min-height: 0 wird ein Flex-Kind nie kleiner als sein Inhalt und
      rollt deshalb nie. Dieselbe Falle wie min-width: 0 an einer Grid-Spalte,
@@ -3461,9 +3476,10 @@ body.rsvp-page #rsvp-topbar {
 .hb-row {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  min-height: var(--hb-zeile);
+  padding: 4px 7px;
   border: 1px solid transparent;
   border-radius: 7px;
   background: none;
@@ -3478,8 +3494,8 @@ body.rsvp-page #rsvp-topbar {
 .hb-row:hover { background: var(--bg); }
 .hb-mark {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   display: grid;
   place-items: center;
   border-radius: 5px;
@@ -3489,14 +3505,14 @@ body.rsvp-page #rsvp-topbar {
   color: var(--muted);
   line-height: 1;
 }
-.hb-flag { font-size: 15px; flex: none; }
+.hb-flag { font-size: 13px; flex: none; }
 .hb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .hb-name {
-  font-size: 13.5px; font-weight: 600; color: var(--text);
+  font-size: 12.5px; font-weight: 600; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .hb-mail {
-  font-size: 11.5px; color: var(--muted);
+  font-size: 10.5px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
@@ -3506,6 +3522,56 @@ body.rsvp-page #rsvp-topbar {
 .hb-row--in:hover { background: var(--ctl-tint); border-color: var(--ctl-edge); }
 .hb-row--in .hb-mark { background: var(--ctl-edge); border-color: var(--ctl-edge); color: #fff; }
 .hb-row--laeuft { opacity: 0.45; pointer-events: none; }
+.hb-row.is-zieht { opacity: 0.4; }
+.hb-row[draggable="true"] { cursor: grab; }
+.hb-row[draggable="true"]:active { cursor: grabbing; }
+
+/* Ablegezonen. Im Ruhezustand nur angedeutet — sie sollen nicht wie zwei
+   Knöpfe aussehen, sondern wie Platz, der auf etwas wartet. Sobald ein Name
+   unterwegs ist, treten sie hervor. */
+.jgr-drops {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+@media (min-width: 700px) {
+  .jgr-drops { grid-template-columns: 1fr 1fr; }
+}
+.jgr-drop {
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.jgr-drop-titel { font-size: 13px; font-weight: 700; color: var(--steel-dark); }
+.jgr-drop-sub { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+
+/* Während gezogen wird, zeigen beide Zonen, dass sie gemeint sind. */
+body.jgr-zieht .jgr-drop { border-color: var(--ctl-edge); background: var(--ctl-tint); }
+body.jgr-zieht .jgr-drop--gesetzt { border-color: #16a34a; background: #f0fdf4; }
+.jgr-drop.is-ueber {
+  border-style: solid;
+  border-color: var(--ctl-edge);
+  background: var(--ctl-tint);
+  box-shadow: var(--ctl-lift);
+}
+.jgr-drop--gesetzt.is-ueber { border-color: #16a34a; background: #dcfce7; }
+
+.jgr-drop-rollen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.jgr-drop-name { font-size: 12.5px; font-weight: 650; margin-right: 2px; }
+.jgr-drop-x { font-size: 12px; color: var(--muted); }
+.ghost-btn.small { font-size: 12px; padding: 4px 9px; }
 
 .hb-foot {
   flex: none;

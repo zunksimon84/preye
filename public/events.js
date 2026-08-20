@@ -1192,7 +1192,8 @@ function renderHunterbase() {
     const drin = roster.has(mail);
     const laeuft = hbLaeuft.has(mail);
     return `
-      <button type="button" class="hb-row${drin ? " hb-row--in" : ""}${laeuft ? " hb-row--laeuft" : ""}"
+      <button type="button" draggable="${drin ? "false" : "true"}"
+              class="hb-row${drin ? " hb-row--in" : ""}${laeuft ? " hb-row--laeuft" : ""}"
               data-email="${escapeHtml(c.email)}" data-name="${escapeHtml(c.name)}"
               data-lang="${escapeHtml(c.language || "de")}"
               title="${drin ? "Von dieser Jagd entfernen" : "Zu dieser Jagd einladen"}">
@@ -3457,20 +3458,111 @@ function wireEinladen() {
   });
   on("#add-hunter-name", "change", onHunterNamePick);
 
-  // CSV import — wire the hidden file input via a visible toolbar button.
-  on("#open-csv-upload", "click", () => { const i = $("#csv-input"); if (i) i.click(); });
-  on("#csv-input", "change", async (e) => {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = ""; // allow re-selecting the same file later
-    if (file) await importHuntersFromCsv(file);
-  });
-
   on("#open-invite-preview", "click", openInvitePreview);
   on("#send-invites-btn", "click", sendInvites);
   on("#invite-close", "click", closeInvitePreview);
   on("#invite-cancel", "click", closeInvitePreview);
   on("#invite-backdrop", "click", closeInvitePreview);
   onAll(".invite-lang-tab", "click", (e) => showInviteLang(e.currentTarget.dataset.lang));
+}
+
+// Ziehen ist der eine Weg in die Jagd, das Formular der andere. Auf dem Handy
+// gibt es kein Ziehen — deshalb sind beide Zonen auch anklickbar, und der Klick
+// auf eine Hunterbase-Zeile lädt weiterhin direkt ein.
+let jgrZiehtKontakt = null;
+
+function wireDrops() {
+  const zonen = $$(".jgr-drop");
+  if (!zonen.length) { console.warn("PREYE: keine Ablegezonen gefunden"); return; }
+
+  zonen.forEach((zone) => {
+    zone.addEventListener("dragover", (e) => {
+      if (!jgrZiehtKontakt) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      zone.classList.add("is-ueber");
+    });
+    zone.addEventListener("dragleave", () => zone.classList.remove("is-ueber"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("is-ueber");
+      let kontakt = jgrZiehtKontakt;
+      if (!kontakt) {
+        // Fallback: manche Browser liefern nur über dataTransfer.
+        try { kontakt = JSON.parse(e.dataTransfer.getData("application/json") || "null"); } catch (err) { kontakt = null; }
+      }
+      if (!kontakt) return;
+      if (zone.dataset.drop === "gesetzt") rollenAuswahlZeigen(zone, kontakt);
+      else jgrKontaktAufnehmen(kontakt, "");
+    });
+    // Anklickbar für alles ohne Ziehen.
+    zone.addEventListener("click", (e) => {
+      if (e.target.closest(".jgr-drop-rollen")) return;
+      showToast("Namen aus der Hunterbase hierher ziehen — oder links auf eine Zeile klicken.", null, 4000);
+    });
+  });
+}
+
+// Nach dem Ablegen in "Hat schon zugesagt" die Rolle wählen. Ohne Rolle wäre
+// "gesetzt" nicht speicherbar: eventHunterSet_ prüft sie gegen VALID_ROLES.
+function rollenAuswahlZeigen(zone, kontakt) {
+  const box = zone.querySelector(".jgr-drop-rollen");
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML =
+    `<span class="jgr-drop-name">${escapeHtml(kontakt.name)} als</span>` +
+    SET_ROLES.map((r) => `<button type="button" class="ghost-btn small" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`).join("") +
+    `<button type="button" class="link-btn jgr-drop-x" data-cancel="1">Abbrechen</button>`;
+  box.onclick = (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    e.stopPropagation();
+    box.hidden = true;
+    box.innerHTML = "";
+    if (b.dataset.cancel) return;
+    jgrKontaktAufnehmen(kontakt, b.dataset.role);
+  };
+}
+
+// Ein Kontakt kommt in die Jagd. Ohne Rolle heißt eingeladen (Status offen),
+// mit Rolle heißt gesetzt — dann geht keine Einladung mehr raus.
+async function jgrKontaktAufnehmen(kontakt, rolle) {
+  const ce = state.currentEvent;
+  if (!ce || !kontakt || !kontakt.email) return;
+  const key = kontakt.email.toLowerCase();
+  if (hbRosterNachEmail().has(key)) {
+    showToast(kontakt.name + " steht schon auf der Liste");
+    return;
+  }
+  if (hbLaeuft.has(key)) return;
+  hbLaeuft.add(key);
+  const temp = {
+    id: "tmp-" + key, hunter: kontakt.name, email: kontakt.email,
+    language: kontakt.language || "de", status: rolle ? "accepted" : "pending",
+    role: rolle || "", dogs: [], invited_at: "", responded_at: "",
+    set_manually: rolle ? new Date().toISOString() : "",
+  };
+  ce.hunters = ce.hunters.concat([temp]);
+  renderHuntersList(ce.hunters);
+  renderHunterbase();
+  try {
+    const r = await postJson({
+      action: "event-hunter-add", event_id: ce.event.id,
+      hunter: temp.hunter, email: temp.email, language: temp.language,
+      role: rolle || "", set: !!rolle,
+    });
+    if (r && r.id) temp.id = r.id;
+    invalidateCache("event-detail", { id: ce.event.id });
+    invalidateCache("events-list");
+    hbStatus(temp.hunter + (rolle ? " gesetzt als " + rolle : " eingeladen"));
+  } catch (err) {
+    ce.hunters = ce.hunters.filter((h) => h !== temp);
+    showToast(err.message || "Fehler", "error");
+  } finally {
+    hbLaeuft.delete(key);
+    renderHuntersList(state.currentEvent?.hunters || []);
+    renderHunterbase();
+  }
 }
 
 function wireHunterbase() {
@@ -3484,6 +3576,31 @@ function wireHunterbase() {
     hbView.q = e.target.value.trim().toLowerCase();
     renderHunterbase();
   });
+
+  // Ziehen: der Kontakt wird im Modulzustand gemerkt, weil dataTransfer beim
+  // dragover nicht gelesen werden darf und die Zonen sonst nicht wüssten,
+  // ob überhaupt etwas Passendes unterwegs ist.
+  const liste = $("#hb-list");
+  if (liste) {
+    liste.addEventListener("dragstart", (e) => {
+      const row = e.target.closest(".hb-row");
+      if (!row) return;
+      jgrZiehtKontakt = { name: row.dataset.name, email: row.dataset.email, language: row.dataset.lang };
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("application/json", JSON.stringify(jgrZiehtKontakt));
+      e.dataTransfer.setData("text/plain", row.dataset.name);
+      row.classList.add("is-zieht");
+      document.body.classList.add("jgr-zieht");
+    });
+    liste.addEventListener("dragend", (e) => {
+      const row = e.target.closest(".hb-row");
+      if (row) row.classList.remove("is-zieht");
+      document.body.classList.remove("jgr-zieht");
+      jgrZiehtKontakt = null;
+    });
+  }
+
+  wireDrops();
 }
 
 // Die Jägerliste dieser Jagd. Delegiert auf den Container, weil die Zeilen bei

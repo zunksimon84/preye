@@ -142,8 +142,8 @@
         <section class="ev-block ev-block--einladen" id="section-einladen">
           <header class="ev-block-head">
             <span class="ev-block-num" aria-hidden="true">2</span>
-            <h2 class="ev-block-title">Jägerinnen einladen</h2>
-            <p class="ev-block-sub">Hinzufügen, einladen, Zusagen verfolgen</p>
+            <h2 class="ev-block-title">Zur Jagd einladen</h2>
+            <p class="ev-block-sub">Aus der Hunterbase ziehen oder von Hand eintragen</p>
           </header>
           <div class="ev-block-body ev-invite-split">
 
@@ -154,7 +154,10 @@
             <aside class="hb-col">
               <div class="hb-panel">
                 <div class="hb-head">
-                  <h3 class="hb-title">Hunterbase <span class="hb-count" id="hb-count">0</span></h3>
+                  <button type="button" class="hb-title" id="open-hunterbase" title="Hunterbase verwalten">
+                    Hunterbase <span class="hb-count" id="hb-count">0</span>
+                    <span class="hb-title-stift" aria-hidden="true">✎</span>
+                  </button>
                   <label class="jgr-search hb-search">
                     <span class="jgr-search-icon" aria-hidden="true">⌕</span>
                     <input type="search" id="hb-search" placeholder="Suchen" autocomplete="off" aria-label="Hunterbase durchsuchen" />
@@ -189,11 +192,21 @@
               <button type="submit" class="primary-btn small" id="add-hunter-btn">+ Hinzufügen</button>
             </form>
             <datalist id="address-book-options"></datalist>
-            <div class="jgr-import">
-              <button type="button" id="open-csv-upload" class="ghost-btn">CSV importieren</button>
-              <input type="file" id="csv-input" accept=".csv,text/csv,text/plain" hidden />
-              <span class="muted">Name, E-Mail, Sprache — bis 200 Zeilen auf einmal.</span>
+            <!-- Ziehen ist der eine Weg, das Formular darüber der andere. Beide
+                 Zonen sind auch anklickbar, damit es auf dem Handy einen Weg
+                 gibt — dort gibt es kein Ziehen. -->
+            <div class="jgr-drops" id="jgr-drops">
+              <div class="jgr-drop jgr-drop--einladen" data-drop="einladen">
+                <span class="jgr-drop-titel">Einladen</span>
+                <span class="jgr-drop-sub">Name hierher ziehen — Status offen, die Mail geht später über „Einladung erstellen“ raus.</span>
+              </div>
+              <div class="jgr-drop jgr-drop--gesetzt" data-drop="gesetzt">
+                <span class="jgr-drop-titel">Hat schon zugesagt</span>
+                <span class="jgr-drop-sub">Mündlich zugesagt oder ohnehin eingeteilt — nach dem Ablegen die Rolle wählen.</span>
+                <div class="jgr-drop-rollen" hidden></div>
+              </div>
             </div>
+            <input type="file" id="csv-input" accept=".csv,text/csv,text/plain" hidden />
 
             <!-- Reiter, Suche und Trefferzahl stehen STATISCH hier und werden
                  nie neu gerendert. renderEventDetail läuft pro Öffnen zweimal
