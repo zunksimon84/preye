@@ -3377,6 +3377,28 @@ body.rsvp-page #rsvp-topbar {
 .jgr-table .hunter-email { display: inline; }
 
 .jgr-pap-ok { color: var(--ctl-ink); font-weight: 700; }
+
+/* Die Rolle als Knopf — nur bei gesetzten Jägern, siehe jgrRolleZelle. Der
+   Stift erscheint erst beim Überfahren, sonst sieht die Spalte nach lauter
+   Bedienelementen aus statt nach Daten. */
+.jgr-role {
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  border-bottom: 1px dashed transparent;
+}
+.jgr-role:hover { color: var(--ctl-ink); border-bottom-color: var(--ctl-edge); }
+.jgr-role-stift { opacity: 0; font-size: 11px; }
+.jgr-role:hover .jgr-role-stift,
+.jgr-role:focus-visible .jgr-role-stift { opacity: 0.7; }
+
+/* Die Rolle, die schon steht, ist in der Auswahl markiert. */
+.hunter-setpick button.is-aktuell {
+  border-color: var(--ctl-edge);
+  color: var(--ctl-ink);
+  font-weight: 700;
+}
 /* "gesetzt" ist die einzige Anzeige dafür, dass keine Bestätigungen
    vorliegen — der Rest des alten Statuslabel-Tricks, der bleiben muss. */
 .jgr-gesetzt {

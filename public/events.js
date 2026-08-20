@@ -663,6 +663,21 @@ function jgrPapiereZelle(r) {
          escapeHtml(r.fehlt.join(" + ")) + "</span>";
 }
 
+// Die Rolle ist nur bei GESETZTEN Jägern änderbar. eventHunterSet_ weigert
+// sich, eine selbst abgegebene Zusage zu überschreiben — dort trägt die Rolle
+// die Bestätigungen zu Jagdschein und VSG 4.4, die nur die Person selbst geben
+// kann. Der Knopf darf deshalb gar nicht erst erscheinen: aus einem
+// Fehler-Toast lernt niemand etwas.
+function jgrRolleZelle(r) {
+  if (!r.role) return '<span class="muted">—</span>';
+  if (!r.gesetzt) {
+    return '<span title="Zusage über den Anmeldelink — die Rolle steht so, wie er sie selbst gewählt hat.">' +
+           escapeHtml(r.role) + "</span>";
+  }
+  return `<button type="button" class="link-btn jgr-role" data-hid="${escapeHtml(r.id)}" title="Rolle ändern">` +
+         escapeHtml(r.role) + ' <span class="jgr-role-stift" aria-hidden="true">✎</span></button>';
+}
+
 function jgrKopf(schluessel, text, klasse) {
   const aktiv = jgrView.sort === schluessel;
   const sortiert = aktiv ? (jgrView.dir > 0 ? "ascending" : "descending") : "none";
@@ -714,7 +729,7 @@ function renderHuntersList(hunters) {
             <td class="jgr-col-lang" data-label="Sprache"><span class="hunter-flag" title="${r.language === "en" ? "English" : "Deutsch"}">${r.language === "en" ? "🇬🇧" : "🇩🇪"}</span></td>
             <td class="jgr-col-name" data-label="Name"><strong>${escapeHtml(r.name)}</strong></td>
             <td class="jgr-col-mail" data-label="E-Mail">${r.email ? `<a class="hunter-email" href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a>` : '<span class="muted">—</span>'}</td>
-            <td class="jgr-col-role" data-label="Rolle">${r.role ? escapeHtml(r.role) : '<span class="muted">—</span>'}</td>
+            <td class="jgr-col-role" data-label="Rolle">${jgrRolleZelle(r)}</td>
             <td class="jgr-col-stat" data-label="Status"><span class="hunter-status">${escapeHtml(JGR_STATUS_LABEL[r.status] || r.status)}</span>${r.gesetzt ? '<span class="jgr-gesetzt" title="Von Hand gesetzt — Jagdschein und VSG 4.4 sind damit nicht bestätigt">gesetzt</span>' : ""}</td>
             <td class="jgr-col-pap" data-label="Papiere">${jgrPapiereZelle(r)}</td>
             <td class="jgr-col-dogs" data-label="Hunde">${dogs ? `<span class="hunter-dogs">${escapeHtml(dogs)}</span>` : ""}</td>
@@ -817,7 +832,7 @@ const SET_ROLES = ["Schütze/Standschnaller", "Treiber", "Hundeführer"];
 // ein <div> nicht platzierbar, der Browser wirft es aus der Tabelle heraus
 // und die Auswahl stünde irgendwo oben auf der Seite. Der Fehler wäre stumm:
 // sichtbar, nur an der falschen Stelle.
-function openSetPicker(row, id, hunterName) {
+function openSetPicker(row, id, hunterName, aktuelleRolle = "") {
   const naechste = row.nextElementSibling;
   if (naechste && naechste.classList.contains("jgr-pickrow")) return;
 
@@ -826,8 +841,9 @@ function openSetPicker(row, id, hunterName) {
   pick.className = "jgr-pickrow";
   pick.innerHTML =
     `<td colspan="${spalten}"><div class="hunter-setpick">` +
-    `<span>${escapeHtml(hunterName)} setzen als</span>` +
-    SET_ROLES.map((r) => `<button type="button" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`).join("") +
+    `<span>${escapeHtml(hunterName)} ${aktuelleRolle ? "ist" : "setzen als"}</span>` +
+    SET_ROLES.map((r) => `<button type="button" class="${r === aktuelleRolle ? "is-aktuell" : ""}"` +
+      ` data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`).join("") +
     `<button type="button" data-cancel="1" class="hunter-setpick-x">Abbrechen</button>` +
     `</div></td>`;
   row.after(pick);
@@ -3255,6 +3271,22 @@ function wireNeueJagd() {
 
 // Jäger hinzufügen, CSV-Import, Einladungsversand.
 function wireEinladen() {
+  // Die Rollen des Kombi-Selects aus SET_ROLES erzeugen, statt sie im Markup
+  // ein drittes Mal auszuschreiben (das erste ist VALID_ROLES in Code.gs).
+  const modus = $("#add-hunter-mode");
+  if (modus && modus.options.length === 1) {
+    const trenner = document.createElement("option");
+    trenner.disabled = true;
+    trenner.textContent = "── ohne Einladung setzen als ──";
+    modus.appendChild(trenner);
+    SET_ROLES.forEach((r) => {
+      const o = document.createElement("option");
+      o.value = r;
+      o.textContent = r;
+      modus.appendChild(o);
+    });
+  }
+
   on("#add-hunter-form", "submit", addHunter);
   on("#add-hunter-mode", "change", (e) => {
     // Der Knopf soll benennen, was gleich passiert — sonst merkt niemand, dass
@@ -3297,6 +3329,13 @@ function wireRoster() {
     const setBtn = e.target.closest(".hunter-set");
     if (setBtn) { setHunter(setBtn.dataset.hid, !!setBtn.dataset.gesetzt); return; }
     // Die Sortierköpfe entstehen bei jedem Render neu, deshalb delegiert.
+    const rolle = e.target.closest(".jgr-role");
+    if (rolle) {
+      const h = (state.currentEvent?.hunters || []).find((x) => x.id === rolle.dataset.hid);
+      const zeile = rolle.closest(".hunter-row");
+      if (h && zeile) openSetPicker(zeile, h.id, h.hunter, h.role || "");
+      return;
+    }
     const kopf = e.target.closest(".jgr-sort");
     if (kopf) {
       const k = kopf.dataset.sort;
