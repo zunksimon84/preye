@@ -2260,6 +2260,78 @@ body.rsvp-page #rsvp-topbar {
 
 .ev-placeholder { color: var(--muted); font-size: 14px; padding: 12px 0; }
 
+/* Fensterbreiten -------------------------------------------------------------
+   Bis 20.08.2026 standen alle sieben auf left: 8px / right: 8px OHNE
+   max-width. Auf dem Handy ist das richtig, auf einem 1680er Schirm sind es
+   1664 px — ein 18-Zeilen-Textfeld über die ganze Wand. Derselbe
+   Umbruchpunkt wie das Seitenraster: eine Zahl, nicht zwei.
+
+   Warum feste height und nicht max-height: die Fensterkörper
+   (.invite-modal-body, .address-book-body, .squad-edit-body, .infomail-body,
+   .event-edit-body) sind alle flex: 1 mit overflow-y: auto. flex: 1 heißt
+   flex-basis: 0, und weil overflow: auto ihr min-height: auto zu 0 auflöst,
+   tragen sie zur Inhaltshöhe eines inhaltsgroßen Containers NICHTS bei. Mit
+   max-height allein schnurrt jedes Fenster auf Kopf plus Fuß zusammen. Die
+   heutige top/bottom-Paarung gibt eine definite Höhe — die muss die
+   Begrenzung ersetzen, nicht aufheben.
+
+   inset: 0 + margin: auto statt left: 50% + translateX(-50%) wie bei
+   #strecke-modal: zentriert beide Achsen ohne Transform, also ohne halbe
+   Pixel bei ungerader Höhe.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 1000px) {
+  #infomail-modal,
+  #squad-edit-modal,
+  #address-book-modal,
+  #invite-modal,
+  #event-edit-modal,
+  #template-modal,
+  #posts-modal {
+    inset: 0;
+    margin: auto;
+    width:  min(var(--ev-modal-w), calc(100vw - 64px));
+    height: min(var(--ev-modal-h), calc(100vh - 64px));
+    border-radius: 14px;
+  }
+
+  /* Häkchen, Name, E-Mail. Breiter ist verschenkt. */
+  #address-book-modal { --ev-modal-w: 560px;  --ev-modal-h: 640px; }
+  /* Formular mit .ev-form-row plus CSV-Hilfe. */
+  #posts-modal        { --ev-modal-w: 720px;  --ev-modal-h: 720px; }
+  /* 780 minus 28 Polsterung sind bei 14 px rund 95 Zeichen je Zeile; ab etwa
+     100 verliert das Auge beim Rücksprung die Zeile. */
+  #invite-modal       { --ev-modal-w: 780px;  --ev-modal-h: 780px; }
+  #template-modal     { --ev-modal-w: 780px;  --ev-modal-h: 800px; }
+  /* Das längste Formular, mit .ev-form-row und .ev-checkbox-grid. */
+  #event-edit-modal   { --ev-modal-w: 920px;  --ev-modal-h: 800px; }
+  /* Zweispaltig, siehe .squad-edit-body weiter unten. */
+  #squad-edit-modal   { --ev-modal-w: 980px;  --ev-modal-h: 760px; }
+  /* Enthält .infomail-preview-pdf mit min-height: 640px. Ein A4-Blatt bei
+     640 Höhe ist rund 453 breit, daneben passt die Gruppenauswahl. */
+  #infomail-modal     { --ev-modal-w: 1120px; --ev-modal-h: 880px; }
+}
+
+/* Runden-Fenster zweispaltig -------------------------------------------------
+   Links die Positionsliste, rechts Bemerkung, Startposition und Löschen. Bei
+   980 px Fensterbreite halbiert das die Listenhöhe; auf dem Handy bleibt es
+   gestapelt.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 1000px) {
+  .squad-edit-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+    align-content: start;
+  }
+  .sqm-full { grid-column: 1 / -1; }
+  .sqm-main,
+  .sqm-side { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .sqm-side .modal-danger-row { margin-top: auto; }
+}
+
 /* Blockrahmen der Detailseite ------------------------------------------------
    Drei Blöcke: Die Jagd · Jägerinnen einladen · Der Jagdtag. Bis 20.08.2026
    standen dort acht gleichrangige Abschnitte hintereinander, drei davon ohne

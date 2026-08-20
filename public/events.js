@@ -1609,20 +1609,28 @@ function openAnstellerEditor(squad) {
   const accepted = getAcceptedHunters();
   // Always show at least one Schütze row so the Ansteller is visible.
   const positions = (squad.positions && squad.positions.length) ? squad.positions : [{ hunter: "" }];
+  // Zwei Hüllen, damit das Fenster am Rechner nebeneinander steht: links die
+  // Positionsliste, rechts Bemerkung und Löschen. Rasterplatzierung auf der
+  // flachen Reihenfolge wäre von genau dieser Reihenfolge abhängig und bräche
+  // beim nächsten Feld.
   body.innerHTML = `
-    <p class="squad-modal-hint">
+    <p class="squad-modal-hint sqm-full">
       Reihe 1 ist <strong>der Ansteller</strong> — er bekommt seinen Stand wie jeder andere Schütze.
     </p>
-    <div class="schuetzen-list" id="modal-schuetzen-list">
-      ${positions.map((p, i) => renderSchuetzeRow(p, i, accepted)).join("")}
+    <div class="sqm-main">
+      <div class="schuetzen-list" id="modal-schuetzen-list">
+        ${positions.map((p, i) => renderSchuetzeRow(p, i, accepted)).join("")}
+      </div>
+      <button class="ghost-btn" type="button" id="modal-add-schuetze">+ Schütze hinzufügen</button>
     </div>
-    <button class="ghost-btn" type="button" id="modal-add-schuetze">+ Schütze hinzufügen</button>
-    <label class="squad-field">
-      <span class="squad-field-label">Bemerkung <span class="muted">(optional)</span></span>
-      <textarea id="modal-squad-briefing" rows="2">${escapeHtml(squad.briefing || "")}</textarea>
-    </label>
-    <div class="modal-danger-row">
-      <button id="modal-squad-delete" class="ghost-btn ghost-btn--danger" type="button">Runde löschen</button>
+    <div class="sqm-side">
+      <label class="squad-field">
+        <span class="squad-field-label">Bemerkung <span class="muted">(optional)</span></span>
+        <textarea id="modal-squad-briefing" rows="4">${escapeHtml(squad.briefing || "")}</textarea>
+      </label>
+      <div class="modal-danger-row">
+        <button id="modal-squad-delete" class="ghost-btn ghost-btn--danger" type="button">Runde löschen</button>
+      </div>
     </div>
   `;
   body.querySelectorAll(".schuetze-row").forEach(wireSchuetzeRow);
@@ -1646,12 +1654,20 @@ function openTreiberEditor(squad) {
   const lat = sp.lat !== undefined && sp.lat !== "" ? Number(sp.lat).toFixed(6) : "";
   const lng = sp.lng !== undefined && sp.lng !== "" ? Number(sp.lng).toFixed(6) : "";
   body.innerHTML = `
-    <p class="squad-modal-hint">
+    <p class="squad-modal-hint sqm-full">
       Reihe 1 ist <strong>der Treiberführer</strong> (Gruppenleiter). Mitglieder
       darunter können <strong>Treiber oder Hundeführer</strong> sein — der
       Treiberführer selbst muss kein Hundeführer sein.
     </p>
 
+    <div class="sqm-main">
+    <div class="schuetzen-list" id="modal-treiber-list">
+      ${positions.map((p, i) => renderTreiberRow(p, i, candidates)).join("")}
+    </div>
+    <button class="ghost-btn" type="button" id="modal-add-treiber">+ Mitglied hinzufügen</button>
+    </div>
+
+    <div class="sqm-side">
     <fieldset class="ev-fieldset start-pos-fieldset">
       <legend>Startposition <span class="muted">(von wo die Gruppe startet)</span></legend>
       <div class="sr-coords-grid">
@@ -1663,17 +1679,13 @@ function openTreiberEditor(squad) {
         <button class="ghost-btn" type="button" id="start-pos-here" title="Aktuelle Position">📍</button>
       </div>
     </fieldset>
-
-    <div class="schuetzen-list" id="modal-treiber-list">
-      ${positions.map((p, i) => renderTreiberRow(p, i, candidates)).join("")}
-    </div>
-    <button class="ghost-btn" type="button" id="modal-add-treiber">+ Mitglied hinzufügen</button>
     <label class="squad-field">
       <span class="squad-field-label">Bemerkung <span class="muted">(optional)</span></span>
-      <textarea id="modal-squad-briefing" rows="2">${escapeHtml(squad.briefing || "")}</textarea>
+      <textarea id="modal-squad-briefing" rows="3">${escapeHtml(squad.briefing || "")}</textarea>
     </label>
     <div class="modal-danger-row">
       <button id="modal-squad-delete" class="ghost-btn ghost-btn--danger" type="button">Gruppe löschen</button>
+    </div>
     </div>
   `;
   body.querySelectorAll(".treiber-row").forEach(wireTreiberRow);
