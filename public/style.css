@@ -1646,10 +1646,39 @@ body.rsvp-page #rsvp-topbar {
   color: inherit;
 }
 
+/* Bis 20.08.2026 hing die einzige Breitenbegrenzung hier und galt damit für
+   alle drei Ansichten — #events-main umschließt Liste, Neue-Jagd-Formular und
+   Detailseite gleichermaßen. Die Detailseite braucht jetzt das Doppelte, die
+   anderen beiden nicht: eine Liste von Karten und ein Formular lesen sich bei
+   720 px am besten, breiter wandert das Auge zwischen Beschriftung und Feld
+   zu weit. Deshalb steht die Begrenzung jetzt an den Ansichten. */
 #events-main {
   padding: 16px 14px 32px;
+}
+
+#view-list,
+#view-new {
   max-width: 720px;
   margin: 0 auto;
+}
+
+#view-detail {
+  max-width: var(--ev-max);
+  margin: 0 auto;
+
+  /* 1600 und nicht mehr: bei der Aufteilung 30/70 im Block "Einladen" landet
+     die Jägertabelle bei ~1080 px. Darüber stehen acht Spalten so weit
+     auseinander, dass das Auge beim Rücksprung die Zeile verliert. Nach unten
+     deckt der Wert die üblichen Rechner randlos ab (MacBook 14"/16" = 1512,
+     1440er Monitor = 1440). */
+  --ev-max: 1600px;
+
+  /* Woran das Klebende klebt. Auf dieser Seite ist NICHTS fixiert — #topbar
+     ist weiter unten auf static zurückgesetzt und scrollt mit weg. Es braucht
+     deshalb nur Sichtabstand zur Fensterkante, keinen Platz für eine Leiste.
+     Sollte je ein mitlaufender Blockkopf kommen, ist das die eine Zeile, die
+     sich ändert. */
+  --ev-stick: 12px;
 }
 
 .ev-view-title {
