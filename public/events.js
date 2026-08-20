@@ -3760,12 +3760,31 @@ async function hbmSpeichern(tr) {
   };
   hbmStatus("Speichere …");
   try {
-    await postJson(daten);
-    invalidateCache("address-book");
+    const r = await postJson(daten);
+    // Ein Apps-Script-Aufruf dauert rund drei Sekunden. Nach dem Schreiben
+    // noch einmal die ganze Stammliste zu holen, verdoppelt die Wartezeit für
+    // eine Änderung, die wir bereits kennen — also lokal anwenden und sofort
+    // zeichnen. Der Abgleich läuft danach im Hintergrund.
+    const fertig = {
+      id: daten.id || (r && r.id) || "",
+      name: daten.name, email: daten.email, language: daten.language,
+      phone: daten.phone, note: daten.note,
+      default_role: daten.default_role, dogs: daten.dogs,
+    };
+    const alt = (state.addressBook || []).find((c) => c.id && c.id === fertig.id);
+    if (alt) {
+      // jagden kommt vom Server und wird von einer Änderung nicht berührt.
+      Object.assign(alt, fertig, { jagden: alt.jagden });
+    } else {
+      state.addressBook = (state.addressBook || []).concat([{ ...fertig, jagden: 0 }]);
+    }
     hbmView.bearbeitet = null;
-    await loadAddressBook();
     renderHunterbaseModal();
+    renderHunterbase();
     hbmStatus(daten.name + " gespeichert");
+
+    invalidateCache("address-book");
+    loadAddressBook();   // bewusst ohne await
   } catch (err) {
     hbmStatus(err.message || "Fehler", true);
   }
@@ -3781,10 +3800,13 @@ async function hbmLoeschen(id) {
   hbmStatus("Lösche …");
   try {
     await postJson({ action: "address-book-delete", id });
-    invalidateCache("address-book");
-    await loadAddressBook();
+    state.addressBook = (state.addressBook || []).filter((x) => x.id !== id);
     renderHunterbaseModal();
+    renderHunterbase();
     hbmStatus(c.name + " gelöscht");
+
+    invalidateCache("address-book");
+    loadAddressBook();   // bewusst ohne await
   } catch (err) {
     hbmStatus(err.message || "Fehler", true);
   }
