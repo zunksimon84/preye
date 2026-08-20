@@ -2387,6 +2387,53 @@ body.rsvp-page #rsvp-topbar {
   .ev-jagd-grid .boar-loader { grid-column: 1 / -1; }
 }
 
+/* Block 3 nebeneinander ------------------------------------------------------
+   Karte klebend links, Arbeitsspalte rechts. Vorbild ist .rn-split /
+   .rn-mapwrap in revier-neu.css, mit zwei Abweichungen:
+
+   - dort top: 84px, weil dashboard.css eine fixierte Leiste hat. Hier ist
+     #topbar auf static gesetzt und scrollt weg, es bleibt --ev-stick.
+   - dort minmax(320px, 44%), hier 360/42%: rechts stehen zwei Kachelspalten
+     statt einer Tabelle und brauchen mehr Grundbreite.
+
+   align-items: start ist Pflicht. Ohne das streckt das Raster die kurze
+   Kartenspalte auf die Höhe der langen Runden-Spalte, und dann hat sticky
+   keinen Weg, an dem es laufen könnte.
+
+   Sticky funktioniert hier ohne weiteren Umbau: body.events-page setzt zwar
+   overflow: auto, aber html behält visible, der Browser reicht das an den
+   Viewport durch und body selbst gilt als visible. Es gibt also keinen
+   overflow-Vorfahren, der sticky bricht.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 1000px) {
+  .jt-split {
+    display: grid;
+    grid-template-columns: minmax(360px, 42%) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .jt-mapcol { position: sticky; top: var(--ev-stick); }
+  .jt-mapcol .ev-section { margin-top: 0; }
+
+  /* Das ganze klebende Paket muss unter die Fensterhöhe passen, sonst kommt
+     es nie zur Ruhe: Abschnittstitel (~34) + Karte + Legende + Abstände.
+     64vh plus ~80px Beiwerk sind ~72vh. */
+  .jt-mapcol #plan-map { height: clamp(420px, 64vh, 680px); }
+
+  /* Bei vielen Ständen wuchert die Legende und sprengt die Rechnung. */
+  .jt-mapcol .plan-map-legend { max-height: 84px; overflow-y: auto; }
+
+  .jt-workcol { min-width: 0; }
+  .jt-workcol .ev-section:first-child { margin-top: 0; }
+
+  /* Zwei Kacheln statt drei: bei 1600 px Seitenbreite ist die rechte Spalte
+     ~896 px, drei wären 293 — und darin steht künftig je Schütze
+     "Name — Nr. 5 Ackerkante". Das bricht. */
+  .jt-workcol .squads-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Revierkarte (plan map) ---------------------------------------------------- */
 
 .plan-map-wrap {
