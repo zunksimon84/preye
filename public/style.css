@@ -2347,6 +2347,46 @@ body.rsvp-page #rsvp-topbar {
   .ev-block-head { padding-left: 10px; }
 }
 
+/* Block 1 nebeneinander ------------------------------------------------------
+   Der Kopfbereich ist ein einziger von events.js erzeugter innerHTML-Klumpen:
+   Hero, Info-Liste, Zeiten-Strip, Briefing in einem #event-header. Statt das
+   in vier Renderfunktionen zu zerlegen, löst display: contents die Hülle auf —
+   die vier Kinder werden dadurch selbst Rasterzellen, und events.js bleibt
+   unberührt.
+
+   Platziert werden nur Hero und Briefing über die volle Breite. Feste
+   grid-row-Angaben wären an die DOM-Reihenfolge gekoppelt und brächen, sobald
+   eine Jagd keine Zeiten oder kein Briefing hat — es fließt also alles
+   andere von selbst.
+
+   Das Briefing bekommt order: 1, damit die Kontakte in die dritte Spalte der
+   zweiten Zeile rutschen statt allein eine vierte Zeile zu öffnen. Ohne das
+   steht ein einzelner Kasten unter drei leeren Spalten.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 1000px) {
+  .ev-jagd-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+  .ev-jagd-grid > #event-header { display: contents; }
+
+  .ev-jagd-grid .ev-hero { grid-column: 1 / -1; }
+  .ev-jagd-grid .ev-briefing { grid-column: 1 / -1; order: 1; margin-top: 0; }
+
+  /* Die Abstände stammen aus dem gestapelten Fluss; im Raster macht sie gap. */
+  .ev-jagd-grid .ev-info-list,
+  .ev-jagd-grid .ev-times-strip { margin-top: 0; }
+  .ev-jagd-grid .ev-contacts { margin: 0; }
+
+  /* Der Ladezustand schreibt einen boar-loader als einziges Kind in
+     #event-header — durch display: contents wird der selbst zur Rasterzelle
+     und stünde sonst in der ersten von drei Spalten. */
+  .ev-jagd-grid .boar-loader { grid-column: 1 / -1; }
+}
+
 /* Revierkarte (plan map) ---------------------------------------------------- */
 
 .plan-map-wrap {
