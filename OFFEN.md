@@ -58,10 +58,20 @@ Der Markenverlauf ist unangetastet. `--muted`, das Orange-Ink und zwei
 Status-Pillen weichen vom Dokument ab — die Doc-Werte lagen unter 4,5:1,
 die Begründungen stehen im Token-Block.
 
+Ansteller-Runden und Treibergruppen unterscheiden sich im **Farbton**, nicht
+in der Helligkeit: `--surface` gegen `--surface-cool`, 162° gegen 206°. Ein
+Helligkeitsunterschied läse sich als Rangfolge, und die gibt es nicht.
+
+Die Freigaben stehen am Ende von Block 1 und laufen dort im Mehrspaltensatz —
+Rot- und Damwild links, Schwarz- und Rehwild rechts.
+
 **Einziger Rest des alten Grüns:** `.infomail-opt` („Schützen einbeziehen"),
 weil am 19.08.2026 ausdrücklich so entschieden. Es ist jetzt der einzige
 Kasten mit `#16a34a` statt `#198754` — eine Nuance daneben. Auf Zuruf
 angleichbar.
+
+Die ganze Regel steht im `preye`-Skill unter „Farbsystem — die Regel für die
+ganze Seite", damit sie beim nächsten Mal nicht neu erfunden wird.
 
 ## Bewusst nicht gemacht
 
