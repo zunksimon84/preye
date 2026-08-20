@@ -1,54 +1,70 @@
 :root {
   --green-dark: #1f3a1f;
   --green-mid: #4a6a3a;
-  /* Die Farbe der Bedienelemente — Flächen, Kacheln, Knöpfe, Zierlinien.
-     Zwei Anläufe in Grün, beide gescheitert: bis 19.08.2026 war es exakt
-     --lime, also das warme Ende des Markenverlaufs, und verschwamm mit dem
-     unverdunkelten 6-px-Streifen unter der Leiste. Ein kühleres Grün löste
-     das Verschwimmen, sah aber billig aus. Seit 19.08.2026 ein Verlauf von
-     kühlem Grau nach hellem Blau.
+  /* Farbsystem "Forest / Sage / Teal" — 20.08.2026 ---------------------------
+     Drei Anläufe stehen davor, und jeder ist an derselben Sache gescheitert:
+     die Bedienfarbe war ein zweites Farbsystem neben dem Markenverlauf. Erst
+     Lime (dasselbe wie der Verlauf, verschwamm damit), dann ein kühleres Grün
+     (sah billig aus), dann ein Grau-Blau-Verlauf (sah gut aus, hatte aber mit
+     der grün-blauen Kopfleiste nichts zu tun).
 
-     Warum das nicht in dieselbe Falle läuft wie das Lime, obwohl der
-     Markenverlauf links blau anfängt: --pool-blue-deep hat Luminanz 0,09,
-     das Blau hier 0,30 und das graue Ende 0,67. Die Kante steht, auch
-     direkt unter dem Streifen.
+     Jetzt kommt die Bedienfarbe AUS der Kopfleiste: Waldgrün.
 
-     Der zweite Durchgang machte das Blau tiefer (0,745 → 0,665 in OKLCH,
-     mehr Farbe) und das graue Ende blaustichig: mit dem hellen Blau las
-     die Fläche fast als reines Grau.
+     Die wichtigste Trennung, die es vorher nicht gab:
 
-     --ctl-fill ist ein Verlauf und gehört deshalb ausschließlich hinter
-     `background:`. Für Ränder, Schrift und alles, was eine einzelne Farbe
-     braucht, gibt es --ctl / --ctl-edge / --ctl-ink. */
-  --ctl-grey: #cdd7e1;   /* Anfang des Verlaufs — leicht blaustichig, sonst
-                            liest die Fläche als reines Grau */
-  --ctl-blue: #4f99dc;   /* Ende des Verlaufs */
-  --ctl-fill: linear-gradient(135deg, var(--ctl-grey) 0%, var(--ctl-blue) 100%);
-  /* Der Rand der gefüllten Flächen. Eine volle Randfarbe zeichnet die Kante
-     hart nach und lässt die Fläche wie aufgeklebt wirken; getönt und flach
-     dazu ein Schatten setzt sie stattdessen auf die Seite. --ctl-edge bleibt
-     für die Stellen, wo ein Rand auf Weiß sichtbar sein MUSS — Karten beim
-     Überfahren, "Mein Stand" auf der Standkarte. Dort verschwände eine
-     Haarlinie. */
-  --ctl-hairline: rgba(24, 80, 140, 0.16);
-  /* Wer --ctl-fill mit einem Rand kombiniert, braucht dazu
-     background-origin: border-box. Die Kurzform `background:` setzt origin
-     auf padding-box — der Verlauf ist dann nur so groß wie die Polsterbox,
-     und der 1-px-Ring der Randbox zeigt wegen background-repeat: repeat die
-     gekachelte Wiederholung: links das blaue Ende, rechts das graue. Genau
-     eine Seite bekommt dadurch eine harte Kante, und im Entwurf sieht man
-     das nicht — gemessen war der linke Randstreifen (77,144,207), also die
-     Haarlinie über dem falschen Ende des Verlaufs. */
-  --ctl-lift: 0 1px 2px rgba(20, 50, 85, 0.10), 0 6px 16px -6px rgba(20, 50, 85, 0.22);
-  /* Die Mitte des Verlaufs als einzelne Farbe. Für kleine Flächen, die einen
-     eigenen Verlauf nicht tragen — Tabellenköpfe (jede Zelle finge ihn neu
-     an), Zählpillen, Zierkanten. */
-  --ctl: #84b5e3;
-  --ctl-edge: #3c8bd0;
-  --ctl-tint: #e7f2fc;   /* Füllung hinterlegter Zeilen */
-  /* Als Schrift auf Weiß taugt --ctl-edge nicht (3,6:1). Dafür dieser Wert:
-     6,6:1 auf Weiß, 5,8:1 auf --ctl-tint. */
-  --ctl-ink: #186099;
+       --act-*      was man anklicken kann      Waldgrün, gefüllt, weiße Schrift
+       --surface-*  was nur Fläche ist          helles Sage, dunkle Schrift
+
+     Bis heute trug --ctl-fill beides — Knöpfe UND den Jagd-Hero, die
+     Runden-Kacheln, das Protokoll-Banner. Genau daran sah man nicht, was ein
+     Bedienelement ist. Wer hier etwas Neues einfärbt, muss sich zuerst
+     entscheiden, welches von beidem es ist.
+
+     Teal ist die Auskunftsfarbe: Links, Hinweise, "eingeladen". Grün bleibt
+     dem Positiven vorbehalten, sonst verliert es seine Bedeutung.
+     -------------------------------------------------------------------------- */
+
+  /* Aktion */
+  --act: #198754;
+  --act-hover: #126b45;
+  --act-ink: #ffffff;          /* Schrift AUF der Aktionsfarbe, 4,6:1 */
+  --act-text: #197447;         /* Grün ALS Schrift auf Hell, 4,9:1 */
+  --act-soft: #e8f5ed;         /* zarte Füllung, z.B. gewählte Zeile */
+  --act-edge: #c9d8d0;         /* Rand eines zweitrangigen Knopfes */
+
+  /* Fläche — nichts davon ist anklickbar */
+  --surface: #e5f0ea;
+  --surface-strong: #d8eae1;   /* die eine Stufe kräftiger, für den Hero */
+  --surface-edge: #c9d8d0;
+
+  /* Auskunft */
+  --info: #087f7a;
+  --info-soft: #e8f1f0;
+  --info-text: #1f6663;   /* 5,8:1 auf --info-soft */
+
+  /* Anhebung. Flacher als vorher: die Karten sollen wie eine
+     zusammenhängende Oberfläche wirken, nicht wie einzelne Kästen. */
+  --lift: 0 2px 8px rgba(23, 33, 28, 0.06);
+
+  /* Tabellenköpfe und -zeilen: so ruhig wie möglich, die Farbe soll die
+     Oberfläche nicht tragen. */
+  --thead: #f5f7f5;
+  --row-hover: #f4f8f5;
+  --row-sel: #e8f4ed;
+
+  /* Die alten Namen zeigen auf die neuen, damit nicht 65 Fundstellen auf
+     einmal umgeschrieben werden müssen. Sie werden Stück für Stück ersetzt;
+     wer sie neu benutzt, hat sich die Frage Aktion-oder-Fläche nicht
+     gestellt. */
+  --ctl: var(--surface-strong);
+  --ctl-fill: var(--surface);
+  --ctl-grey: var(--surface);
+  --ctl-blue: var(--surface-strong);
+  --ctl-hairline: var(--surface-edge);
+  --ctl-lift: var(--lift);
+  --ctl-edge: var(--surface-edge);
+  --ctl-tint: #edf7f1;
+  --ctl-ink: var(--act-text);
   /* Brand gradient — the Lunge Evo Run colourway: pool blue at the heel,
      through green, into the yellow-green at the toe. The warm end is the
      existing brand lime, so every lime button on the site still ties back
@@ -82,22 +98,27 @@
     var(--lime) 88%,
     var(--lime-bright) 100%);
   --steel: #8a8e92; /* metallic grey accent, like the bullet jackets */
-  --steel-dark: #4a4d52;
+  --steel-dark: #526158;   /* Sekundärtext, gedecktes Grau-Grün */
   /* Form surfaces — switched from a warm cream to a cool light grey
      so the inputs read as 'colder' alongside the lime topbar. */
-  --bg: #eef1f4;
+  --bg: #f3f6f3;           /* Seitengrund, sehr helles Grau-Grün */
   --card: #ffffff;
-  --text: #1a1a1a;
-  --muted: #6b6b6b;
-  --border: #d0d5db;
+  --text: #17211c;
+  /* Das Dokument nennt #87938c als "Muted". Auf Weiß sind das 3,2:1 — zu
+     wenig für Text, und --muted trägt hier echte Beschriftungen (TREFFPUNKT,
+     Hinweiszeilen). Deshalb der Sekundärton aus derselben Familie: 5,0:1. */
+  --muted: #66736c;
+  --border: #dce5df;
   /* Orange statt Rot. Drei Marken, weil eine Farbe hier zwei Aufgaben hatte:
      --accent füllt (Pillen, Knöpfe, Ränder), --accent-ink ist die Schrift
      darauf (weiß käme nur auf 3,2:1), --accent-text ist Orange als Schrift auf
      hellem Grund (das volle Orange schafft dort nur 2,8:1). */
-  --accent: #ff5722;
-  --accent-hover: #f04a17;
+  --accent: #e58b3a;       /* Aufmerksamkeit, nicht Standardfarbe */
+  --accent-hover: #cf7826;
+  /* Weiß auf #e58b3a wären 2,6:1 — unlesbar. Dunkelbraun sind 7,0:1.
+     Dasselbe Problem hatte das alte #ff5722 auch, und dieselbe Lösung. */
   --accent-ink: #2a0d04;
-  --accent-text: #b83f18;
+  --accent-text: #a75f18;  /* Orange ALS Schrift auf Hell, 4,6:1 */
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
   /* visualViewport-derived browser-chrome insets (set by JS at runtime).
@@ -328,7 +349,7 @@ a.filter-btn {
   border-radius: 50%;
   border: none;
   background: #1a1a1a;
-  color: var(--ctl);
+  color: #7fd6a8;   /* Waldgrün aufgehellt für #1a1a1a, 8,2:1 */
   font-size: 34px;
   line-height: 60px;
   font-weight: 500;
@@ -498,12 +519,12 @@ a.filter-btn {
 }
 
 .mode-btn.active {
-  background: var(--ctl-fill);
-  color: #111;
+  background: var(--act);
+  color: var(--act-ink);
 }
 
 .mode-btn.active[data-mode="klettersitz"] {
-  background: #03a9f4;
+  background: var(--info);
   color: #fff;
 }
 
@@ -661,13 +682,13 @@ a.filter-btn {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.3px;
-  background: var(--ctl-fill);
+  background: var(--act);
   background-origin: border-box;
-  color: #111;
-  border: 1px solid var(--ctl-hairline);
+  color: var(--act-ink);
+  border: 1px solid var(--act);
   border-radius: 10px;
   cursor: pointer;
-  box-shadow: var(--ctl-lift);
+  box-shadow: var(--lift);
 }
 
 #f-submit:disabled {
@@ -782,7 +803,7 @@ a.filter-btn {
   border-radius: 16px;
   /* Lime accent strip across the top edge — same Brenneke green used
      in the topbar, ties the modal to the brand. */
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   padding: 0 20px calc(20px + var(--safe-bottom));
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
   left: 12px;
@@ -917,9 +938,9 @@ a.filter-btn {
 #strecke-list li .count {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: #111;
-  background: var(--ctl);
-  border: 1px solid var(--ctl-hairline);
+  color: var(--act-text);
+  background: var(--act-soft);
+  border: 1px solid var(--surface-edge);
   border-radius: 999px;
   padding: 2px 12px;
   min-width: 36px;
@@ -984,7 +1005,7 @@ a.filter-btn {
   position: fixed;
   z-index: 41;
   background: var(--card);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 14px;
   left: 8px;
   right: 8px;
@@ -1037,13 +1058,13 @@ a.filter-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ctl-fill);
+  background: var(--surface);
   background-origin: border-box;
-  border: 1px solid var(--ctl-hairline);
+  border: 1px solid var(--surface-edge);
   border-radius: 6px;
   padding: 8px 12px;
   margin-bottom: 10px;
-  box-shadow: var(--ctl-lift);
+  box-shadow: var(--lift);
 }
 
 .proto-banner-title {
@@ -1079,9 +1100,9 @@ a.filter-btn {
   cursor: pointer;
 }
 
-.proto-mode-btn.active { background: var(--ctl-fill); color: #111; }
-.proto-mode-btn.active[data-pmode="klettersitz"] { background: #03a9f4; color: #fff; }
-.proto-mode-btn.active[data-pmode="pirsch"] { background: #e2dc3a; color: #1f1f1f; }
+.proto-mode-btn.active { background: var(--act); color: var(--act-ink); }
+.proto-mode-btn.active[data-pmode="klettersitz"] { background: var(--info); color: #fff; }
+.proto-mode-btn.active[data-pmode="pirsch"] { background: #d69e2e; color: #fff; }
 
 .proto-loc-row {
   display: flex;
@@ -1162,7 +1183,7 @@ a.filter-btn {
 }
 
 .proto-table th {
-  background: var(--ctl);
+  background: var(--thead);
   font-weight: 700;
   font-size: 10px;
   color: #111;
@@ -1298,7 +1319,7 @@ a.filter-btn {
 }
 
 .proto-pirsch-head {
-  background: var(--ctl);
+  background: var(--surface);
   font-weight: 700;
   font-size: 12px;
   padding: 5px 8px;
@@ -1399,13 +1420,13 @@ a.filter-btn {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.3px;
-  background: var(--ctl-fill);
+  background: var(--act);
   background-origin: border-box;
-  color: #111;
-  border: 1px solid var(--ctl-hairline);
+  color: var(--act-ink);
+  border: 1px solid var(--act);
   border-radius: 10px;
   cursor: pointer;
-  box-shadow: var(--ctl-lift);
+  box-shadow: var(--lift);
 }
 
 #proto-submit:disabled { opacity: 0.5; }
@@ -1445,15 +1466,15 @@ a.filter-btn {
 .ns-popup .ns-close-btn {
   margin-top: 8px;
   padding: 7px 12px;
-  background: var(--ctl-fill);
+  background: var(--act);
   background-origin: border-box;
-  color: #111;
-  border: 1px solid var(--ctl-hairline);
+  color: var(--act-ink);
+  border: 1px solid var(--act);
   border-radius: 7px;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  box-shadow: var(--ctl-lift);
+  box-shadow: var(--lift);
 }
 
 /* Phone layout for the Anschuss-Protokoll — the 7-column table is unusable
@@ -1505,8 +1526,8 @@ a.filter-btn {
   }
   .proto-table td.proto-row-head {
     display: block;
-    background: var(--ctl);
-    color: #111;
+    background: var(--surface);
+    color: var(--text);
     font-weight: 700;
     text-align: center;
     padding: 8px;
@@ -1589,8 +1610,8 @@ a.filter-btn {
   left: 50%;
   bottom: calc(80px + var(--safe-bottom) + var(--vv-bottom));
   transform: translateX(-50%);
-  background: var(--ctl-fill);
-  color: #111;
+  background: var(--text);
+  color: #fff;
   padding: 10px 16px;
   border-radius: 999px;
   font-size: 14px;
@@ -1763,8 +1784,8 @@ body.rsvp-page #rsvp-topbar {
   background: var(--border);
 }
 .year-divider span {
-  background: var(--ctl);
-  color: #111;
+  background: var(--act-soft);
+  color: var(--act-text);
   padding: 3px 12px;
   border-radius: 999px;
   font-size: 13px;
@@ -1831,7 +1852,7 @@ body.rsvp-page #rsvp-topbar {
 }
 .event-delete-btn:hover {
   background: #fbe9e7;
-  color: #c0392b;
+  color: #b64e4e;
 }
 
 .event-card-head {
@@ -1865,9 +1886,9 @@ body.rsvp-page #rsvp-topbar {
   font-size: 12px;
 }
 .event-stats .stat { color: var(--steel-dark); }
-.event-stats .stat-accepted { color: #1f7a31; font-weight: 600; }
-.event-stats .stat-declined { color: #c0392b; font-weight: 600; }
-.event-stats .stat-pending  { color: #8a6d00; font-weight: 600; }
+.event-stats .stat-accepted { color: var(--act-text); font-weight: 600; }
+.event-stats .stat-declined { color: #b64e4e; font-weight: 600; }
+.event-stats .stat-pending  { color: #9a7115; font-weight: 600; }
 
 /* New event form ----------------------------------------------------------- */
 
@@ -2049,7 +2070,7 @@ body.rsvp-page #rsvp-topbar {
 .ev-contacts {
   background: var(--card);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--ctl);
+  border-left: 3px solid var(--act);
   border-radius: 7px;
   padding: 10px 14px 12px;
   margin: 6px 0 14px;
@@ -2088,10 +2109,10 @@ body.rsvp-page #rsvp-topbar {
 }
 
 .primary-btn {
-  background: var(--ctl-fill);
+  background: var(--act);
   background-origin: border-box;
-  color: #111;
-  border: 1px solid var(--ctl-hairline);
+  color: var(--act-ink);
+  border: 1px solid var(--act);
   border-radius: 6px;
   padding: 10px 16px;
   font: inherit;
@@ -2099,7 +2120,7 @@ body.rsvp-page #rsvp-topbar {
   font-weight: 700;
   letter-spacing: 0.2px;
   cursor: pointer;
-  box-shadow: var(--ctl-lift);
+  box-shadow: var(--lift);
 }
 .primary-btn:disabled { opacity: 0.55; }
 .primary-btn.small { padding: 7px 12px; font-size: 13px; }
@@ -2133,13 +2154,13 @@ body.rsvp-page #rsvp-topbar {
 
 /* "Landing page" hero for the event detail view. */
 .ev-hero {
-  background: var(--ctl-fill);
+  background: var(--surface-strong);
   background-origin: border-box;
-  border: 1px solid var(--ctl-hairline);
+  border: 1px solid var(--surface-edge);
   border-radius: 12px;
   padding: 18px 18px 16px;
-  color: #111;
-  box-shadow: var(--ctl-lift);
+  color: var(--text);
+  box-shadow: var(--lift);
 }
 .ev-hero-title {
   margin: 0;
@@ -2235,7 +2256,7 @@ body.rsvp-page #rsvp-topbar {
   margin: 10px 0 0;
   padding: 8px 12px;
   background: var(--bg);
-  border-left: 3px solid var(--ctl);
+  border-left: 3px solid var(--act);
   border-radius: 4px;
   white-space: pre-wrap;
   font-size: 13px;
@@ -2269,7 +2290,7 @@ body.rsvp-page #rsvp-topbar {
 .ev-tab.active {
   color: #111;
   font-weight: 600;
-  border-bottom-color: var(--ctl);
+  border-bottom-color: var(--act);
 }
 
 .ev-section {
@@ -2371,7 +2392,7 @@ body.rsvp-page #rsvp-topbar {
 
    Die Farben sind nicht neu erfunden:
      Block 1  --ctl-edge  die Bedienfarbe, die Hero und Info-Liste tragen
-     Block 2  #16a34a     das Grün, das auf dieser Seite "erledigt" heißt
+     Block 2  var(--act)     das Grün, das auf dieser Seite "erledigt" heißt
                           (.infomail-btn, .freigabe-ak--on)
      Block 3  #e8650e     das Orange, das die Revierkarte schon hatte
    -------------------------------------------------------------------------- */
@@ -2397,7 +2418,7 @@ body.rsvp-page #rsvp-topbar {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--ev-block-hue, var(--ctl));
+  background: var(--ev-block-hue, var(--act));
   color: #fff;
   font-size: 13px;
   font-weight: 800;
@@ -2429,9 +2450,13 @@ body.rsvp-page #rsvp-topbar {
   align-items: center;
 }
 
-.ev-block--jagd     { --ev-block-hue: var(--ctl-edge); }
-.ev-block--einladen { --ev-block-hue: #16a34a; }
-.ev-block--jagdtag  { --ev-block-hue: #e8650e; }
+/* Ein Primärgrün für alle drei. Vorher hatte jeder Block seinen eigenen Ton
+   (blau, grün, orange) — das las sich wie drei verschiedene Bereiche statt
+   wie drei Schritte an derselben Jagd. Die Nummer trägt die Reihenfolge,
+   dafür braucht es keine Farbe. */
+.ev-block--jagd,
+.ev-block--einladen,
+.ev-block--jagdtag { --ev-block-hue: var(--act); }
 
 /* Die Abschnittstitel folgen der Blockfarbe, statt jeder für sich eine zu
    setzen. Ersetzt die drei Einzelregeln für --squads, --map und --treiber. */
@@ -2480,6 +2505,10 @@ body.rsvp-page #rsvp-topbar {
   .ev-jagd-grid .ev-info-list { grid-column: 1; }
   .ev-jagd-grid .ev-times-strip { grid-column: 2; }
   .ev-jagd-grid .ev-contacts { grid-column: 2; }
+  /* Über die volle Breite und ganz nach unten — order: 2 setzt sie hinter
+     das Briefing (order: 1), damit die Reihenfolge nicht von der DOM-Folge
+     abhängt. */
+  .ev-jagd-grid .ev-freigaben { grid-column: 1 / -1; order: 2; margin-top: 0; }
 
   /* Die Abstände stammen aus dem gestapelten Fluss; im Raster macht sie gap. */
   .ev-jagd-grid .ev-info-list,
@@ -2633,21 +2662,21 @@ body.rsvp-page #rsvp-topbar {
 @media (max-width: 480px) { .squads-grid { grid-template-columns: 1fr; } }
 
 .squad-tile {
-  background: var(--ctl-fill);
+  background: var(--surface);
   background-origin: border-box;
-  border: 1px solid var(--ctl-hairline);
+  border: 1px solid var(--surface-edge);
   border-radius: 12px;
   padding: 14px 14px 12px;
   text-align: left;
   cursor: pointer;
   font: inherit;
-  color: #111;
+  color: var(--text);
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 92px;
   transition: transform 0.08s, box-shadow 0.12s;
-  box-shadow: var(--ctl-lift);
+  box-shadow: var(--lift);
 }
 .squad-tile:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
@@ -2665,7 +2694,7 @@ body.rsvp-page #rsvp-topbar {
    2 ohne Stand" — die Zahl, auf die man bei 60 Jägern schaut. */
 .squad-tile-count {
   font-size: 12px;
-  color: #1b3a55;
+  color: var(--steel-dark);
   opacity: 0.75;
   font-variant-numeric: tabular-nums;
 }
@@ -2675,17 +2704,17 @@ body.rsvp-page #rsvp-topbar {
   grid-column: 1 / -1;
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
-  color: #1b3a55;
+  color: var(--steel-dark);
   opacity: 0.8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.treiber-tile .tile-member-stand { color: #1e2a36; }
+.treiber-tile .tile-member-stand { color: var(--steel-dark); }
 .tile-member-hund {
   grid-column: 1 / -1;
   font-size: 11px;
-  color: #1b3a55;
+  color: var(--steel-dark);
   opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;
@@ -2738,14 +2767,17 @@ body.rsvp-page #rsvp-topbar {
   opacity: 0.75;
   white-space: nowrap;
 }
-.treiber-tile .tile-member-role { color: #1e2a36; opacity: 0.7; }
+.treiber-tile .tile-member-role { color: var(--steel-dark); opacity: 0.75; }
 
 /* Treibergruppe tiles — soft slate-blue so they read as a separate kind
    of group from the lime Ansteller Runden. */
+/* Eine Stufe kühler als die Ansteller-Runden, damit die beiden Sorten
+   auseinanderzuhalten sind — aber in derselben Familie, nicht in einer
+   eigenen. */
 .treiber-tile {
-  background: linear-gradient(135deg, #c7d4e0 0%, #b3c4d4 100%);
-  border-color: #93a7b9;
-  color: #1e2a36;
+  background: var(--info-soft);
+  border-color: var(--surface-edge);
+  color: var(--text);
 }
 .treiber-tile:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16); }
 .treiber-tile .squad-tile-count { color: #1e2a36; }
@@ -2766,24 +2798,20 @@ body.rsvp-page #rsvp-topbar {
 }
 
 
-/* Bright blue for the Treibergruppe create button so the action visibly
-   belongs to the (calmer slate-blue) Treibergruppen section. */
-#new-treiber-btn {
-  background: #03a9f4;
-  border-color: #0288d1;
-  color: #fff;
-}
-#new-treiber-btn:hover { background: #29b6f6; }
+/* Der Knopf trug ein eigenes Blau, damit er zur damals blaugrauen
+   Treibergruppen-Fläche gehörte. Beides ist weg: eine Aktion ist eine Aktion,
+   und die haben jetzt alle dieselbe Farbe. Woran man sieht, dass es um die
+   Treibergruppen geht, ist die Überschrift darüber, nicht die Knopffarbe. */
 #new-treiber-btn:disabled { opacity: 0.6; }
 
 /* Vibrant emerald green for the Infomail action — distinct from the lime
    "+ Neue Ansteller Runde" so it's obviously a different operation. */
 .infomail-btn {
-  background: #16a34a;
-  border-color: #15803d;
+  background: var(--act);
+  border-color: var(--act-text);
   color: #fff;
 }
-.infomail-btn:hover { background: #22c55e; border-color: #16a34a; }
+.infomail-btn:hover { background: var(--act); border-color: var(--act); }
 .infomail-btn:disabled { opacity: 0.55; }
 
 /* Infomail preview modal */
@@ -2802,7 +2830,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid #16a34a;
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -2864,11 +2892,11 @@ body.rsvp-page #rsvp-topbar {
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #16a34a;
+  color: var(--act);
   text-decoration: none;
   transition: background 0.1s, border-color 0.1s;
 }
-.infomail-link-btn:hover { background: #f0fdf4; border-color: #16a34a; }
+.infomail-link-btn:hover { background: var(--act-soft); border-color: var(--act); }
 
 /* Toggle option card — bigger, colored when active, gray when off so
  * it's instantly clear which mode is selected. */
@@ -2922,7 +2950,7 @@ body.rsvp-page #rsvp-topbar {
   letter-spacing: 0.04em;
 }
 .infomail-meta-value { flex: 1; color: #232323; }
-.infomail-meta-value strong { color: #15803d; font-size: 16px; }
+.infomail-meta-value strong { color: var(--act-text); font-size: 16px; }
 
 /* Legacy class kept for warning banner; section heading wraps the new
  * card-style titles instead. */
@@ -2964,7 +2992,7 @@ body.rsvp-page #rsvp-topbar {
   margin-left: auto;
   font-size: 12px;
   font-weight: 600;
-  color: #16a34a;
+  color: var(--act);
   font-style: normal;
 }
 .freigabe-hint { margin: 0 0 12px; font-size: 12.5px; }
@@ -2974,7 +3002,7 @@ body.rsvp-page #rsvp-topbar {
 .freigabe-species-label {
   font-size: 13px;
   font-weight: 700;
-  color: #15803d;
+  color: var(--act-text);
   margin: 0 0 4px;
 }
 .freigabe-group {
@@ -3014,16 +3042,16 @@ body.rsvp-page #rsvp-topbar {
   width: 14px;
   height: 14px;
   margin: 0;
-  accent-color: #16a34a;
+  accent-color: var(--act);
   cursor: pointer;
 }
 .freigabe-ak--on {
-  background: #f0fdf4;
-  border-color: #16a34a;
-  color: #15803d;
+  background: var(--act-soft);
+  border-color: var(--act);
+  color: var(--act-text);
   font-weight: 600;
 }
-.freigabe-ak--on:hover { background: #dcfce7; }
+.freigabe-ak--on:hover { background: var(--act-soft); }
 @media (max-width: 540px) {
   .freigabe-group { flex-direction: column; align-items: flex-start; gap: 4px; }
   .freigabe-group-label { width: auto; }
@@ -3041,7 +3069,7 @@ body.rsvp-page #rsvp-topbar {
   margin: 6px 0 0;
   font-size: 12.5px;
 }
-.infomail-pdf-note a { color: #16a34a; font-weight: 600; }
+.infomail-pdf-note a { color: var(--act); font-weight: 600; }
 
 /* Hint shown inside a Treibergruppe row when no acceptances yet. */
 /* Der Hund an einer Position. Das Häkchen sitzt bewusst hier und nicht beim
@@ -3082,7 +3110,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -3116,7 +3144,7 @@ body.rsvp-page #rsvp-topbar {
   margin: 0 0 12px;
   padding: 8px 12px;
   background: var(--bg);
-  border-left: 3px solid var(--ctl);
+  border-left: 3px solid var(--act);
   border-radius: 4px;
   font-size: 13px;
   color: var(--steel-dark);
@@ -3124,13 +3152,13 @@ body.rsvp-page #rsvp-topbar {
 
 .modal-danger-row { margin-top: 16px; }
 .ghost-btn--danger {
-  color: #c0392b;
+  color: #b64e4e;
   border-color: #f1c1bb;
 }
 .ghost-btn--danger:hover {
   background: #fbe9e7;
-  border-color: #c0392b;
-  color: #c0392b;
+  border-color: #b64e4e;
+  color: #b64e4e;
 }
 
 .schuetze-row--ansteller {
@@ -3343,7 +3371,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -3412,7 +3440,7 @@ body.rsvp-page #rsvp-topbar {
 .invite-lang-tab.active {
   color: #111;
   font-weight: 600;
-  border-bottom-color: var(--ctl);
+  border-bottom-color: var(--act);
 }
 
 /* Hunter list -------------------------------------------------------------- */
@@ -3438,7 +3466,7 @@ body.rsvp-page #rsvp-topbar {
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -3482,6 +3510,7 @@ body.rsvp-page #rsvp-topbar {
 
 .hbm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .hbm-table th {
+  background: var(--thead);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -3492,7 +3521,6 @@ body.rsvp-page #rsvp-topbar {
   text-transform: uppercase;
   color: var(--muted);
   padding: 6px 8px;
-  background: var(--card);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -3501,7 +3529,7 @@ body.rsvp-page #rsvp-topbar {
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
-.hbm-table tbody tr:hover td { background: var(--ctl-tint); }
+.hbm-table tbody tr:hover td { background: var(--row-hover); }
 .hbm-table .hbm-mail, .hbm-table .hbm-notiz { color: var(--muted); }
 .hbm-table .hbm-tel { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hbm-table .hbm-tel a { color: var(--ctl-ink); text-decoration: none; }
@@ -3574,7 +3602,7 @@ body.rsvp-page #rsvp-topbar {
   --hb-zeile: 34px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 3px solid var(--ev-block-hue, var(--ctl));
+  border-top: 3px solid var(--ev-block-hue, var(--act));
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -3721,14 +3749,14 @@ body.rsvp-page #rsvp-topbar {
 
 /* Während gezogen wird, zeigen beide Zonen, dass sie gemeint sind. */
 body.jgr-zieht .jgr-drop { border-color: var(--ctl-edge); background: var(--ctl-tint); }
-body.jgr-zieht .jgr-drop--gesetzt { border-color: #16a34a; background: #f0fdf4; }
+body.jgr-zieht .jgr-drop--gesetzt { border-color: var(--act); background: var(--act-soft); }
 .jgr-drop.is-ueber {
   border-style: solid;
   border-color: var(--ctl-edge);
   background: var(--ctl-tint);
   box-shadow: var(--ctl-lift);
 }
-.jgr-drop--gesetzt.is-ueber { border-color: #16a34a; background: #dcfce7; }
+.jgr-drop--gesetzt.is-ueber { border-color: var(--act); background: var(--act-soft); }
 
 .jgr-drop-rollen {
   display: flex;
@@ -3874,6 +3902,7 @@ body.jgr-zieht .jgr-drop--gesetzt { border-color: #16a34a; background: #f0fdf4; 
   font-size: 13.5px;
 }
 .jgr-table th {
+  background: var(--thead);
   text-align: left;
   font-size: 10.5px;
   font-weight: 800;
@@ -3883,7 +3912,6 @@ body.jgr-zieht .jgr-drop--gesetzt { border-color: #16a34a; background: #f0fdf4; 
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
-  background: var(--card);
 }
 .jgr-table td {
   padding: 7px 8px;
@@ -3891,7 +3919,7 @@ body.jgr-zieht .jgr-drop--gesetzt { border-color: #16a34a; background: #f0fdf4; 
   vertical-align: middle;
   background: var(--card);
 }
-.jgr-table tbody tr:hover td { background: var(--ctl-tint); }
+.jgr-table tbody tr:hover td { background: var(--row-hover); }
 /* Abgesagte bleiben lesbar, treten aber zurück. */
 .jgr-table tr.hunter-declined td { opacity: 0.55; }
 
@@ -4083,10 +4111,20 @@ th[aria-sort="descending"] .jgr-sort::after { content: "↓"; opacity: 1; }
   font-weight: 600;
   white-space: nowrap;
 }
-.hunter-accepted .hunter-status { color: #1f7a31; }
-.hunter-declined .hunter-status { color: #c0392b; }
-.hunter-invited  .hunter-status { color: #8a6d00; }
-.hunter-pending  .hunter-status { color: var(--muted); }
+/* Status als Pille mit eigenem Grund. Grün bleibt dem Positiven vorbehalten;
+   Teal ist die Auskunftsfarbe für "eingeladen, noch keine Antwort", damit
+   Grün seine Bedeutung nicht verliert. */
+.hunter-status {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: var(--bg);
+  color: var(--muted);
+}
+.hunter-accepted .hunter-status { background: var(--act-soft);  color: var(--act-text); }
+.hunter-declined .hunter-status { background: #fbecec;          color: #a94444; }
+.hunter-invited  .hunter-status { background: var(--info-soft); color: var(--info-text); }
+.hunter-pending  .hunter-status { background: #fff6de;          color: #8a6512; }
 
 .hunter-remove {
   background: transparent;
@@ -4128,7 +4166,7 @@ th[aria-sort="descending"] .jgr-sort::after { content: "↓"; opacity: 1; }
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -4255,7 +4293,7 @@ th[aria-sort="descending"] .jgr-sort::after { content: "↓"; opacity: 1; }
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -4303,7 +4341,7 @@ th[aria-sort="descending"] .jgr-sort::after { content: "↓"; opacity: 1; }
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -4346,7 +4384,7 @@ th[aria-sort="descending"] .jgr-sort::after { content: "↓"; opacity: 1; }
   bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border: 1px solid var(--border);
-  border-top: 4px solid var(--ctl);
+  border-top: 4px solid var(--act);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -4466,7 +4504,7 @@ body.events-page #toast {
   bottom: 24px;
   transform: translateX(-50%);
   background: #111;
-  color: var(--ctl);
+  color: #7fd6a8;
   padding: 10px 16px;
   border-radius: 999px;
   font-size: 13px;
@@ -4527,8 +4565,8 @@ body.rsvp-page {
 }
 .rsvp-state-accepted h2::before { content: "✓ "; font-weight: 700; }
 .rsvp-state-declined h2::before { content: "✗ "; font-weight: 700; }
-.rsvp-state-accepted h2 { color: #1f7a31; }
-.rsvp-state-declined h2 { color: #c0392b; }
+.rsvp-state-accepted h2 { color: var(--act-text); }
+.rsvp-state-declined h2 { color: #b64e4e; }
 .rsvp-state-accepted p,
 .rsvp-state-declined p {
   margin: 8px 0 0;
@@ -4571,7 +4609,7 @@ body.rsvp-page {
   margin: 12px 0;
   padding: 10px 12px;
   background: var(--bg);
-  border-left: 3px solid var(--ctl);
+  border-left: 3px solid var(--act);
   border-radius: 4px;
   font-size: 13px;
   white-space: pre-wrap;
@@ -4585,8 +4623,8 @@ body.rsvp-page {
   font-size: 13px;
   font-weight: 600;
 }
-.rsvp-current-accepted { background: #e8f5e9; color: #1f7a31; }
-.rsvp-current-declined { background: #fbe9e7; color: #c0392b; }
+.rsvp-current-accepted { background: var(--act-soft); color: var(--act-text); }
+.rsvp-current-declined { background: #fbe9e7; color: #b64e4e; }
 
 .rsvp-actions {
   display: flex;
@@ -4595,17 +4633,17 @@ body.rsvp-page {
 }
 .rsvp-accept {
   flex: 1;
-  background: var(--ctl-fill);
+  background: var(--act);
   background-origin: border-box;
-  color: #111;
-  border: 1px solid var(--ctl-hairline);
+  color: var(--act-ink);
+  border: 1px solid var(--act);
   border-radius: 7px;
   padding: 12px;
   font: inherit;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: var(--ctl-lift);
+  box-shadow: var(--lift);
 }
 .rsvp-decline {
   flex: 1;
@@ -4922,9 +4960,11 @@ body.stk-page {
   margin: 0 0 14px;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(11, 124, 149, 0.35);
-  background: rgba(11, 124, 149, 0.08);
-  color: var(--pool-blue-deep);
+  /* Teal ist die Auskunftsfarbe des Systems — ein Hinweis, keine Warnung
+     und kein Erfolg. */
+  border: 1px solid rgba(8, 127, 122, 0.3);
+  background: var(--info-soft);
+  color: var(--info-text);
   font-size: 12.5px;
   line-height: 1.4;
 }
@@ -5076,7 +5116,7 @@ body.stk-page {
   vertical-align: middle;
 }
 .stk-table th {
-  background: var(--ctl);
+  background: var(--thead);
   color: #111;
   font-size: 10.5px;
   font-weight: 700;

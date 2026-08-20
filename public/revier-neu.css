@@ -109,7 +109,7 @@
 .rn-legend .d { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
 .rn-legend .neu { background: #2fa35f; }
 .rn-legend .alt { background: transparent; border: 2px solid #9a9a9a; }
-.rn-legend .konflikt { background: #ff5722; }
+.rn-legend .konflikt { background: #e58b3a; }
 .rn-legend .aus { background: #c9d0d6; }
 
 .rn-tablewrap { min-width: 0; overflow-x: auto; }

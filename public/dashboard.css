@@ -29,17 +29,28 @@
     var(--pool-deep) 0%, var(--pool) 20%, var(--sea) 40%,
     var(--green) 62%, var(--lime) 86%, var(--lime-bright) 100%);
 
-  /* Neutrals pulled toward the teal so nothing reads as stock grey. */
-  --ink: #06202b;
-  --ink-soft: #35565f;
-  --ink-faint: #6d8a92;
+  /* Dieselben Neutralen wie style.css seit dem Farbkonzept vom 20.08.2026:
+     ein sehr helles Grau-Grün, das an die Kopfleiste anschließt. Vorher zogen
+     sie ins Teal, was für sich stimmig war, neben der Detailseite aber ein
+     zweites System ergab. Die Werte stehen hier zum zweiten Mal, weil diese
+     Seite style.css nicht lädt. */
+  --ink: #17211c;
+  --ink-soft: #526158;
+  --ink-faint: #66736c;
   --paper: #ffffff;
-  --tint: #eef4f3;
-  --rule: #d5e3e1;
+  --tint: #f3f6f3;
+  --rule: #dce5df;
   --night: #04141c;
-  --alert: #ff5722;        /* Füllfarbe */
-  --alert-ink: #2a0d04;    /* Schrift darauf */
-  --alert-text: #b83f18;   /* Orange als Schrift auf Hell */
+
+  /* Die Aktionsfarbe — Waldgrün, wie im ganzen Rest. */
+  --act: #198754;
+  --act-hover: #126b45;
+  --act-soft: #e8f5ed;
+  --act-text: #197447;
+
+  --alert: #e58b3a;        /* Füllfarbe — Aufmerksamkeit, nicht Standard */
+  --alert-ink: #2a0d04;    /* Schrift darauf, 7,0:1 */
+  --alert-text: #a75f18;   /* Orange als Schrift auf Hell, 4,9:1 */
 
   --gap: clamp(14px, 2.6vw, 28px);
   --shell: 1280px;

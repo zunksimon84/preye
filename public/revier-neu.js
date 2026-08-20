@@ -474,7 +474,7 @@ function drawMarkers() {
   let any = false;
   for (const r of state.rows) {
     if (!Number.isFinite(r.lat) || !Number.isFinite(r.lng)) continue;
-    const color = !r.take ? "#c9d0d6" : r.matched ? "#ff5722" : r.status === "error" ? "#ff5722" : "#2fa35f";
+    const color = !r.take ? "#c9d0d6" : r.matched ? "#e58b3a" : r.status === "error" ? "#e58b3a" : "#2fa35f";
     const m = new google.maps.Marker({
       position: { lat: r.lat, lng: r.lng }, map, title: r.name, zIndex: 5,
       draggable: true,
