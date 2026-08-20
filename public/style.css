@@ -36,6 +36,12 @@
   --surface: #e5f0ea;
   --surface-strong: #d8eae1;   /* die eine Stufe kräftiger, für den Hero */
   --surface-edge: #c9d8d0;
+  /* Die kühle Schwester für die zweite Sorte derselben Art — heute die
+     Treibergruppen neben den Ansteller-Runden. Gleiche Helligkeit, aber
+     Farbton 206° statt 162° und mehr Farbe: die alte Paarung lag nur 27°
+     auseinander bei 0,01 Chroma und war praktisch nicht zu sehen. */
+  --surface-cool: #d7eff2;
+  --surface-cool-edge: #b9d7dc;
 
   /* Auskunft */
   --info: #087f7a;
@@ -2775,8 +2781,8 @@ body.rsvp-page #rsvp-topbar {
    auseinanderzuhalten sind — aber in derselben Familie, nicht in einer
    eigenen. */
 .treiber-tile {
-  background: var(--info-soft);
-  border-color: var(--surface-edge);
+  background: var(--surface-cool);
+  border-color: var(--surface-cool-edge);
   color: var(--text);
 }
 .treiber-tile:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16); }
