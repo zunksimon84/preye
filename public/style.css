@@ -3359,6 +3359,165 @@ body.rsvp-page #rsvp-topbar {
 
 /* Hunter list -------------------------------------------------------------- */
 
+/* Hunterbase als Spalte -------------------------------------------------------
+   Warum eigener Scroll-Container UND sticky: 200 Kontakte à 44 px sind
+   8800 px. Nur sticky würde die Seite genau um diese 8800 px verlängern —
+   also um das, was der ganze Umbau vermeiden soll.
+   -------------------------------------------------------------------------- */
+
+.ev-invite-split { display: grid; gap: 16px; }
+
+.hb-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--ev-block-hue, var(--ctl));
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.hb-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.hb-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hb-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ctl-ink);
+  background: var(--ctl-tint);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
+}
+/* .jgr-search bringt flex: 0 1 250px mit. In .hb-head, das eine SPALTEN-
+   Flexbox ist, wäre das eine Höhe von 250px — das Feld wurde ein Oval über
+   die halbe Spalte. Hier zählt nur die Breite. */
+/* .hb-head .hb-search und nicht nur .hb-search: der Hunterbase-Block steht im
+   Blatt VOR dem Jägerregister, und bei gleicher Spezifität gewinnt die
+   spätere Regel — .jgr-search { flex: 0 1 250px } also. */
+.hb-head .hb-search { flex: 0 0 auto; width: 100%; }
+
+.hb-scroll {
+  flex: 1 1 auto;
+  /* Ohne min-height: 0 wird ein Flex-Kind nie kleiner als sein Inhalt und
+     rollt deshalb nie. Dieselbe Falle wie min-width: 0 an einer Grid-Spalte,
+     nur um 90 Grad gedreht. */
+  min-height: 0;
+  overflow-y: auto;
+  /* Am Listenende soll nicht die Seite weiterscrollen. */
+  overscroll-behavior: contain;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hb-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* 200 Zeilen sind für den Browser billig, wenn er die außerhalb des
+     Sichtfelds gar nicht erst setzt. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
+}
+.hb-row:hover { background: var(--bg); }
+.hb-mark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 1;
+}
+.hb-flag { font-size: 15px; flex: none; }
+.hb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hb-name {
+  font-size: 13.5px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hb-mail {
+  font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Wer auf dieser Jagd ist, wird hinterlegt. Damit beantwortet die Spalte
+   auch die Frage "wen habe ich noch nicht gefragt". */
+.hb-row--in { background: var(--ctl-tint); border-color: var(--ctl-hairline); }
+.hb-row--in:hover { background: var(--ctl-tint); border-color: var(--ctl-edge); }
+.hb-row--in .hb-mark { background: var(--ctl-edge); border-color: var(--ctl-edge); color: #fff; }
+.hb-row--laeuft { opacity: 0.45; pointer-events: none; }
+
+.hb-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.hb-status { font-size: 12px; color: var(--ctl-ink); font-weight: 600; }
+.hb-hint { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.jgr-import {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.hb-leer { color: var(--muted); font-size: 13px; margin: 8px 4px; line-height: 1.4; }
+
+@media (min-width: 1000px) {
+  .ev-invite-split {
+    grid-template-columns: minmax(280px, 30%) minmax(0, 1fr);
+    align-items: start;   /* sonst hat die klebende Spalte keinen Raum */
+  }
+  .hb-panel {
+    position: sticky;
+    top: var(--ev-stick);
+    /* Die Höhe MUSS definit sein, sonst hat der innere Scroller nichts,
+       woran er sich klemmt. */
+    max-height: calc(100vh - 2 * var(--ev-stick));
+  }
+  .jgr-col { min-width: 0; }
+}
+
+/* Handy: keine Spalte, ein gedeckelter Kasten über der Tabelle — die Liste
+   soll die Seite nicht kapern. */
+@media (max-width: 999px) {
+  .hb-panel { margin-bottom: 4px; }
+  .hb-scroll { max-height: 46vh; }
+}
+
 /* Jägerregister ---------------------------------------------------------------
    Aus der Kartenliste (eine .hunter-row à 59 px) wird eine Tabelle mit
    Reitern, Suche und Sortierung. Bei 60 Jägern spart das rund 1900 px

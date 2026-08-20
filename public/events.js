@@ -502,6 +502,8 @@ function renderEventDetail() {
   renderContactsBlock(event);
   renderFreigabenBlock(event, state.currentEvent.freigaben_matrix);
   renderHuntersList(hunters);
+  // Die Marken in der Hunterbase leiten sich aus dem Roster ab.
+  renderHunterbase();
   // Squads section is always visible now (no tabs), so load the posts data
   // it needs on every event open.
   loadPostsIfNeeded().then(renderSquads);
@@ -1122,106 +1124,139 @@ async function importHuntersFromCsv(file) {
 
 // ---------- Address book picker ----------
 
-async function openAddressBookModal() {
-  if (!state.currentEvent) return;
-  await loadAddressBook();
-  const rosterEmails = new Set(
-    (state.currentEvent.hunters || []).map((h) => (h.email || "").toLowerCase()).filter(Boolean)
-  );
-  const list = $("#address-book-list");
-  if (!state.addressBook.length) {
-    list.innerHTML = "";
-    $("#address-book-empty").hidden = false;
-  } else {
-    $("#address-book-empty").hidden = true;
-    // Sort alphabetically by name for predictable browsing.
-    const sorted = state.addressBook.slice().sort((a, b) =>
-      a.name.localeCompare(b.name, "de", { sensitivity: "base" })
-    );
-    list.innerHTML = sorted.map((c) => {
-      const checked = rosterEmails.has(c.email.toLowerCase()) ? "checked" : "";
-      const flag = c.language === "en" ? "🇬🇧" : "🇩🇪";
-      return `
-        <label class="ab-row">
-          <input type="checkbox"
-                 data-name="${escapeHtml(c.name)}"
-                 data-email="${escapeHtml(c.email)}"
-                 data-lang="${escapeHtml(c.language || "de")}"
-                 ${checked} />
-          <span class="ab-flag" aria-hidden="true">${flag}</span>
-          <div class="ab-main">
-            <span class="ab-name">${escapeHtml(c.name)}</span>
-            <span class="ab-email">${escapeHtml(c.email)}</span>
-          </div>
-        </label>
-      `;
-    }).join("");
-  }
-  $("#address-book-backdrop").hidden = false;
-  $("#address-book-modal").hidden = false;
+// ---------- Hunterbase-Spalte (hb-) ----------
+// Bis 20.08.2026 ein Vollbild-Fenster: Häkchen setzen, Übernehmen, Fenster zu.
+// Als dauerhafte Spalte gibt es keinen Übernehmen-Moment mehr, an dem man
+// sammeln könnte — und das ist eine Verbesserung. Ein Häkchen, das erst später
+// wirkt, während die Tabelle daneben schon den anderen Stand zeigt, wäre
+// schlimmer als ein Round-Trip.
+//
+// Nebenbei fällt damit die Schleife weg, die beim Übernehmen je abgehaktem
+// Jäger EIN event-hunter-remove schickte. Entfernt wird jetzt rechts in der
+// Tabelle, wo die Person steht; die Zeile links kippt von selbst auf
+// "hinzufügen", weil sie aus state.currentEvent.hunters abgeleitet ist.
+
+const hbView = { q: "" };
+const hbLaeuft = new Set();   // E-Mails, die gerade geschrieben werden
+
+function hbRosterNachEmail() {
+  const m = new Map();
+  (state.currentEvent?.hunters || []).forEach((h) => {
+    if (h.email) m.set(h.email.toLowerCase(), h);
+  });
+  return m;
 }
 
-function closeAddressBookModal() {
-  $("#address-book-modal").hidden = true;
-  $("#address-book-backdrop").hidden = true;
-}
+function renderHunterbase() {
+  const list = $("#hb-list");
+  if (!list) return;
+  const roster = hbRosterNachEmail();
+  const alle = (state.addressBook || []).slice()
+    .sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" }));
+  const sichtbar = hbView.q
+    ? alle.filter((c) => (c.name + " " + c.email).toLowerCase().includes(hbView.q))
+    : alle;
 
-async function applyAddressBookSelection() {
-  if (!state.currentEvent) return;
-  const checkboxes = $$("#address-book-list input[type=checkbox]");
-  const rosterByEmail = new Map();
-  (state.currentEvent.hunters || []).forEach((h) => {
-    if (h.email) rosterByEmail.set(h.email.toLowerCase(), h);
-  });
-  const toAdd = [];
-  const toRemoveIds = [];
-  checkboxes.forEach((cb) => {
-    const email = cb.dataset.email.toLowerCase();
-    if (cb.checked && !rosterByEmail.has(email)) {
-      toAdd.push({
-        name: cb.dataset.name,
-        email: cb.dataset.email,
-        language: cb.dataset.lang || "de",
-      });
-    } else if (!cb.checked && rosterByEmail.has(email)) {
-      toRemoveIds.push(rosterByEmail.get(email).id);
-    }
-  });
-  if (!toAdd.length && !toRemoveIds.length) {
-    closeAddressBookModal();
+  const zaehler = $("#hb-count");
+  if (zaehler) zaehler.textContent = hbView.q ? `${sichtbar.length}/${alle.length}` : String(alle.length);
+
+  if (!alle.length) {
+    list.innerHTML = '<p class="hb-leer">Noch keine Kontakte — der erste Jäger, den Du hier einträgst, legt einen an.</p>';
     return;
   }
-  const btn = $("#address-book-apply");
-  btn.disabled = true;
-  const oldText = btn.textContent;
-  btn.textContent = "Speichere …";
+  if (!sichtbar.length) {
+    list.innerHTML = '<p class="hb-leer">Kein Treffer.</p>';
+    return;
+  }
+
+  list.innerHTML = sichtbar.map((c) => {
+    const mail = (c.email || "").toLowerCase();
+    const drin = roster.has(mail);
+    const laeuft = hbLaeuft.has(mail);
+    return `
+      <button type="button" class="hb-row${drin ? " hb-row--in" : ""}${laeuft ? " hb-row--laeuft" : ""}"
+              data-email="${escapeHtml(c.email)}" data-name="${escapeHtml(c.name)}"
+              data-lang="${escapeHtml(c.language || "de")}"
+              title="${drin ? "Von dieser Jagd entfernen" : "Zu dieser Jagd einladen"}">
+        <span class="hb-mark" aria-hidden="true">${drin ? "✓" : "+"}</span>
+        <span class="hb-flag" aria-hidden="true">${c.language === "en" ? "🇬🇧" : "🇩🇪"}</span>
+        <span class="hb-main">
+          <span class="hb-name">${escapeHtml(c.name)}</span>
+          <span class="hb-mail">${escapeHtml(c.email || "")}</span>
+        </span>
+      </button>`;
+  }).join("");
+}
+
+function hbStatus(text) {
+  const el = $("#hb-status");
+  if (el) el.textContent = text || "";
+}
+
+// Ein Klick = eine Aktion = ein Round-Trip. Optimistisch nach dem Muster von
+// saveEditingSquad: lokal anwenden, zeichnen, schreiben, bei Fehler zurück.
+async function hbToggle(el) {
+  const ce = state.currentEvent;
+  if (!ce) return;
+  const email = el.dataset.email || "";
+  const key = email.toLowerCase();
+  if (!email || hbLaeuft.has(key)) return;
+
+  const roster = hbRosterNachEmail();
+  const drin = roster.get(key);
+
+  // Rückfrage nur, wenn wirklich etwas verloren geht: eine Antwort liegt vor
+  // oder die Einladung ist schon raus. Wer sich gerade verklickt hat, soll
+  // den Klick ohne Dialog rückgängig machen können.
+  if (drin) {
+    const schonAngeschrieben = !!drin.invited_at ||
+      drin.status === "accepted" || drin.status === "declined";
+    if (schonAngeschrieben &&
+        !confirm(`${drin.hunter} von dieser Jagd entfernen?` +
+                 (drin.status === "accepted" ? " Er hat bereits zugesagt." : ""))) {
+      return;
+    }
+  }
+
+  hbLaeuft.add(key);
+  renderHunterbase();
+
   try {
-    for (const id of toRemoveIds) {
-      await postJson({ action: "event-hunter-remove", id });
-    }
-    let added = 0;
-    if (toAdd.length) {
+    if (drin) {
+      // Entfernen läuft über denselben Weg wie der Knopf in der Tabelle.
+      await postJson({ action: "event-hunter-remove", id: drin.id });
+      ce.hunters = ce.hunters.filter((h) => h !== drin);
+      hbStatus(drin.hunter + " entfernt");
+    } else {
+      const temp = {
+        id: "tmp-" + email, hunter: el.dataset.name, email,
+        language: el.dataset.lang || "de", status: "pending", role: "",
+        dogs: [], invited_at: "", responded_at: "", set_manually: "",
+        // confirmed_* bleiben bewusst undefined — "nicht mitgeliefert" ist der
+        // richtige Zustand, bis das Backend geantwortet hat.
+      };
+      ce.hunters = ce.hunters.concat([temp]);
+      renderHuntersList(ce.hunters);
       const r = await postJson({
-        action: "event-hunters-batch-add",
-        event_id: state.currentEvent.event.id,
-        hunters: toAdd,
+        action: "event-hunter-add", event_id: ce.event.id,
+        hunter: temp.hunter, email: temp.email, language: temp.language,
+        role: "", set: false,
       });
-      added = r.added || 0;
+      if (r && r.id) temp.id = r.id;
+      hbStatus(temp.hunter + " eingeladen");
     }
-    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("event-detail", { id: ce.event.id });
     invalidateCache("events-list");
-    invalidateCache("address-book");
-    const parts = [];
-    if (added) parts.push(`${added} hinzugefügt`);
-    if (toRemoveIds.length) parts.push(`${toRemoveIds.length} entfernt`);
-    showToast(parts.join(" · ") || "Keine Änderungen");
-    closeAddressBookModal();
-    await loadEventDetail(state.currentEvent.event.id);
   } catch (err) {
+    // Die optimistische Zeile wieder wegnehmen.
+    ce.hunters = (ce.hunters || []).filter((h) => String(h.id).indexOf("tmp-") !== 0);
     showToast(err.message || "Fehler", "error");
+    hbStatus("");
+    await loadEventDetail(ce.event.id);
   } finally {
-    btn.disabled = false;
-    btn.textContent = oldText;
+    hbLaeuft.delete(key);
+    renderHunterbase();
+    renderHuntersList(state.currentEvent?.hunters || []);
   }
 }
 
@@ -1232,12 +1267,14 @@ async function loadAddressBook() {
   if (cached) {
     state.addressBook = cached;
     refreshAddressBookList();
+    renderHunterbase();
   }
   try {
     const fresh = await fetchJson("address-book");
     state.addressBook = fresh;
     writeCache("address-book", null, fresh);
     refreshAddressBookList();
+    renderHunterbase();
   } catch (err) {
     if (!cached) state.addressBook = [];
   }
@@ -3419,11 +3456,16 @@ function wireEinladen() {
 }
 
 function wireHunterbase() {
-  on("#open-address-book", "click", openAddressBookModal);
-  on("#address-book-close", "click", closeAddressBookModal);
-  on("#address-book-cancel", "click", closeAddressBookModal);
-  on("#address-book-backdrop", "click", closeAddressBookModal);
-  on("#address-book-apply", "click", applyAddressBookSelection);
+  // Die Zeilen entstehen bei jedem Render neu, der Container steht statisch
+  // im Markup.
+  on("#hb-list", "click", (e) => {
+    const row = e.target.closest(".hb-row");
+    if (row) hbToggle(row);
+  });
+  on("#hb-search", "input", (e) => {
+    hbView.q = e.target.value.trim().toLowerCase();
+    renderHunterbase();
+  });
 }
 
 // Die Jägerliste dieser Jagd. Delegiert auf den Container, weil die Zeilen bei
