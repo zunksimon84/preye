@@ -2051,15 +2051,41 @@ body.rsvp-page #rsvp-topbar {
   border: 1px solid var(--border);
   border-left: 3px solid var(--ctl);
   border-radius: 7px;
-  padding: 10px 14px;
+  padding: 10px 14px 12px;
   margin: 6px 0 14px;
   font-size: 13px;
 }
-.ev-contacts-title { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--steel-dark); }
-.ev-contacts p { margin: 2px 0; }
-.ev-contact-label { font-weight: 600; color: var(--steel-dark); margin-right: 4px; }
-.ev-nsf-list { margin: 2px 0 4px 18px; padding: 0; }
-.ev-nsf-list li { margin: 1px 0; }
+.ev-contacts-title { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--steel-dark); }
+
+/* Drei Spalten über ALLE Zeilen hinweg. max-content auf den ersten beiden
+   heißt: die Nummern beginnen alle an derselben Stelle, egal wie lang die
+   Namen sind. Vorher war das Fließtext mit <br>, jede Zeile rutschte anders
+   weit ein und lange Zeilen brachen mitten in der Telefonnummer um. */
+.ev-contact-grid {
+  display: grid;
+  grid-template-columns: max-content max-content 1fr;
+  column-gap: 18px;
+  row-gap: 3px;
+  align-items: baseline;
+}
+.ev-contact-label { font-weight: 600; color: var(--steel-dark); white-space: nowrap; }
+.ev-contact-name { white-space: nowrap; }
+.ev-contact-tel {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ctl-ink);
+  text-decoration: none;
+}
+.ev-contact-tel:hover { text-decoration: underline; }
+.ev-contact-tel--leer { color: var(--muted); }
+
+/* Auf dem Handy passen drei Spalten nicht nebeneinander: Bezeichnung über
+   das Paar, Name und Nummer darunter. */
+@media (max-width: 620px) {
+  .ev-contact-grid { grid-template-columns: max-content 1fr; }
+  .ev-contact-label { grid-column: 1 / -1; margin-top: 4px; }
+  .ev-contact-label:empty { display: none; }
+}
 
 .primary-btn {
   background: var(--ctl-fill);
@@ -2437,9 +2463,13 @@ body.rsvp-page #rsvp-topbar {
    -------------------------------------------------------------------------- */
 
 @media (min-width: 1000px) {
+  /* Zwei Spalten statt drei: links die Stammdaten, rechts Zeiten und
+     Kontakte untereinander. Bei drei Spalten blieb die dritte oft leer (nicht
+     jede Jagd hat Zeiten UND Kontakte), und der Kontakte-Kasten war mit 524 px
+     so schmal, dass Telefonnummern mittendrin umbrachen. */
   .ev-jagd-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
     gap: 14px;
     align-items: start;
   }
@@ -2447,6 +2477,9 @@ body.rsvp-page #rsvp-topbar {
 
   .ev-jagd-grid .ev-hero { grid-column: 1 / -1; }
   .ev-jagd-grid .ev-briefing { grid-column: 1 / -1; order: 1; margin-top: 0; }
+  .ev-jagd-grid .ev-info-list { grid-column: 1; }
+  .ev-jagd-grid .ev-times-strip { grid-column: 2; }
+  .ev-jagd-grid .ev-contacts { grid-column: 2; }
 
   /* Die Abstände stammen aus dem gestapelten Fluss; im Raster macht sie gap. */
   .ev-jagd-grid .ev-info-list,

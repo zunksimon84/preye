@@ -517,25 +517,43 @@ function formatLongDate(iso) {
   return d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
+// Kontakte als Raster statt als Fließtext: Bezeichnung, Name, Telefon je eine
+// Spalte. max-content auf den ersten beiden heißt, dass alle Nummern an
+// derselben Stelle beginnen, egal wie lang die Namen sind — vorher rutschte
+// jede Zeile anders weit ein und lange Zeilen brachen mitten in der Nummer um.
 function renderContactsBlock(event) {
   const el = $("#event-contacts");
-  const lines = [];
-  const vet = [event.vet_name, event.vet_phone].filter(Boolean).join(" — ");
-  const coord = [event.coordinator_name, event.coordinator_phone].filter(Boolean).join(" — ");
-  if (vet) lines.push(`<p><span class="ev-contact-label">Tierarzt:</span> ${escapeHtml(vet)}</p>`);
-  if (coord) lines.push(`<p><span class="ev-contact-label">Nachsuchen-Koordinator:</span> ${escapeHtml(coord)}</p>`);
-  const nsf = Array.isArray(event.nachsuchenfuehrer) ? event.nachsuchenfuehrer.filter((p) => p.name || p.phone) : [];
-  if (nsf.length) {
-    const items = nsf.map((p) => `<li>${escapeHtml([p.name, p.phone].filter(Boolean).join(" — "))}</li>`).join("");
-    lines.push(`<p class="ev-contact-label">Nachsuchenführer:</p><ul class="ev-nsf-list">${items}</ul>`);
-  }
-  if (!lines.length) {
+  if (!el) return;
+  const zeilen = [];
+  const add = (label, name, tel) => {
+    if (!name && !tel) return;
+    zeilen.push(
+      `<span class="ev-contact-label">${label ? escapeHtml(label) : ""}</span>` +
+      `<span class="ev-contact-name">${escapeHtml(name || "—")}</span>` +
+      (tel
+        ? `<a class="ev-contact-tel" href="tel:${escapeHtml(String(tel).replace(/[^+\d]/g, ""))}">${escapeHtml(tel)}</a>`
+        : '<span class="ev-contact-tel ev-contact-tel--leer">—</span>')
+    );
+  };
+
+  add("Tierarzt", event.vet_name, event.vet_phone);
+  add("Nachsuchen-Koordinator", event.coordinator_name, event.coordinator_phone);
+
+  const nsf = Array.isArray(event.nachsuchenfuehrer)
+    ? event.nachsuchenfuehrer.filter((p) => p.name || p.phone) : [];
+  // Die Bezeichnung steht nur an der ersten Zeile; darunter ist klar, dass es
+  // dieselbe Sorte ist.
+  nsf.forEach((p, i) => add(i === 0 ? (nsf.length > 1 ? "Nachsuchenführer" : "Nachsuchenführer") : "", p.name, p.phone));
+
+  if (!zeilen.length) {
     el.hidden = true;
     el.innerHTML = "";
     return;
   }
   el.hidden = false;
-  el.innerHTML = `<h3 class="ev-contacts-title">Kontakte <span class="muted">(für die schriftliche Einladung)</span></h3>${lines.join("")}`;
+  el.innerHTML =
+    '<h3 class="ev-contacts-title">Kontakte <span class="muted">(für die schriftliche Einladung)</span></h3>' +
+    '<div class="ev-contact-grid">' + zeilen.join("") + "</div>";
 }
 
 // ---------- Jägerregister (jgr-) ----------
