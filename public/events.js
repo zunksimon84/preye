@@ -1363,7 +1363,7 @@ function getTreibergruppen() {
 }
 
 // Filter posts to only those whose `area` matches one of the event's
-// Teilgebiete. For NPA-Müritz the corresponding areas (Babke, Langenhagen,
+// Teilgebiete. For NPA-Müritz the corresponding areas (Babke, Langhagen,
 // Schwarzenhof) currently have no posts, so this naturally returns empty
 // and forces Klettersitz with manual coordinates.
 function getKanzelnForEvent() {

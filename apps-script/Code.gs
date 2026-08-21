@@ -2042,7 +2042,7 @@ function migrateReviere() {
       bbox_s: 53.654, bbox_w: 12.870, bbox_n: 53.670, bbox_e: 12.895, sort: 4 },
     { revier: "mueritz", area: "Babke", id_prefix: "MZBA",
       bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: 1 },
-    { revier: "mueritz", area: "Langenhagen", id_prefix: "MZLH",
+    { revier: "mueritz", area: "Langhagen", id_prefix: "MZLH",
       bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: 2 },
     { revier: "mueritz", area: "Schwarzenhof", id_prefix: "MZSH",
       bbox_s: "", bbox_w: "", bbox_n: "", bbox_e: "", sort: 3 },
@@ -6417,6 +6417,82 @@ function addressBookBatchAdd_(body) {
     added++;
   }
   return { ok: true, added: added, skipped: skipped, errors: errors };
+}
+
+// ---------- Teilgebiet umbenennen ----------
+// Einmalig von Hand im Apps-Script-Editor auszuführen: Funktion wählen, ▶.
+// Braucht KEINE Bereitstellung — die läuft gegen den gespeicherten Code.
+//
+// Der Name eines Teilgebiets steht an drei Stellen, und alle drei müssen
+// zusammenpassen: revier_areas (die Liste selbst), posts.area (jeder Stand)
+// und events.teilgebiet (eine kommagetrennte Namensliste). Bleibt eine
+// zurück, verliert entweder die Karte ihre Stände oder eine Jagd ihr Revier.
+//
+// Die ID-Präfixe der Stände bleiben unangetastet: MZ-MZLH-32 heißt weiter so.
+// Umbenennen hieße, jeden Verweis in harvests, Archiven, nachsuchen und
+// Ansteller-Runden nachzuziehen.
+
+function umbenennenLangenhagen() {
+  return teilgebietUmbenennen_("Langenhagen", "Langhagen");
+}
+
+function teilgebietUmbenennen_(alt, neu) {
+  const altT = String(alt || "").trim();
+  const neuT = String(neu || "").trim();
+  if (!altT || !neuT) throw new Error("alter und neuer Name nötig");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const bericht = { revier_areas: 0, posts: 0, events: 0 };
+
+  const spalteErsetzen = function (blattName, header, spalte, ersetzer) {
+    const sheet = ensureSheet_(ss, blattName, header);
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return 0;
+    const cols = sheetHeader_(sheet);
+    const c = cols.indexOf(spalte);
+    if (c < 0) return 0;
+    const bereich = sheet.getRange(2, c + 1, lastRow - 1, 1);
+    const werte = bereich.getValues();
+    let n = 0;
+    for (let i = 0; i < werte.length; i++) {
+      const vorher = String(werte[i][0] == null ? "" : werte[i][0]);
+      const nachher = ersetzer(vorher);
+      if (nachher !== vorher) { werte[i][0] = nachher; n++; }
+    }
+    if (n) bereich.setValues(werte);
+    return n;
+  };
+
+  const genau = function (v) { return v.trim() === altT ? neuT : v; };
+
+  bericht.revier_areas = spalteErsetzen(SHEETS.revier_areas, REVIER_AREA_HEADER, "area", genau);
+  bericht.posts = spalteErsetzen(SHEETS.posts, POST_HEADER, "area", genau);
+
+  // teilgebiet ist eine kommagetrennte Liste — Teilstringersatz würde
+  // "Langenhagen Nord" mit erwischen, deshalb je Eintrag vergleichen.
+  bericht.events = spalteErsetzen(SHEETS.events, EVENT_HEADER, "teilgebiet", function (v) {
+    if (!v) return v;
+    const teile = v.split(",").map(function (t) { return t.trim(); });
+    let getroffen = false;
+    const raus = teile.map(function (t) {
+      if (t === altT) { getroffen = true; return neuT; }
+      return t;
+    });
+    return getroffen ? raus.join(", ") : v;
+  });
+
+  // Sonst liefert die App bis zu fünf Minuten lang noch den alten Namen.
+  try { CacheService.getScriptCache().remove(REVIER_CACHE_KEY); } catch (err) {}
+
+  const text = altT + " → " + neuT + ": " +
+    bericht.revier_areas + " Teilgebietszeile(n), " +
+    bericht.posts + " Stand/Stände, " +
+    bericht.events + " Jagd(en)";
+  Logger.log(text);
+  try {
+    SpreadsheetApp.getUi().alert("Teilgebiet umbenannt", text, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (err) { /* ohne Oberfläche (z.B. Trigger) reicht das Protokoll */ }
+  return bericht;
 }
 
 function randomToken_() {

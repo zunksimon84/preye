@@ -13,7 +13,7 @@ window.PREYE_REVIERE = [
   { key: "peenwerder", name: "Peenwerder", short: "Peenwerder",
     areas: ["Hauptrevier", "Ost", "Nord", "Nordrand"] },
   { key: "mueritz", name: "Müritz Nationalpark", short: "NPA-Müritz",
-    areas: ["Babke", "Langenhagen", "Schwarzenhof", "Serrahn"] },
+    areas: ["Babke", "Langhagen", "Schwarzenhof", "Serrahn"] },
 ];
 
 // Nicht jede Jagd liegt in einem der eingerichteten Reviere — ein
