@@ -692,7 +692,9 @@ function renderJagdtagCard(jt) {
         placeholder="Freigaben aus der Ansprache eintragen">${escapeHtml(d.freigaben || "")}</textarea>
     </label>`;
 
-  $("#stk-send").textContent = "Per SMS an Nachsuchen-Koordinator";
+  // Bewusst ohne Empfänger im Text: die Standkarte meldet Sichtungen, keine
+  // Nachsuche — "an Nachsuchen-Koordinator" hat hier verwirrt.
+  $("#stk-send").textContent = "Per SMS senden";
 }
 
 function renderBlankCard() {
