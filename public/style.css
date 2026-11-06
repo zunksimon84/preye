@@ -5395,6 +5395,45 @@ body.nachsuche-page #stk-topbar { position: static; }
   padding: 16px 14px 48px;
 }
 
+/* --- QR-Codes (qr.html) --------------------------------------------- */
+.qr-form { margin-bottom: 16px; }
+.qr-presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.qr-preset {
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--info-text);
+  background: var(--info-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.qr-preset:hover { border-color: var(--info); }
+.qr-preset.active { color: #fff; background: var(--info); }
+.qr-field { display: block; margin: 0 0 10px; font-size: 13px; color: var(--steel-dark); }
+.qr-field > span { display: block; margin-bottom: 4px; }
+.qr-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.qr-warn {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  color: #2a0d04;
+  background: #fbe3cd;
+  border-radius: 8px;
+}
+.qr-result { text-align: center; }
+.qr-preview { width: min(320px, 100%); margin: 6px auto 10px; }
+.qr-preview svg { display: block; width: 100%; height: auto; }
+.qr-contains { font-size: 13px; word-break: break-all; color: var(--steel-dark); }
+.qr-result .proto-actions { justify-content: center; }
+
 /* Kontakte eines Jagdtags (jagdtag.js) über dem Protokoll. */
 .ns-jagdtag { margin: 0 0 18px; }
 @media print { .ns-jagdtag, .proto-share-hint { display: none; } }

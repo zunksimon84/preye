@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b7c95" />
+    <title>PREYE — QR-Codes</title>
+    <link rel="icon" type="image/png" href="favicon-preye.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="nachsuche-page qr-page">
+    <header id="stk-topbar">
+      <h1>
+        <a href="index.html" class="brand-link" aria-label="Zur Startseite">
+          <img class="brand-eye" src="preye-mark.png" alt="" />
+          <span class="brand-pray">PREYE</span>
+        </a>
+        <span class="brand-place">QR-Codes</span>
+      </h1>
+      <nav class="filters">
+        <a href="index.html" class="filter-btn">← Start</a>
+      </nav>
+    </header>
+
+    <main id="ns-main">
+      <p class="ns-intro">
+        Der Code enthält die Adresse selbst — keine Weiterleitung, kein Anbieter
+        dazwischen, nichts, das ablaufen kann. Er entsteht hier auf Deinem Gerät.
+        Für Einladungen in Word das <b>PNG</b> nehmen, für Druckereien das <b>SVG</b>.
+      </p>
+
+      <section class="stk-block qr-form">
+        <h3>Wohin soll der Code führen?</h3>
+        <div class="qr-presets" id="qr-presets"></div>
+        <label class="qr-field">
+          <span>Adresse</span>
+          <input type="url" id="qr-url" inputmode="url" autocomplete="off" spellcheck="false"
+                 placeholder="https://preye.org/…" />
+        </label>
+        <label class="qr-field">
+          <span>Beschriftung unter dem Code <span class="muted">(optional, nur im PNG)</span></span>
+          <input type="text" id="qr-caption" maxlength="60" placeholder="z.B. Standkarte" />
+        </label>
+        <p class="qr-warn" id="qr-warn" hidden></p>
+      </section>
+
+      <section class="stk-block qr-result" id="qr-result" hidden>
+        <div class="qr-preview" id="qr-preview"></div>
+        <p class="qr-contains">Enthält genau: <code id="qr-contains"></code></p>
+        <div class="proto-actions">
+          <button type="button" id="qr-png" class="primary-btn">PNG herunterladen</button>
+          <button type="button" id="qr-svg" class="cancel-btn">SVG herunterladen</button>
+          <button type="button" id="qr-copy" class="cancel-btn">Bild kopieren</button>
+        </div>
+        <p class="stk-hint">Vor dem Verschicken einmal mit der Handykamera vom Bildschirm abfotografieren.</p>
+      </section>
+    </main>
+
+    <div id="toast" hidden></div>
+    <script src="viewport-insets.js"></script>
+    <script src="qr-lib.js"></script>
+    <script src="qr.js"></script>
+  </body>
+</html>
