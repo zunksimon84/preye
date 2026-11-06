@@ -170,6 +170,107 @@ function prefillJagdtag() {
   }
 }
 
+// ---------- "PDF teilen" mit SMS-Kurzmeldung (nur mit Jagdtag) ----------
+//
+// Eine Webseite kann per sms:-Link nur Text an eine feste Nummer schicken,
+// keine Datei. Also zwei Schritte am selben Knopf: erst die Kurzmeldung per
+// SMS an den Nachsuchen-Koordinator — die kommt auch mit einem Balken GSM an —,
+// dann, zurück auf der Seite, das PDF übers Teilen-Menü. Beides in einem Tipp
+// geht nicht verlässlich: nach dem Wechsel in die SMS-App ist die Geste
+// verbraucht, und das Teilen-Menü braucht eine frische.
+
+const val = (sel) => {
+  const el = $(sel);
+  return el ? String(el.value || "").trim() : "";
+};
+
+function stueckLines(n) {
+  const p = (k) => val(`[data-proto="s${n}_${k}"]`);
+  const sexBtn = document.querySelector(`[data-proto-sex="s${n}"] .gender-btn[aria-pressed="true"]`);
+  const sex = sexBtn ? (sexBtn.dataset.gender === "m" ? "♂" : "♀") : "";
+  const wild = [p("wildart"), sex, p("kg") ? "ca. " + p("kg") + " kg" : "", p("stuecke") ? p("stuecke") + " Stk." : ""]
+    .filter(Boolean).join(" ");
+  const zeichen = ["schweiss", "knochen", "schnitthaar", "kugelriss", "gewebe", "sonstiges"]
+    .filter((k) => { const c = $(`[data-proto="s${n}_${k}"]`); return c && c.checked; })
+    .map((k) => ({ schweiss: "Schweiß", knochen: "Knochen", schnitthaar: "Schnitthaar",
+      kugelriss: "Kugelriss", gewebe: "Gewebe", sonstiges: "Sonstiges" }[k]));
+  const bits = [
+    p("uhrzeit") ? p("uhrzeit") + " Uhr" : "",
+    wild,
+    p("schuesse") ? p("schuesse") + " Schuss" : "",
+  ].filter(Boolean);
+  if (!bits.length && !zeichen.length && !p("beob") && !p("bem")) return [];
+  const lines = [`Stück ${n === 1 ? "I" : "II"}: ${bits.join(", ") || "—"}`];
+  if (zeichen.length) lines.push("  Pirschzeichen: " + zeichen.join(", "));
+  if (p("beob")) lines.push("  Beobachtung: " + p("beob"));
+  if (p("hund")) lines.push("  Von Hund verfolgt: " + p("hund"));
+  if (p("bem")) lines.push("  Bemerkung: " + p("bem"));
+  return lines;
+}
+
+function buildSmsText() {
+  const jt = window.PREYE_JAGDTAG;
+  const lat = val("#proto-loc-lat");
+  const lng = val("#proto-loc-lng");
+  const name = val('[data-proto="name"]');
+  const tel = val('[data-proto="tel"]');
+  const lines = [
+    "ANSCHUSS / NACHSUCHE" + (jt ? " – " + jt.jagd : ""),
+    "Stand: " + (val("#proto-free-stand") || "—"),
+  ];
+  if (lat && lng) lines.push("Position: https://maps.google.com/?q=" + lat + "," + lng);
+  lines.push("Schütze: " + ([name, tel].filter(Boolean).join(", ") || "—"));
+  const kal = [val('[data-proto="kaliber"]'),
+    $('[data-proto="bleifrei"]').checked ? "bleifrei" : "",
+    $('[data-proto="bleihaltig"]').checked ? "bleihaltig" : ""].filter(Boolean).join(", ");
+  if (kal) lines.push("Kaliber: " + kal);
+  const st = [...stueckLines(1), ...stueckLines(2)];
+  lines.push(...(st.length ? st : ["Keine Angaben zum Stück."]));
+  lines.push("PDF folgt.");
+  return lines.join("\n");
+}
+
+let smsSent = false;
+
+function setShareButton() {
+  const btn = $("#proto-pdf");
+  const hint = $("#proto-share-hint");
+  if (smsSent) {
+    btn.textContent = "Jetzt PDF teilen";
+    if (hint) {
+      hint.textContent = "SMS an " + window.PREYE_JAGDTAG.nachsuchen_koordinator.name
+        + " ist vorbereitet — abschicken, dann hier das PDF hinterher teilen.";
+      hint.hidden = false;
+    }
+  } else {
+    btn.textContent = "PDF teilen";
+    if (hint) hint.hidden = true;
+  }
+}
+
+function koordSmsNumber() {
+  const jt = window.PREYE_JAGDTAG;
+  const k = jt && jt.nachsuchen_koordinator;
+  return k ? String(k.phone || "").replace(/[^\d+]/g, "") : "";
+}
+
+async function onShareClick() {
+  const to = koordSmsNumber();
+  if (to && !smsSent) {
+    if (!val("#proto-free-stand") && !val('[data-proto="name"]')) {
+      if (!confirm("Stand und Name sind leer. Trotzdem an den Nachsuchen-Koordinator senden?")) return;
+    }
+    smsSent = true;
+    setShareButton();
+    // "?&body=" ist die eine Schreibweise, die iOS und Android beide lesen.
+    location.href = "sms:" + to + "?&body=" + encodeURIComponent(buildSmsText());
+    return;
+  }
+  await downloadPdf();
+  smsSent = false;
+  setShareButton();
+}
+
 function resetSheet() {
   if (!confirm("Alle Eingaben verwerfen?")) return;
   const sheet = $("#protocol-sheet");
@@ -183,6 +284,8 @@ function resetSheet() {
   if (wildFigures) wildFigures.refresh();
   if (sexButtons) sexButtons.clear();
   prefillJagdtag();
+  smsSent = false;
+  setShareButton();
   showToast("Zurückgesetzt");
 }
 
@@ -198,7 +301,8 @@ function wire() {
   requestAnimationFrame(() => figures.forEach((f) => f.resize()));
   window.addEventListener("resize", () => figures.forEach((f) => f.resize()));
 
-  $("#proto-pdf").addEventListener("click", downloadPdf);
+  $("#proto-pdf").addEventListener("click", onShareClick);
+  setShareButton();
   $("#proto-print").addEventListener("click", () => window.print());
   $("#proto-reset").addEventListener("click", resetSheet);
 

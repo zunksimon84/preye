@@ -5397,7 +5397,18 @@ body.nachsuche-page #stk-topbar { position: static; }
 
 /* Kontakte eines Jagdtags (jagdtag.js) über dem Protokoll. */
 .ns-jagdtag { margin: 0 0 18px; }
-@media print { .ns-jagdtag { display: none; } }
+@media print { .ns-jagdtag, .proto-share-hint { display: none; } }
+.proto-share-hint {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--steel-dark);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--pool-blue);
+  border-radius: 10px;
+}
 
 .ns-intro {
   margin: 4px 0 18px;
