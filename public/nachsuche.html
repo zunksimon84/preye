@@ -37,6 +37,13 @@
         übertragen; das Protokoll entsteht auf Deinem Gerät.
       </p>
 
+      <!-- Nur gefüllt, wenn jagdtag.js einen Jagdtag kennt (fester QR-Link
+           aus einer Papiereinladung). -->
+      <section id="ns-jagdtag" class="stk-block stk-block--contacts ns-jagdtag" hidden>
+        <h3 id="ns-jagdtag-title">Kontakte</h3>
+        <div id="ns-jagdtag-contacts"></div>
+      </section>
+
       <section id="protocol-modal" class="ns-sheet">
         <div class="protocol-body" id="protocol-sheet">
         <div class="proto-banner">
@@ -247,6 +254,7 @@
 
     <div id="toast" hidden></div>
     <script src="viewport-insets.js"></script>
+    <script src="jagdtag.js"></script>
     <script type="module" src="nachsuche.js"></script>
     <script src="pwa.js"></script>
   </body>

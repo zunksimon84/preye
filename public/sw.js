@@ -11,7 +11,7 @@
 // this can't make the rest of the site behave oddly. Hunt data doesn't live
 // here either; standkarte.js caches that in localStorage itself.
 
-const CACHE = "preye-standkarte-v2";
+const CACHE = "preye-standkarte-v3";
 
 const SHELL = [
   "standkarte.html",
@@ -21,6 +21,9 @@ const SHELL = [
   // Speicher, findet die Abhängigkeit nicht und die Karte bleibt leer — genau
   // die Lage, für die es diesen Dienstarbeiter überhaupt gibt.
   "reviere-def.js",
+  // Jagdtag hinter den festen QR-Links (Blanko-Karte). Fehlt er offline,
+  // wäre die Karte im Funkloch plötzlich leer.
+  "jagdtag.js",
   "style.css",
   "config.js",
   "preye-mark.png",

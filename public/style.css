@@ -5395,6 +5395,10 @@ body.nachsuche-page #stk-topbar { position: static; }
   padding: 16px 14px 48px;
 }
 
+/* Kontakte eines Jagdtags (jagdtag.js) über dem Protokoll. */
+.ns-jagdtag { margin: 0 0 18px; }
+@media print { .ns-jagdtag { display: none; } }
+
 .ns-intro {
   margin: 4px 0 18px;
   font-size: 14.5px;

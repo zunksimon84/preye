@@ -452,7 +452,7 @@ function refreshSpeciesOptions() {
 function buildReport() {
   let head, who;
   if (state.blank) {
-    const d = blankData();
+    const d = blankInfo();
     head = "Standkarte " + (d.jagd || "").trim() + (d.datum ? " · " + formatDate(d.datum) : "");
     who = "Schütze: " + (d.name || "—") + (d.stand ? " · Stand: " + d.stand : "");
   } else {
@@ -593,9 +593,14 @@ function blankData() {
 }
 
 function saveBlank() {
-  const out = {};
+  // Start from what is stored, so fields not on screen (the Jagdtag card has
+  // no Jagd/Datum inputs) keep their values.
+  const out = blankData();
   $$("[data-blank]").forEach((el) => { out[el.dataset.blank] = el.value; });
   try { localStorage.setItem(BLANK_KEY, JSON.stringify(out)); } catch {}
+  // With a Jagdtag the heading is fixed and must not be overwritten by the
+  // (absent) jagd/datum fields.
+  if (jagdtag()) return;
   // The heading mirrors the two fields that name the day.
   $("#stk-title").textContent = out.jagd || "Standkarte";
   $("#stk-subtitle").textContent =
@@ -612,7 +617,99 @@ function blankField(key, label, type = "text", placeholder = "") {
     </label>`;
 }
 
+// Ein Jagdtag aus jagdtag.js — die Papiereinladung mit festem QR-Link.
+function jagdtag() {
+  return window.PREYE_JAGDTAG || null;
+}
+
+// What the report and the heading read: the typed fields, with the Jagdtag's
+// fixed facts on top when there is one.
+function blankInfo() {
+  const d = blankData();
+  const jt = jagdtag();
+  if (!jt) return d;
+  return Object.assign({}, d, { jagd: jt.jagd, revier: jt.revier, datum: jt.datum });
+}
+
+function routeLink(lat, lng) {
+  if (lat == null || lng == null) return "";
+  return ` <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat + "," + lng)}" target="_blank" rel="noopener noreferrer">Route →</a>`;
+}
+
+// Die Blanko-Karte mit hinterlegtem Jagdtag: nur die allgemeinen Angaben aus
+// der Einladung, fest gedruckt. Selbst eingetragen wird nur, was die
+// Einladung nicht wissen kann — wer man ist und wo man sitzt.
+function renderJagdtagCard(jt) {
+  document.title = "PREYE 👁 Standkarte · " + jt.jagd;
+  $("#stk-title").textContent = jt.jagd;
+  $("#stk-subtitle").textContent = [formatDate(jt.datum), jt.revier].filter(Boolean).join(" · ");
+  $("#stk-banner-sub").textContent = jt.revier || "";
+
+  $("#stk-mine").hidden = false;
+  $("#stk-mine-hunter").textContent = "";
+  $("#stk-mine-body").innerHTML = `
+    <div class="stk-bl-grid">
+      ${blankField("name", "Mein Name")}
+      ${blankField("stand", "Mein Stand", "text", "z.B. Kanzel 14, Buchenweg")}
+      ${blankField("runde", "Runde / Ansteller", "text", "optional")}
+    </div>`;
+  $(".stk-mine-label").textContent = "Meine Angaben";
+
+  const rows = [];
+  const add = (dt, dd) => {
+    if (!dd) return;
+    rows.push(`<div class="stk-dl-row"><dt>${escapeHtml(dt)}</dt><dd>${dd}</dd></div>`);
+  };
+  add("Datum", escapeHtml(formatDate(jt.datum)));
+  add("Treffpunkt", escapeHtml(jt.treffpunkt || "") + routeLink(jt.treffpunkt_lat, jt.treffpunkt_lng));
+  add("Treffzeit", escapeHtml(jt.treff_time || ""));
+  add("Jagdbeginn", escapeHtml(jt.start_time || ""));
+  add("Jagdende", escapeHtml(jt.end_time || ""));
+  add("Nach der Jagd", escapeHtml(jt.nach_der_jagd || "") + routeLink(jt.nach_der_jagd_lat, jt.nach_der_jagd_lng));
+  $("#stk-times").innerHTML = rows.join("");
+  const brief = $("#stk-briefing");
+  if (jt.treffpunkt_hinweis) {
+    brief.textContent = "Anfahrt: " + jt.treffpunkt_hinweis;
+    brief.hidden = false;
+  } else {
+    brief.hidden = true;
+  }
+
+  let contacts = "";
+  const k = jt.nachsuchen_koordinator || {};
+  contacts += contactLine("Nachsuchen-Koordinator", k.name, k.phone);
+  for (const nsf of jt.nachsuchenfuehrer || []) {
+    contacts += contactLine("Nachsuchenführer", nsf.name, nsf.phone);
+  }
+  const vet = jt.tierarzt || {};
+  contacts += contactLine("Tierarzt", vet.name, vet.phone);
+  $("#stk-contacts").innerHTML = contacts;
+
+  const d = blankData();
+  $("#stk-freigaben").innerHTML = `
+    <label class="stk-bl-field stk-bl-field--wide">
+      <textarea data-blank="freigaben" rows="4"
+        placeholder="Freigaben aus der Ansprache eintragen">${escapeHtml(d.freigaben || "")}</textarea>
+    </label>`;
+
+  $("#stk-send").textContent = "Per SMS an Nachsuchen-Koordinator";
+}
+
 function renderBlankCard() {
+  const jt = jagdtag();
+  if (jt) {
+    renderJagdtagCard(jt);
+    renderList();
+    renderJe();
+    renderOfflineNote();
+    $("#stk-foot").textContent = "Waidmannsheil!";
+    $("#stk-card").hidden = false;
+    $("#stk-switch").hidden = false;
+    $("#stk-switch").textContent = "Jagd auswählen";
+    document.body.classList.add("stk-blanko");
+    setState("");
+    return;
+  }
   const d = blankData();
   document.title = "PREYE 👁 Standkarte (blanko)";
   $("#stk-title").textContent = d.jagd || "Standkarte";
@@ -829,6 +926,7 @@ function wireUi() {
     state.blank = false;
     document.body.classList.remove("stk-blanko");
     $("#stk-switch").textContent = "Jagd wechseln";
+    $("#stk-send").textContent = "Meldung senden";
     resetToEventPicker();
   });
 
@@ -919,6 +1017,18 @@ function wireUi() {
 
   $("#stk-send").addEventListener("click", async () => {
     const text = buildReport();
+    // Blanko-Karte mit Jagdtag: straight into an SMS to the Nachsuchen-
+    // Koordinator — no share sheet, no choosing. SMS needs only a bar of GSM,
+    // which is what there is out there. "?&body=" is the one spelling both
+    // iOS and Android read.
+    const jt = state.blank ? jagdtag() : null;
+    const smsTo = jt && jt.nachsuchen_koordinator
+      ? String(jt.nachsuchen_koordinator.phone || "").replace(/[^\d+]/g, "")
+      : "";
+    if (smsTo) {
+      location.href = "sms:" + smsTo + "?&body=" + encodeURIComponent(text);
+      return;
+    }
     const ev = state.blank
       ? { name: (blankData().jagd || "Standkarte"), coordinator_phone: blankData().koord_tel || "" }
       : state.detail.event;

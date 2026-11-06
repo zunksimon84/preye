@@ -117,6 +117,59 @@ async function downloadPdf() {
   }
 }
 
+// ---------- Jagdtag (fester QR-Link aus einer Papiereinladung) ----------
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function contactLine(label, name, phone) {
+  if (!name && !phone) return "";
+  const tel = String(phone || "").replace(/[^\d+]/g, "");
+  const num = phone
+    ? (tel ? `<a href="tel:${escapeHtml(tel)}">${escapeHtml(phone)}</a>` : escapeHtml(phone))
+    : "";
+  return `<div class="stk-contact">
+      <span class="stk-contact-label">${escapeHtml(label)}</span>
+      <span class="stk-contact-name">${escapeHtml(name || "")}</span>
+      ${num ? `<span class="stk-contact-phone">${num}</span>` : ""}
+    </div>`;
+}
+
+const nameTel = (p) => [p && p.name, p && p.phone].filter(Boolean).join(", ");
+
+function renderJagdtag() {
+  const jt = window.PREYE_JAGDTAG;
+  if (!jt) return;
+  $("#ns-jagdtag-title").textContent = "Kontakte · " + jt.jagd;
+  const k = jt.nachsuchen_koordinator || {};
+  let html = contactLine("Nachsuchen-Koordinator", k.name, k.phone);
+  for (const nsf of jt.nachsuchenfuehrer || []) {
+    html += contactLine("Nachsuchenführer", nsf.name, nsf.phone);
+  }
+  const vet = jt.tierarzt || {};
+  html += contactLine("Tierarzt", vet.name, vet.phone);
+  $("#ns-jagdtag-contacts").innerHTML = html;
+  $("#ns-jagdtag").hidden = false;
+}
+
+// Die Meldezeilen unten im Protokoll vorbelegen — auch nach "Zurücksetzen",
+// denn die Kontakte gelten weiter, nur die Eingaben sind weg.
+function prefillJagdtag() {
+  const jt = window.PREYE_JAGDTAG;
+  if (!jt) return;
+  const meldung = $('[data-proto="meldung"]');
+  if (meldung && !meldung.value) meldung.value = nameTel(jt.nachsuchen_koordinator);
+  const nsf = $('[data-proto="nsf_name"]');
+  if (nsf && !nsf.value) nsf.value = (jt.nachsuchenfuehrer || []).map(nameTel).filter(Boolean).join(" · ");
+  const stand = $("#proto-free-stand");
+  if (stand && !stand.placeholder.includes(jt.revier)) {
+    stand.placeholder = "z.B. Kanzel 14 — " + jt.revier;
+  }
+}
+
 function resetSheet() {
   if (!confirm("Alle Eingaben verwerfen?")) return;
   const sheet = $("#protocol-sheet");
@@ -129,6 +182,7 @@ function resetSheet() {
   // Ohne das bliebe der Bogen von Stück II stehen, obwohl seine Wildart weg ist.
   if (wildFigures) wildFigures.refresh();
   if (sexButtons) sexButtons.clear();
+  prefillJagdtag();
   showToast("Zurückgesetzt");
 }
 
@@ -139,6 +193,8 @@ function wire() {
   wildFigures = wireWildFigures($("#protocol-sheet"), figures);
   sexButtons = wireSexButtons($("#protocol-sheet"));
   fillRangeSelects();
+  renderJagdtag();
+  prefillJagdtag();
   requestAnimationFrame(() => figures.forEach((f) => f.resize()));
   window.addEventListener("resize", () => figures.forEach((f) => f.resize()));
 
