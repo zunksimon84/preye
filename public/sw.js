@@ -11,7 +11,7 @@
 // this can't make the rest of the site behave oddly. Hunt data doesn't live
 // here either; standkarte.js caches that in localStorage itself.
 
-const CACHE = "preye-standkarte-v3";
+const CACHE = "preye-standkarte-v4";
 
 const SHELL = [
   "standkarte.html",
@@ -24,6 +24,9 @@ const SHELL = [
   // Jagdtag hinter den festen QR-Links (Blanko-Karte). Fehlt er offline,
   // wäre die Karte im Funkloch plötzlich leer.
   "jagdtag.js",
+  // Passwortsperre für die Jagd-Standkarte (die Blanko-Karte bleibt offen).
+  "gate.js",
+  "gate.css",
   "style.css",
   "config.js",
   "preye-mark.png",

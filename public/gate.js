@@ -5,18 +5,17 @@
 // Revieren und auf der Standkarte echte Revierdaten stehen, gehört sie an den
 // Anfang der App. Damit sie nicht ein drittes Mal kopiert wird, liegt sie hier.
 //
-// Bewusst offen bleiben zwei Seiten:
+// Bewusst offen bleiben:
 //   rsvp.html       — der eingeladene Jäger weist sich über seinen eigenen
 //                     Token im Link aus, das Backend lässt ihn ohne Passwort
 //                     durch (siehe rsvp-info / rsvp-respond in Code.gs).
 //   nachsuche.html  — leeres Anschussprotokoll, kein Backend, keine
 //                     Revierdaten. Das Ding muss im Wald aufgehen, auch wenn
 //                     sonst nichts geht.
-//   standkarte.html — der QR-Code in der Infomail führt direkt dorthin. Die
-//                     Jäger scannen ihn am Jagdtag auf dem Parkplatz; die
-//                     Karte hinter ein Passwort zu legen, das sie nicht haben,
-//                     würde den QR-Code wertlos machen. Der Link trägt die
-//                     Jagd-ID, ist also nicht zu erraten.
+//   standkarte.html?blanko=1 — die leere Standkarte, ohne Revierdaten. Auf
+//                     sie zeigen die gedruckten QR-Codes. Die Standkarte einer
+//                     Jagd (mit Treiben, Ständen, Jägern) liegt dagegen hinter
+//                     der Sperre; standkarte.js ruft pass() selbst auf.
 //
 // Solange die Seite öffentlich geschaltet ist (Script Property site_mode ≠
 // "private"), tut das Modul nichts — die Maske erscheint erst, wenn im Sheet

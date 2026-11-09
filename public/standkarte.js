@@ -924,7 +924,9 @@ async function resetToEventPicker() {
 }
 
 function wireUi() {
-  $("#stk-switch").addEventListener("click", () => {
+  $("#stk-switch").addEventListener("click", async () => {
+    // Von der offenen Blanko-Karte zu den Jagden: hier liegt die Sperre.
+    if (state.blank) await passGate();
     state.blank = false;
     document.body.classList.remove("stk-blanko");
     $("#stk-switch").textContent = "Jagd wechseln";
@@ -1052,6 +1054,13 @@ function wireUi() {
   });
 }
 
+// Passwortsperre (gate.js). Ist die Seite öffentlich geschaltet oder der
+// Server nicht erreichbar, geht es sofort weiter. Nach der Eingabe liegt der
+// Token in localStorage, backendUrl() nimmt ihn beim nächsten Abruf mit.
+async function passGate() {
+  if (window.PreyeGate) await window.PreyeGate.pass();
+}
+
 async function main() {
   wireUi();
   window.addEventListener("online", renderOfflineNote);
@@ -1072,6 +1081,9 @@ async function main() {
     renderBlankCard();
     return;
   }
+
+  // Die Blanko-Karte ist öffentlich, alles mit Jagddaten nicht.
+  await passGate();
 
   if (wantEvent) {
     await selectEvent(wantEvent);
