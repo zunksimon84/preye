@@ -288,7 +288,7 @@ function renderMine() {
 // ---------- Beobachtungsliste ----------
 
 function listKey() {
-  if (state.blank) return "preye.stk.list.blanko";
+  if (state.blank) return "preye.stk.list.blanko" + jagdtagSuffix();
   return "preye.stk.list." + (state.detail.event.id || "x") + "." + (state.me || "anon");
 }
 
@@ -324,7 +324,7 @@ const JE_FLAGS = {
 };
 
 function jeKey() {
-  if (state.blank) return "preye.stk.einrichtung.blanko";
+  if (state.blank) return "preye.stk.einrichtung.blanko" + jagdtagSuffix();
   return "preye.stk.einrichtung." + (state.detail.event.id || "x") + "." + (state.me || "anon");
 }
 
@@ -588,8 +588,31 @@ function renderOfflineNote() {
 
 const BLANK_KEY = "preye.stk.blanko.v1";
 
+// Mit Jagdtag hat jede Jagd ihren eigenen Speicher. Sonst stünden am nächsten
+// Jagdtag die Sichtungen und der Stand vom letzten noch drin — und gingen per
+// SMS mit raus. Ohne Jagdtag bleibt alles beim alten Schlüssel.
+function jagdtagSuffix() {
+  const jt = jagdtag();
+  return jt && jt.datum ? "." + jt.datum : "";
+}
+
+function blankKey() {
+  return BLANK_KEY + jagdtagSuffix();
+}
+
+function readJson(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
+}
+
 function blankData() {
-  try { return JSON.parse(localStorage.getItem(BLANK_KEY) || "{}"); } catch { return {}; }
+  const d = readJson(blankKey());
+  // Neuer Jagdtag, noch nichts eingetragen: den Namen von der letzten Karte
+  // übernehmen — der ändert sich nicht, Stand und Runde schon.
+  if (jagdtagSuffix() && !Object.keys(d).length) {
+    const name = readJson(BLANK_KEY).name;
+    if (name) return { name };
+  }
+  return d;
 }
 
 function saveBlank() {
@@ -597,7 +620,13 @@ function saveBlank() {
   // no Jagd/Datum inputs) keep their values.
   const out = blankData();
   $$("[data-blank]").forEach((el) => { out[el.dataset.blank] = el.value; });
-  try { localStorage.setItem(BLANK_KEY, JSON.stringify(out)); } catch {}
+  try { localStorage.setItem(blankKey(), JSON.stringify(out)); } catch {}
+  // Den Namen auch unter dem alten Schlüssel merken, für den nächsten Jagdtag.
+  if (jagdtagSuffix() && out.name) {
+    const base = readJson(BLANK_KEY);
+    base.name = out.name;
+    try { localStorage.setItem(BLANK_KEY, JSON.stringify(base)); } catch {}
+  }
   // With a Jagdtag the heading is fixed and must not be overwritten by the
   // (absent) jagd/datum fields.
   if (jagdtag()) return;
@@ -986,7 +1015,7 @@ function wireUi() {
     try { localStorage.removeItem(listKey()); } catch {}
     if (state.blank) {
       // Dort heißt der Knopf "alle Eingaben leeren", also auch die Rubrik.
-      try { localStorage.removeItem(BLANK_KEY); } catch {}
+      try { localStorage.removeItem(blankKey()); } catch {}
       try { localStorage.removeItem(jeKey()); } catch {}
       renderBlankCard();
       showToast("Zurückgesetzt");

@@ -11,7 +11,7 @@
 // this can't make the rest of the site behave oddly. Hunt data doesn't live
 // here either; standkarte.js caches that in localStorage itself.
 
-const CACHE = "preye-standkarte-v4";
+const CACHE = "preye-standkarte-v5";
 
 const SHELL = [
   "standkarte.html",
